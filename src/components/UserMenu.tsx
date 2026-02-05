@@ -40,8 +40,9 @@ export function UserMenu() {
         <User className="h-4 w-4 text-muted-foreground" />
         <span className="max-w-[150px] truncate">{user.email}</span>
       </div>
-      <Button variant="ghost" size="icon-sm" onClick={signOut} title="Sign out">
-        <LogOut className="h-4 w-4" />
+      <Button variant="outline" size="sm" onClick={signOut}>
+        <LogOut className="h-4 w-4 mr-1" />
+        Sign out
       </Button>
     </div>
   );
