@@ -23,9 +23,7 @@ export interface Theme {
 }
 
 export interface SummaryContext {
-  who: 'myself' | 'someone-else' | 'group';
-  whatMatters: string;
-  why: string;
+  extractionGoal: string;
   additionalContext?: string;
 }
 
@@ -34,22 +32,15 @@ export async function generateSummary(
   context: SummaryContext,
   mode: 'combined' | 'separate'
 ): Promise<string[]> {
-  const recipientDescription =
-    context.who === 'myself'
-      ? 'yourself'
-      : context.who === 'someone-else'
-        ? 'another person'
-        : 'a group of people';
-
   if (mode === 'combined' || transcripts.length === 1) {
     const combinedTranscript = transcripts.join('\n\n---\n\n');
-    const summary = await summarizeSingle(combinedTranscript, context, recipientDescription);
+    const summary = await summarizeSingle(combinedTranscript, context);
     return [summary];
   }
 
   // Separate summaries
   const summaries = await Promise.all(
-    transcripts.map((transcript) => summarizeSingle(transcript, context, recipientDescription))
+    transcripts.map((transcript) => summarizeSingle(transcript, context))
   );
 
   return summaries;
@@ -57,10 +48,9 @@ export async function generateSummary(
 
 async function summarizeSingle(
   transcript: string,
-  context: SummaryContext,
-  recipientDescription: string
+  context: SummaryContext
 ): Promise<string> {
-  const userMessage = buildUserMessage(transcript, context, recipientDescription);
+  const userMessage = buildUserMessage(transcript, context);
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -79,14 +69,11 @@ async function summarizeSingle(
 
 function buildUserMessage(
   transcript: string,
-  context: SummaryContext,
-  recipientDescription: string
+  context: SummaryContext
 ): string {
-  let message = `Create a summary of this meeting transcript for ${recipientDescription}.
+  let message = `Create a summary of this meeting transcript.
 
-**What matters to them:** ${context.whatMatters}
-
-**Purpose of this summary:** ${context.why}`;
+**What to extract:** ${context.extractionGoal}`;
 
   if (context.additionalContext) {
     message += `\n\n**Additional context:** ${context.additionalContext}`;
@@ -166,9 +153,8 @@ export async function extractThemes(
 ): Promise<Theme[]> {
   const userMessage = `Identify the abstract conceptual themes in this meeting transcript.
 
-**What matters to the recipient:** ${context.whatMatters}
-
-**Purpose:** ${context.why}
+**What the user wants to extract:** ${context.extractionGoal}
+${context.additionalContext ? `\n**Additional context:** ${context.additionalContext}` : ''}
 
 Filter themes to focus on what's relevant to these concerns.
 

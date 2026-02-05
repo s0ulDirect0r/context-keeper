@@ -68,22 +68,28 @@ export function SummaryViewSaved({ summary }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-2">
-            <p>
-              <span className="font-medium">Audience: </span>
-              {summary.context.who === 'myself'
-                ? 'Yourself'
-                : summary.context.who === 'someone-else'
-                  ? 'Someone else'
-                  : 'A group'}
-            </p>
-            <p>
-              <span className="font-medium">What matters: </span>
-              {summary.context.whatMatters}
-            </p>
-            <p>
-              <span className="font-medium">Purpose: </span>
-              {summary.context.why}
-            </p>
+            {/* Handle both new format (extractionGoal) and old format (whatMatters/why) */}
+            {summary.context.extractionGoal ? (
+              <p>
+                <span className="font-medium">What to extract: </span>
+                {summary.context.extractionGoal}
+              </p>
+            ) : (
+              <>
+                {'whatMatters' in summary.context && (
+                  <p>
+                    <span className="font-medium">What matters: </span>
+                    {(summary.context as unknown as { whatMatters: string }).whatMatters}
+                  </p>
+                )}
+                {'why' in summary.context && (
+                  <p>
+                    <span className="font-medium">Purpose: </span>
+                    {(summary.context as unknown as { why: string }).why}
+                  </p>
+                )}
+              </>
+            )}
             {summary.context.additionalContext && (
               <p>
                 <span className="font-medium">Additional context: </span>

@@ -11,14 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'At least one transcript required' }, { status: 400 });
     }
 
-    if (!context?.who || !context?.whatMatters || !context?.why) {
-      return NextResponse.json({ error: 'Context (who, whatMatters, why) required' }, { status: 400 });
+    if (!context?.extractionGoal) {
+      return NextResponse.json({ error: 'Context (extractionGoal) required' }, { status: 400 });
     }
 
     const summaryContext: SummaryContext = {
-      who: context.who,
-      whatMatters: context.whatMatters,
-      why: context.why,
+      extractionGoal: context.extractionGoal,
       additionalContext: context.additionalContext,
     };
 
