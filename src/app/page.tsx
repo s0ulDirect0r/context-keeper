@@ -281,6 +281,16 @@ export default function Home() {
     setError(null);
   };
 
+  const handleDisconnectOtter = async () => {
+    if (user) {
+      const supabase = createClient();
+      await supabase.from('otter_connections').delete().eq('user_id', user.id);
+    } else {
+      clearSession();
+    }
+    setOtterSession(null);
+  };
+
   const goBack = (to: Step) => {
     setError(null);
     setStep(to);
@@ -302,7 +312,13 @@ export default function Home() {
           </div>
         )}
 
-        {step === 'choose-method' && <InputMethodPicker onSelect={handleMethodSelect} />}
+        {step === 'choose-method' && (
+          <InputMethodPicker
+            onSelect={handleMethodSelect}
+            connectedOtterEmail={otterSession?.email}
+            onDisconnectOtter={handleDisconnectOtter}
+          />
+        )}
 
         {step === 'otter-login' && (
           <OtterLogin
@@ -316,7 +332,7 @@ export default function Home() {
           <RecordingList
             recordings={recordings}
             onSelect={handleRecordingSelect}
-            onBack={() => goBack('otter-login')}
+            onBack={() => goBack('choose-method')}
             loading={loadingRecordings}
           />
         )}
