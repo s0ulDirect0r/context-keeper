@@ -25,12 +25,16 @@ export function ThemeBubbles({ themes }: Props) {
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Assign a consistent random color to each theme based on its id
+  // Assign a deterministic color to each theme based on its id
   const themeColors = useMemo(() => {
     const colors: Record<string, string> = {};
-    const shuffled = [...THEME_COLORS].sort(() => Math.random() - 0.5);
-    themes.forEach((theme, index) => {
-      colors[theme.id] = shuffled[index % shuffled.length];
+    themes.forEach((theme) => {
+      // Simple hash of theme id to get consistent color index
+      let hash = 0;
+      for (let i = 0; i < theme.id.length; i++) {
+        hash = (hash * 31 + theme.id.charCodeAt(i)) >>> 0;
+      }
+      colors[theme.id] = THEME_COLORS[hash % THEME_COLORS.length];
     });
     return colors;
   }, [themes]);
