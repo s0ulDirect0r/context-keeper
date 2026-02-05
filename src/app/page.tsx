@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { UserMenu } from '@/components/UserMenu';
 import { InputMethodPicker } from '@/components/InputMethodPicker';
@@ -11,7 +11,11 @@ import { ContextWizard } from '@/components/ContextWizard';
 import { SummaryModeSelector } from '@/components/SummaryModeSelector';
 import { SummaryView } from '@/components/SummaryView';
 import { LoadingState } from '@/components/LoadingState';
+import { createClient } from '@/lib/supabase/client';
+import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
+
+type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
 import type { SummaryContext, Theme } from '@/lib/claude';
 import {
   getStoredSession,
@@ -34,9 +38,7 @@ export default function Home() {
   const { user } = useAuth();
   const [step, setStep] = useState<Step>('choose-method');
   const [inputMethod, setInputMethod] = useState<'otter' | 'manual' | null>(null);
-  const [otterSession, setOtterSession] = useState<StoredOtterSession | null>(
-    () => getStoredSession()
-  );
+  const [otterSession, setOtterSession] = useState<StoredOtterSession | null>(null);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [transcripts, setTranscripts] = useState<string[]>([]);
   const [context, setContext] = useState<SummaryContext | null>(null);
@@ -46,6 +48,44 @@ export default function Home() {
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load Otter connection based on auth state
+  // Logged in: Supabase is source of truth
+  // Guest: localStorage is source of truth
+  useEffect(() => {
+    const loadOtterConnection = async () => {
+      if (user) {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('otter_connections')
+          .select('*')
+          .single();
+
+        if (error) {
+          // PGRST116 = no rows found, which is fine
+          if (error.code !== 'PGRST116') {
+            console.error('Failed to load Otter connection:', error);
+          }
+          return;
+        }
+
+        const row = data as OtterConnectionRow;
+        if (row) {
+          setOtterSession({
+            email: row.otter_email,
+            userId: row.otter_user_id,
+            cookies: row.cookies,
+            csrfToken: row.csrf_token ?? undefined,
+          });
+        }
+      } else {
+        // Guest mode: use localStorage
+        setOtterSession(getStoredSession());
+      }
+    };
+
+    loadOtterConnection();
+  }, [user]);
 
   const handleMethodSelect = async (method: 'otter' | 'manual') => {
     setInputMethod(method);
@@ -81,9 +121,25 @@ export default function Home() {
       csrfToken: data.csrfToken,
     };
 
-    if (remember) {
+    // Save Otter connection based on auth state
+    if (user) {
+      // Logged in: save to Supabase
+      const supabase = createClient();
+      const { error } = await supabase.from('otter_connections').upsert({
+        user_id: user.id,
+        otter_email: email,
+        otter_user_id: data.userId,
+        cookies: data.cookies,
+        csrf_token: data.csrfToken,
+      });
+      if (error) {
+        console.error('Failed to save Otter connection:', error);
+      }
+    } else if (remember) {
+      // Guest mode: save to localStorage if "remember me" checked
       storeSession(session);
     }
+
     setOtterSession(session);
     await fetchRecordings(session);
   };

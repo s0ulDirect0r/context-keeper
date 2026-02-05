@@ -44,6 +44,39 @@ export interface Database {
         };
         Relationships: [];
       };
+      otter_connections: {
+        Row: {
+          id: string;
+          user_id: string;
+          otter_email: string;
+          otter_user_id: string;
+          cookies: string;
+          csrf_token: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          otter_email: string;
+          otter_user_id: string;
+          cookies: string;
+          csrf_token?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          otter_email?: string;
+          otter_user_id?: string;
+          cookies?: string;
+          csrf_token?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
