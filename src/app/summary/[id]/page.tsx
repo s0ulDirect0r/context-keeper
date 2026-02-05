@@ -35,30 +35,28 @@ export default async function SummaryPage({ params }: Props) {
   const summary = toSavedSummary(row as SummaryRow);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-3xl mx-auto">
-          <div className="mb-6">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-            </Link>
-          </div>
-
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold">{summary.title}</h1>
-            <p className="text-muted-foreground mt-1">
-              {new Intl.DateTimeFormat('en-US', {
-                dateStyle: 'long',
-                timeStyle: 'short',
-              }).format(summary.createdAt)}
-            </p>
-          </div>
-
-          <SummaryViewSaved summary={summary} />
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-6">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
         </div>
+
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">{summary.title}</h1>
+          <p className="text-muted-foreground mt-1">
+            {new Intl.DateTimeFormat('en-US', {
+              dateStyle: 'long',
+              timeStyle: 'short',
+            }).format(summary.createdAt)}
+          </p>
+        </div>
+
+        <SummaryViewSaved summary={summary} />
       </div>
     </div>
   );

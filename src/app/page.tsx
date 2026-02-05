@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { UserMenu } from '@/components/UserMenu';
 import { InputMethodPicker } from '@/components/InputMethodPicker';
 import { OtterLogin } from '@/components/OtterLogin';
 import { RecordingList } from '@/components/RecordingList';
@@ -297,15 +296,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <h1 className="font-semibold text-lg">Context Keeper</h1>
-          <UserMenu />
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-12">
+    <main className="container mx-auto px-4 py-12">
         {error && (
           <div className="max-w-2xl mx-auto mb-6 rounded-md bg-red-50 dark:bg-red-950 p-4 text-red-800 dark:text-red-200">
             {error}
@@ -372,6 +363,5 @@ export default function Home() {
           />
         )}
       </main>
-    </div>
   );
 }

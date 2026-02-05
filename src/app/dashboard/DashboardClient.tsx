@@ -8,7 +8,7 @@ import type { SavedSummary } from '@/lib/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Trash2, Home, FileText } from 'lucide-react';
+import { Search, Trash2, FileText } from 'lucide-react';
 
 interface DashboardClientProps {
   initialSummaries: SavedSummary[];
@@ -55,22 +55,13 @@ export function DashboardClient({ initialSummaries }: DashboardClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Your Summaries</h1>
-            <p className="text-muted-foreground mt-1">
-              {summaries.length} saved {summaries.length === 1 ? 'summary' : 'summaries'}
-            </p>
-          </div>
-          <Link href="/">
-            <Button variant="outline">
-              <Home className="h-4 w-4 mr-2" />
-              New Summary
-            </Button>
-          </Link>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Your Summaries</h1>
+        <p className="text-muted-foreground mt-1">
+          {summaries.length} saved {summaries.length === 1 ? 'summary' : 'summaries'}
+        </p>
+      </div>
 
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -160,6 +151,5 @@ export function DashboardClient({ initialSummaries }: DashboardClientProps) {
           </div>
         )}
       </div>
-    </div>
   );
 }
