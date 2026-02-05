@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Markdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -48,8 +49,8 @@ export function SummaryView({ summaries, onStartOver }: Props) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-              {summary}
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <Markdown>{summary}</Markdown>
             </div>
           </CardContent>
         </Card>
