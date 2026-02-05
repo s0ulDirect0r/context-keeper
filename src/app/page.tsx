@@ -53,6 +53,9 @@ export default function Home() {
   // Guest: localStorage is source of truth
   useEffect(() => {
     const loadOtterConnection = async () => {
+      // Clear existing state first to avoid stale data
+      setOtterSession(null);
+
       if (user) {
         const supabase = createClient();
         const { data, error } = await supabase
