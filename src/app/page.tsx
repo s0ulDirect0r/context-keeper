@@ -10,7 +10,7 @@ import { SummaryModeSelector } from '@/components/SummaryModeSelector';
 import { SummaryView } from '@/components/SummaryView';
 import { LoadingState } from '@/components/LoadingState';
 import type { Recording } from '@/lib/otter';
-import type { SummaryContext } from '@/lib/claude';
+import type { SummaryContext, Theme } from '@/lib/claude';
 import {
   getStoredSession,
   storeSession,
@@ -39,6 +39,7 @@ export default function Home() {
   const [context, setContext] = useState<SummaryContext | null>(null);
   const [summaryMode, setSummaryMode] = useState<'combined' | 'separate'>('combined');
   const [summaries, setSummaries] = useState<string[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -197,6 +198,7 @@ export default function Home() {
       }
 
       setSummaries(data.summaries);
+      setThemes(data.themes || []);
       setStep('summary');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary');
@@ -211,6 +213,7 @@ export default function Home() {
     setTranscripts([]);
     setContext(null);
     setSummaries([]);
+    setThemes([]);
     setError(null);
   };
 
@@ -274,7 +277,7 @@ export default function Home() {
         {step === 'generating' && <LoadingState />}
 
         {step === 'summary' && (
-          <SummaryView summaries={summaries} onStartOver={handleStartOver} />
+          <SummaryView summaries={summaries} themes={themes} onStartOver={handleStartOver} />
         )}
       </main>
     </div>

@@ -4,13 +4,16 @@ import { useState } from 'react';
 import Markdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ThemeBubbles } from './ThemeBubbles';
+import type { Theme } from '@/lib/claude';
 
 interface Props {
   summaries: string[];
+  themes: Theme[];
   onStartOver: () => void;
 }
 
-export function SummaryView({ summaries, onStartOver }: Props) {
+export function SummaryView({ summaries, themes, onStartOver }: Props) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -31,6 +34,15 @@ export function SummaryView({ summaries, onStartOver }: Props) {
           Copy and paste into WhatsApp, email, or anywhere else
         </p>
       </div>
+
+      {themes.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-center text-sm text-muted-foreground">
+            Key themes (click to see quotes)
+          </p>
+          <ThemeBubbles themes={themes} />
+        </div>
+      )}
 
       {summaries.map((summary, index) => (
         <Card key={index}>

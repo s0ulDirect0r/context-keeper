@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { generateSummary, type SummaryContext } from '@/lib/claude';
+import { generateSummary, extractThemes, type SummaryContext } from '@/lib/claude';
 
 export async function POST(request: Request) {
   try {
@@ -22,9 +22,16 @@ export async function POST(request: Request) {
 
     const summaryMode = mode === 'separate' ? 'separate' : 'combined';
 
-    const summaries = await generateSummary(transcripts, summaryContext, summaryMode);
+    // Combine transcripts for theme extraction (always analyze all content together)
+    const combinedTranscript = transcripts.join('\n\n---\n\n');
 
-    return NextResponse.json({ summaries });
+    // Run summary generation and theme extraction in parallel
+    const [summaries, themes] = await Promise.all([
+      generateSummary(transcripts, summaryContext, summaryMode),
+      extractThemes(combinedTranscript, summaryContext),
+    ]);
+
+    return NextResponse.json({ summaries, themes });
   } catch (error) {
     console.error('Summary generation error:', error);
     const message = error instanceof Error ? error.message : 'Failed to generate summary';
