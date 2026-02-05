@@ -1,23 +1,61 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Markdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeBubbles } from './ThemeBubbles';
-import { Check } from 'lucide-react';
-import type { Theme } from '@/lib/claude';
+import { AuthDialog } from './AuthDialog';
+import { Check, Loader2 } from 'lucide-react';
+import { useAuth } from './AuthProvider';
+import type { Theme, SummaryContext } from '@/lib/claude';
 
 interface Props {
   summaries: string[];
   themes: Theme[];
+  context: SummaryContext | null;
   onStartOver: () => void;
   savedSummaryId?: string | null;
+  onSaved?: (id: string) => void;
 }
 
-export function SummaryView({ summaries, themes, onStartOver, savedSummaryId }: Props) {
+export function SummaryView({ summaries, themes, context, onStartOver, savedSummaryId, onSaved }: Props) {
+  const { user } = useAuth();
+  const router = useRouter();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [pendingSave, setPendingSave] = useState(false);
+
+  // When user signs in and we have a pending save, save the summary and redirect
+  useEffect(() => {
+    if (user && pendingSave && !savedSummaryId && context) {
+      setSaving(true);
+      fetch('/api/summaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summaries, themes, context }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.savedSummaryId) {
+            onSaved?.(data.savedSummaryId);
+            router.push(`/summary/${data.savedSummaryId}`);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to save summary:', err);
+          setSaving(false);
+          setPendingSave(false);
+        });
+    }
+  }, [user, pendingSave, savedSummaryId, summaries, themes, context, onSaved, router]);
+
+  const handleSignUpToSave = () => {
+    setPendingSave(true);
+    setAuthDialogOpen(true);
+  };
 
   const copyToClipboard = async (text: string, index: number) => {
     try {
@@ -36,16 +74,23 @@ export function SummaryView({ summaries, themes, onStartOver, savedSummaryId }: 
         <p className="text-muted-foreground mt-1">
           Copy and paste into WhatsApp, email, or anywhere else
         </p>
-        {savedSummaryId && (
+        {saving && (
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Saving to your library...</span>
+          </div>
+        )}
+        {savedSummaryId && !saving && (
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-sm">
             <Check className="h-4 w-4" />
             <span>Saved to your library</span>
-            <Link
-              href={`/summary/${savedSummaryId}`}
-              className="underline underline-offset-2 hover:text-green-900 dark:hover:text-green-100"
-            >
-              View
-            </Link>
+          </div>
+        )}
+        {!user && !savedSummaryId && !saving && (
+          <div className="mt-4">
+            <Button variant="outline" size="sm" onClick={handleSignUpToSave}>
+              Sign up to save this summary
+            </Button>
           </div>
         )}
       </div>
@@ -88,6 +133,8 @@ export function SummaryView({ summaries, themes, onStartOver, savedSummaryId }: 
           Create another summary
         </Button>
       </div>
+
+      <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
     </div>
   );
 }
