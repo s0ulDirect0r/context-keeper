@@ -1,19 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import Markdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeBubbles } from './ThemeBubbles';
+import { Check } from 'lucide-react';
 import type { Theme } from '@/lib/claude';
 
 interface Props {
   summaries: string[];
   themes: Theme[];
   onStartOver: () => void;
+  savedSummaryId?: string | null;
 }
 
-export function SummaryView({ summaries, themes, onStartOver }: Props) {
+export function SummaryView({ summaries, themes, onStartOver, savedSummaryId }: Props) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -33,6 +36,18 @@ export function SummaryView({ summaries, themes, onStartOver }: Props) {
         <p className="text-muted-foreground mt-1">
           Copy and paste into WhatsApp, email, or anywhere else
         </p>
+        {savedSummaryId && (
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-sm">
+            <Check className="h-4 w-4" />
+            <span>Saved to your library</span>
+            <Link
+              href={`/summary/${savedSummaryId}`}
+              className="underline underline-offset-2 hover:text-green-900 dark:hover:text-green-100"
+            >
+              View
+            </Link>
+          </div>
+        )}
       </div>
 
       {themes.length > 0 && (

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
+import { UserMenu } from '@/components/UserMenu';
 import { InputMethodPicker } from '@/components/InputMethodPicker';
 import { OtterLogin } from '@/components/OtterLogin';
 import { RecordingList } from '@/components/RecordingList';
@@ -29,6 +31,7 @@ type Step =
   | 'summary';
 
 export default function Home() {
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>('choose-method');
   const [inputMethod, setInputMethod] = useState<'otter' | 'manual' | null>(null);
   const [otterSession, setOtterSession] = useState<StoredOtterSession | null>(
@@ -40,6 +43,7 @@ export default function Home() {
   const [summaryMode, setSummaryMode] = useState<'combined' | 'separate'>('combined');
   const [summaries, setSummaries] = useState<string[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -180,6 +184,7 @@ export default function Home() {
   const generateSummary = async (ctx: SummaryContext, mode: 'combined' | 'separate') => {
     setStep('generating');
     setError(null);
+    setSavedSummaryId(null);
 
     try {
       const response = await fetch('/api/summarize', {
@@ -189,6 +194,7 @@ export default function Home() {
           transcripts,
           context: ctx,
           mode,
+          save: !!user,
         }),
       });
 
@@ -199,6 +205,7 @@ export default function Home() {
 
       setSummaries(data.summaries);
       setThemes(data.themes || []);
+      setSavedSummaryId(data.savedSummaryId || null);
       setStep('summary');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary');
@@ -214,6 +221,7 @@ export default function Home() {
     setContext(null);
     setSummaries([]);
     setThemes([]);
+    setSavedSummaryId(null);
     setError(null);
   };
 
@@ -224,6 +232,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      <header className="border-b">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <h1 className="font-semibold text-lg">Context Keeper</h1>
+          <UserMenu />
+        </div>
+      </header>
+
       <main className="container mx-auto px-4 py-12">
         {error && (
           <div className="max-w-2xl mx-auto mb-6 rounded-md bg-red-50 dark:bg-red-950 p-4 text-red-800 dark:text-red-200">
@@ -277,7 +292,12 @@ export default function Home() {
         {step === 'generating' && <LoadingState />}
 
         {step === 'summary' && (
-          <SummaryView summaries={summaries} themes={themes} onStartOver={handleStartOver} />
+          <SummaryView
+            summaries={summaries}
+            themes={themes}
+            onStartOver={handleStartOver}
+            savedSummaryId={savedSummaryId}
+          />
         )}
       </main>
     </div>

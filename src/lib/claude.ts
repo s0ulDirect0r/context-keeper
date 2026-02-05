@@ -127,6 +127,39 @@ Rules:
 - Each theme needs 2-5 supporting quotes
 - Focus on themes relevant to what the recipient cares about`;
 
+const TITLE_GENERATION_PROMPT = `Generate a punchy, memorable 2-5 word title for a meeting summary.
+
+The title should:
+- Be catchy and evocative (like a news headline or book chapter title)
+- Capture the essence or key conflict/topic of the meeting
+- NOT be generic (avoid "Team Meeting", "Weekly Sync", "Project Update")
+
+Good examples: "The Budget Showdown", "Alignment Crisis", "Launch Day Panic", "The Pivot Decision", "Hiring Debate"
+Bad examples: "Meeting Notes", "Summary of Discussion", "Team Call", "Q2 Planning"
+
+Respond with ONLY the title, no quotes or explanation.`;
+
+export async function generateTitle(summaryText: string): Promise<string> {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 50,
+    system: TITLE_GENERATION_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Generate a title for this meeting summary:\n\n${summaryText.slice(0, 2000)}`,
+      },
+    ],
+  });
+
+  const textBlock = response.content.find((block) => block.type === 'text');
+  if (!textBlock || textBlock.type !== 'text') {
+    return 'Meeting Summary';
+  }
+
+  return textBlock.text.trim().replace(/^["']|["']$/g, '');
+}
+
 export async function extractThemes(
   transcript: string,
   context: SummaryContext
