@@ -9,7 +9,7 @@ import { ThemeBubbles } from './ThemeBubbles';
 import { AuthDialog } from './AuthDialog';
 import { Check, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
-import { markdownToPlainText } from '@/lib/utils';
+import { copyRichText } from '@/lib/utils';
 import type { Theme, SummaryContext } from '@/lib/claude';
 
 interface Props {
@@ -60,8 +60,7 @@ export function SummaryView({ summaries, themes, context, onStartOver, savedSumm
 
   const copyToClipboard = async (text: string, index: number) => {
     try {
-      const plainText = markdownToPlainText(text);
-      await navigator.clipboard.writeText(plainText);
+      await copyRichText(text);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {

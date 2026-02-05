@@ -1,35 +1,32 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { marked } from "marked"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 /**
- * Convert markdown to plain text by stripping syntax
+ * Copy text with both HTML (for rich paste) and plain text (fallback)
  */
-export function markdownToPlainText(markdown: string): string {
-  return markdown
-    // Remove headers but keep text
-    .replace(/^#{1,6}\s+(.*)$/gm, '$1')
-    // Remove bold/italic
+export async function copyRichText(markdown: string): Promise<void> {
+  const html = await marked(markdown);
+  const plainText = markdown
     .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/\*(.+?)\*/g, '$1')
-    .replace(/___(.+?)___/g, '$1')
-    .replace(/__(.+?)__/g, '$1')
-    .replace(/_(.+?)_/g, '$1')
-    // Remove inline code
-    .replace(/`(.+?)`/g, '$1')
-    // Remove links but keep text
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-    // Remove images
-    .replace(/!\[.*?\]\(.+?\)/g, '')
-    // Convert bullet points to dashes
-    .replace(/^\s*[\*\-]\s+/gm, '- ')
-    // Remove horizontal rules
-    .replace(/^[-*_]{3,}$/gm, '')
-    // Trim extra whitespace
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1');
+
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plainText], { type: 'text/plain' }),
+      }),
+    ]);
+  } catch {
+    // Fallback for browsers that don't support ClipboardItem
+    await navigator.clipboard.writeText(plainText);
+  }
 }
