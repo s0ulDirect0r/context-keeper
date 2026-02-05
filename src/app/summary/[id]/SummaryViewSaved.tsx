@@ -6,6 +6,7 @@ import type { SavedSummary } from '@/lib/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeBubbles } from '@/components/ThemeBubbles';
+import { markdownToPlainText } from '@/lib/utils';
 
 interface Props {
   summary: SavedSummary;
@@ -16,7 +17,8 @@ export function SummaryViewSaved({ summary }: Props) {
 
   const copyToClipboard = async (text: string, index: number) => {
     try {
-      await navigator.clipboard.writeText(text);
+      const plainText = markdownToPlainText(text);
+      await navigator.clipboard.writeText(plainText);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {
