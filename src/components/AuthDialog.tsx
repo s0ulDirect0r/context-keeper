@@ -13,15 +13,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type AuthMode = 'sign-in' | 'sign-up' | 'magic-link' | 'check-email';
+export type AuthMode = 'sign-in' | 'sign-up' | 'magic-link' | 'check-email';
 
 interface AuthDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialMode?: AuthMode;
 }
 
-export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
-  const [mode, setMode] = useState<AuthMode>('sign-in');
+export function AuthDialog({ open, onOpenChange, initialMode = 'sign-in' }: AuthDialogProps) {
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -112,7 +113,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setEmail('');
     setPassword('');
     setError(null);
-    setMode('sign-in');
+    setMode(initialMode);
   };
 
   const handleOpenChange = (open: boolean) => {

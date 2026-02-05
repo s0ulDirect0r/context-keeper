@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { useAppMode } from '@/components/AppModeProvider';
 import { AuthDialog } from '@/components/AuthDialog';
 import { Button } from '@/components/ui/button';
 import { Plus, LayoutDashboard, LogOut } from 'lucide-react';
@@ -11,8 +12,14 @@ import { cn } from '@/lib/utils';
 
 export function NavBar() {
   const { user, loading, signOut } = useAuth();
+  const { isAppMode } = useAppMode();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const pathname = usePathname();
+
+  // Hide nav on landing page for non-authenticated users (unless they're in app mode)
+  if (!user && !loading && pathname === '/' && !isAppMode) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -67,8 +74,11 @@ export function NavBar() {
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={() => setAuthDialogOpen(true)}>
+              <Button variant="ghost" size="sm" onClick={() => setAuthDialogOpen(true)}>
                 Sign in
+              </Button>
+              <Button size="sm" onClick={() => setAuthDialogOpen(true)}>
+                Sign up
               </Button>
               <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
             </>
