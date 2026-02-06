@@ -1,4 +1,5 @@
 import type { SummaryContext, Theme, Speaker } from '@/lib/claude';
+import type { SummaryContent } from '@/lib/summary-types';
 
 export type Json =
   | string
@@ -100,7 +101,7 @@ export interface Database {
 export interface SavedSummary {
   id: string;
   title: string;
-  summaries: string[];
+  summaries: SummaryContent;
   themes: Theme[];
   context: SummaryContext;
   transcripts: string[] | null;
@@ -115,7 +116,7 @@ export function toSavedSummary(row: Database['public']['Tables']['summaries']['R
   return {
     id: row.id,
     title: row.title,
-    summaries: row.summaries as unknown as string[],
+    summaries: row.summaries as unknown as SummaryContent,
     themes: row.themes as unknown as Theme[],
     context: row.context as unknown as SummaryContext,
     transcripts: (row.transcripts as unknown as string[] | null) ?? null,
