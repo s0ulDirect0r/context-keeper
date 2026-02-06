@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateSummary, extractThemes, extractSpeakers, type SummaryContext } from '@/lib/claude';
+import { isStructuredSummary } from '@/lib/summary-types';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -50,7 +51,11 @@ export async function POST(request: Request) {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        const title = deriveTitle(recordingTitles);
+        // Use recording titles if available, otherwise pull AI-generated title from structured summary
+        let title = deriveTitle(recordingTitles);
+        if (title === 'Untitled Summary' && isStructuredSummary(summaries) && summaries[0].title) {
+          title = summaries[0].title;
+        }
 
         const insertData: Database['public']['Tables']['summaries']['Insert'] = {
           user_id: user.id,
