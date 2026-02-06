@@ -46,16 +46,6 @@ export default async function SummaryPage({ params }: Props) {
           </Link>
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">{summary.title}</h1>
-          <p className="text-muted-foreground mt-1">
-            {new Intl.DateTimeFormat('en-US', {
-              dateStyle: 'long',
-              timeStyle: 'short',
-            }).format(summary.createdAt)}
-          </p>
-        </div>
-
         <SummaryViewSaved summary={summary} />
       </div>
     </div>
