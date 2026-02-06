@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { SummaryViewSaved } from '@/app/summary/[id]/SummaryViewSaved';
 import type { SavedSummary } from '@/lib/supabase/types';
 import type { SummaryContext, Theme, Speaker } from '@/lib/claude';
+import type { SummaryContent } from '@/lib/summary-types';
 
 interface Props {
   params: Promise<{ token: string }>;
@@ -28,7 +29,7 @@ export default async function SharedSummaryPage({ params }: Props) {
   const summary: SavedSummary = {
     id: row.id,
     title: row.title,
-    summaries: row.summaries as unknown as string[],
+    summaries: row.summaries as unknown as SummaryContent,
     themes: (row.themes as unknown as Theme[]) || [],
     context: row.context as unknown as SummaryContext,
     transcripts: null, // Intentionally hidden for shared views

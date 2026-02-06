@@ -20,6 +20,7 @@ import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
 import type { SummaryContext, Theme, Speaker } from '@/lib/claude';
+import type { SummaryContent } from '@/lib/summary-types';
 import {
   getStoredSession,
   storeSession,
@@ -50,7 +51,7 @@ export default function Home() {
   const [transcripts, setTranscripts] = useState<string[]>([]);
   const [context, setContext] = useState<SummaryContext | null>(null);
   const [summaryMode, setSummaryMode] = useState<'combined' | 'separate'>('combined');
-  const [summaries, setSummaries] = useState<string[]>([]);
+  const [summaries, setSummaries] = useState<SummaryContent>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
