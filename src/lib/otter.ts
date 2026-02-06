@@ -35,21 +35,28 @@ interface SpeechesResponse {
   speeches: SpeechData[];
 }
 
+interface OtterSpeaker {
+  id: number;
+  speaker_name: string;
+}
+
 interface SpeechDetailResponse {
   speech: {
     otid: string;
     title: string;
+    speakers?: OtterSpeaker[];
     transcripts?: Array<{
       transcript: string;
       start_offset: number;
       end_offset: number;
-      speaker_id?: string;
+      speaker_id?: number;
     }>;
     monologues?: Array<{
       elements: Array<{
         type: string;
         value: string;
       }>;
+      speaker_id?: number;
     }>;
   };
 }
@@ -129,10 +136,15 @@ export async function otterGetRecordings(
   }));
 }
 
+export interface TranscriptResult {
+  text: string;
+  speakerNames: string[];
+}
+
 export async function otterGetTranscript(
   session: OtterSession,
   speechId: string
-): Promise<string> {
+): Promise<TranscriptResult> {
   const url = `${BASE_URL}/speech?userid=${session.userId}&otid=${speechId}`;
 
   const response = await fetch(url, {
@@ -153,16 +165,53 @@ export async function otterGetTranscript(
     throw new Error('Speech not found');
   }
 
+  // Build speaker ID → name map
+  const speakerMap = new Map<number, string>();
+  if (speech.speakers) {
+    for (const s of speech.speakers) {
+      speakerMap.set(s.id, s.speaker_name);
+    }
+  }
+
   // Method 1: Direct transcripts array
   if (speech.transcripts && speech.transcripts.length > 0) {
-    return speech.transcripts.map((t) => t.transcript).join(' ');
+    let lastSpeakerId: number | undefined;
+    const parts: string[] = [];
+
+    for (const t of speech.transcripts) {
+      if (t.speaker_id !== undefined && t.speaker_id !== lastSpeakerId) {
+        const name = speakerMap.get(t.speaker_id) || `Speaker ${t.speaker_id}`;
+        parts.push(`\n${name}: ${t.transcript}`);
+        lastSpeakerId = t.speaker_id;
+      } else {
+        parts.push(t.transcript);
+      }
+    }
+
+    return { text: parts.join(' ').trim(), speakerNames: [...speakerMap.values()] };
   }
 
   // Method 2: Monologues format
   if (speech.monologues && speech.monologues.length > 0) {
-    return speech.monologues
-      .flatMap((m) => m.elements.filter((e) => e.type === 'text').map((e) => e.value))
-      .join(' ');
+    let lastSpeakerId: number | undefined;
+    const parts: string[] = [];
+
+    for (const m of speech.monologues) {
+      const text = m.elements
+        .filter((e) => e.type === 'text')
+        .map((e) => e.value)
+        .join(' ');
+
+      if (m.speaker_id !== undefined && m.speaker_id !== lastSpeakerId) {
+        const name = speakerMap.get(m.speaker_id) || `Speaker ${m.speaker_id}`;
+        parts.push(`\n${name}: ${text}`);
+        lastSpeakerId = m.speaker_id;
+      } else {
+        parts.push(text);
+      }
+    }
+
+    return { text: parts.join(' ').trim(), speakerNames: [...speakerMap.values()] };
   }
 
   throw new Error('No transcript content found');

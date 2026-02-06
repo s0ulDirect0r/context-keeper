@@ -12,7 +12,7 @@ function deriveTitle(recordingTitles?: string[]): string {
 
 export async function POST(request: Request) {
   try {
-    const { transcripts, context, mode, save, recordingTitles } = await request.json();
+    const { transcripts, context, mode, save, recordingTitles, otterSpeakerNames } = await request.json();
 
     if (!transcripts || !Array.isArray(transcripts) || transcripts.length === 0) {
       return NextResponse.json({ error: 'At least one transcript required' }, { status: 400 });
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const [summaries, themes, speakers] = await Promise.all([
       generateSummary(transcripts, summaryContext, summaryMode),
       extractThemes(combinedTranscript, summaryContext),
-      extractSpeakers(combinedTranscript),
+      extractSpeakers(combinedTranscript, otterSpeakerNames),
     ]);
 
     let savedSummaryId: string | null = null;

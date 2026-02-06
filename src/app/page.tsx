@@ -52,6 +52,7 @@ export default function Home() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
+  const [otterSpeakerNames, setOtterSpeakerNames] = useState<string[]>([]);
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,6 +225,7 @@ export default function Home() {
         (id: string) => recordings.find((r) => r.id === id)?.title || 'Untitled'
       );
       setRecordingTitles(titles);
+      setOtterSpeakerNames(data.speakerNames || []);
       setTranscripts(validTranscripts);
       setStep('context-wizard');
     } catch (err) {
@@ -235,6 +237,7 @@ export default function Home() {
 
   const handleManualTranscript = (transcript: string) => {
     setRecordingTitles([]);
+    setOtterSpeakerNames([]);
     setTranscripts([transcript]);
     setStep('context-wizard');
   };
@@ -268,6 +271,7 @@ export default function Home() {
           mode,
           save: !!user,
           recordingTitles,
+          otterSpeakerNames,
         }),
       });
 
@@ -293,6 +297,7 @@ export default function Home() {
     setRecordings([]);
     setTranscripts([]);
     setRecordingTitles([]);
+    setOtterSpeakerNames([]);
     setContext(null);
     setSummaries([]);
     setThemes([]);

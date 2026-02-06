@@ -37,18 +37,21 @@ export async function POST(request: Request) {
 
     const session: OtterSession = { userId, cookies };
 
-    const transcripts = await Promise.all(
+    const results = await Promise.all(
       recordingIds.map(async (id: string) => {
         try {
-          const text = await otterGetTranscript(session, id);
-          return { id, text };
+          const result = await otterGetTranscript(session, id);
+          return { id, text: result.text, speakerNames: result.speakerNames };
         } catch (error) {
-          return { id, text: null, error: (error as Error).message };
+          return { id, text: null, speakerNames: [], error: (error as Error).message };
         }
       })
     );
 
-    return NextResponse.json({ transcripts });
+    // Deduplicate speaker names across all recordings
+    const allSpeakerNames = [...new Set(results.flatMap((r) => r.speakerNames))];
+
+    return NextResponse.json({ transcripts: results, speakerNames: allSpeakerNames });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch transcripts';
     return NextResponse.json({ error: message }, { status: 500 });

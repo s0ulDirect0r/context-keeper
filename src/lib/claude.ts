@@ -187,14 +187,21 @@ Rules:
 - Order speakers by amount of speaking time (most first)
 - Quotes should capture that speaker's most important or characteristic contributions`;
 
-export async function extractSpeakers(transcript: string): Promise<Speaker[]> {
+export async function extractSpeakers(
+  transcript: string,
+  knownSpeakerNames?: string[]
+): Promise<Speaker[]> {
+  const knownNames = knownSpeakerNames?.length
+    ? `\n\nThe known speakers in this meeting are: ${knownSpeakerNames.join(', ')}. Use these exact names.`
+    : '';
+
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
     system: SPEAKER_EXTRACTION_PROMPT,
     messages: [{
       role: 'user',
-      content: `Identify all speakers and their key quotes from this transcript:\n\n${transcript}`,
+      content: `Identify all speakers and their key quotes from this transcript:${knownNames}\n\n${transcript}`,
     }],
   });
 
