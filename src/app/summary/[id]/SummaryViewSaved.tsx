@@ -26,6 +26,7 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [title, setTitle] = useState(summary.title);
   const [editingTitle, setEditingTitle] = useState(false);
+  const [savingTitle, setSavingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Edit context state
@@ -51,24 +52,29 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
   };
 
   const saveTitle = async (newTitle: string) => {
+    if (savingTitle) return;
     const trimmed = newTitle.trim();
     if (!trimmed || trimmed === summary.title) {
       setTitle(summary.title);
       setEditingTitle(false);
       return;
     }
+    setSavingTitle(true);
     try {
       await fetch(`/api/summaries/${summary.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: trimmed }),
       });
+      setSummary((prev) => ({ ...prev, title: trimmed }));
       setTitle(trimmed);
     } catch (err) {
       console.error('Failed to save title:', err);
       setTitle(summary.title);
+    } finally {
+      setSavingTitle(false);
+      setEditingTitle(false);
     }
-    setEditingTitle(false);
   };
 
   const handleRegenerate = async (mode: 'replace' | 'new') => {

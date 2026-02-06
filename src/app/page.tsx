@@ -55,6 +55,7 @@ export default function Home() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
+  const [recordingDates, setRecordingDates] = useState<string[]>([]);
   const [otterSpeakerNames, setOtterSpeakerNames] = useState<string[]>([]);
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
@@ -223,11 +224,13 @@ export default function Home() {
         throw new Error('No transcripts could be retrieved');
       }
 
-      // Capture Otter recording titles for use as summary title
-      const titles = recordingIds.map(
-        (id: string) => recordings.find((r) => r.id === id)?.title || 'Untitled'
+      // Capture Otter recording titles and dates for use as summary metadata
+      const selected = recordingIds.map(
+        (id: string) => recordings.find((r) => r.id === id)
       );
-      setRecordingTitles(titles);
+      setRecordingTitles(selected.map((r) => r?.title || 'Untitled'));
+      setRecordingDates(selected.map((r) => r?.createdAt?.toISOString() || ''));
+
       setOtterSpeakerNames(data.speakerNames || []);
       setTranscripts(validTranscripts);
       setStep('context-wizard');
@@ -240,6 +243,7 @@ export default function Home() {
 
   const handleManualTranscript = (transcript: string) => {
     setRecordingTitles([]);
+    setRecordingDates([]);
     setOtterSpeakerNames([]);
     setTranscripts([transcript]);
     setStep('context-wizard');
@@ -274,6 +278,7 @@ export default function Home() {
           mode,
           save: !!user,
           recordingTitles,
+          recordingDates,
           otterSpeakerNames,
         }),
       });
@@ -306,6 +311,7 @@ export default function Home() {
     setRecordings([]);
     setTranscripts([]);
     setRecordingTitles([]);
+    setRecordingDates([]);
     setOtterSpeakerNames([]);
     setContext(null);
     setSummaries([]);

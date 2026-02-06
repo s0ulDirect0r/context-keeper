@@ -15,17 +15,6 @@ import type { StructuredSummary } from './summary-types';
 
 const client = new Anthropic();
 
-// ── Legacy prompt (kept for rollback safety) ──────────────────────────
-
-const _LEGACY_SYSTEM_PROMPT = `You are a meeting summary assistant. Generate concise, scannable summaries tailored to what the recipient cares about.
-
-Rules:
-- Output ONLY the summary content (no greetings, sign-offs, or meta-commentary)
-- Use bullet points and headers for scannability
-- Focus on what's relevant to the recipient based on context provided
-- Be concise but don't omit important details
-- Use markdown formatting for structure`;
-
 // ── Structured summary prompt + tool ──────────────────────────────────
 
 const STRUCTURED_SYSTEM_PROMPT = `You are an expert meeting analyst. You produce structured, quote-driven summaries tailored to the recipient's needs.
@@ -243,6 +232,46 @@ export async function generateSummary(
   return summaries;
 }
 
+/** Strip sections with missing or malformed arrays so the UI never crashes on bad data. */
+function sanitizeStructuredSummary(raw: Record<string, unknown>): StructuredSummary {
+  const result: StructuredSummary = { formatVersion: 2 };
+
+  if (typeof raw.title === 'string') result.title = raw.title;
+  if (typeof raw.date === 'string') result.date = raw.date;
+
+  const km = raw.keyMoments as { moments?: unknown } | undefined;
+  if (km && Array.isArray(km.moments) && km.moments.length > 0) {
+    result.keyMoments = { moments: km.moments };
+  }
+
+  const qa = raw.questionsAndAnswers as { items?: unknown } | undefined;
+  if (qa && Array.isArray(qa.items) && qa.items.length > 0) {
+    result.questionsAndAnswers = { items: qa.items };
+  }
+
+  const et = raw.emergingThemes as { themes?: unknown } | undefined;
+  if (et && Array.isArray(et.themes) && et.themes.length > 0) {
+    result.emergingThemes = { themes: et.themes };
+  }
+
+  const ki = raw.keyInsights as { insights?: unknown } | undefined;
+  if (ki && Array.isArray(ki.insights) && ki.insights.length > 0) {
+    result.keyInsights = { insights: ki.insights };
+  }
+
+  const mom = raw.momentum as { items?: unknown } | undefined;
+  if (mom && Array.isArray(mom.items) && mom.items.length > 0) {
+    result.momentum = { items: mom.items };
+  }
+
+  const op = raw.observersPerspective as { content?: unknown } | undefined;
+  if (op && typeof op.content === 'string' && op.content.length > 0) {
+    result.observersPerspective = { content: op.content };
+  }
+
+  return result;
+}
+
 async function summarizeSingleStructured(
   transcript: string,
   context: SummaryContext,
@@ -263,8 +292,7 @@ async function summarizeSingleStructured(
   // Extract tool call input
   const toolBlock = response.content.find((block) => block.type === 'tool_use');
   if (toolBlock && toolBlock.type === 'tool_use') {
-    const input = toolBlock.input as Omit<StructuredSummary, 'formatVersion'>;
-    return { formatVersion: 2, ...input };
+    return sanitizeStructuredSummary(toolBlock.input as Record<string, unknown>);
   }
 
   // Fallback: try to parse text response as JSON
@@ -272,15 +300,15 @@ async function summarizeSingleStructured(
   if (textBlock && textBlock.type === 'text') {
     try {
       const parsed = JSON.parse(textBlock.text);
-      return { formatVersion: 2, ...parsed };
+      return sanitizeStructuredSummary(parsed);
     } catch {
       const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0]);
-          return { formatVersion: 2, ...parsed };
+          return sanitizeStructuredSummary(parsed);
         } catch {
-          // Fall through to legacy wrap
+          // Fall through
         }
       }
     }
@@ -309,45 +337,6 @@ function buildStructuredUserMessage(
   }
   if (date) {
     message += `\n**Meeting date (from recording metadata):** ${date}`;
-  }
-
-  message += `\n\n---\n\n**Transcript:**\n${transcript}`;
-
-  return message;
-}
-
-// Legacy generation — kept for rollback safety
-async function summarizeSingleLegacy(
-  transcript: string,
-  context: SummaryContext
-): Promise<string> {
-  const userMessage = buildLegacyUserMessage(transcript, context);
-
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
-    system: _LEGACY_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userMessage }],
-  });
-
-  const textBlock = response.content.find((block) => block.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('No text response from Claude');
-  }
-
-  return textBlock.text;
-}
-
-function buildLegacyUserMessage(
-  transcript: string,
-  context: SummaryContext
-): string {
-  let message = `Create a summary of this meeting transcript.
-
-**What to extract:** ${context.extractionGoal}`;
-
-  if (context.additionalContext) {
-    message += `\n\n**Additional context:** ${context.additionalContext}`;
   }
 
   message += `\n\n---\n\n**Transcript:**\n${transcript}`;
