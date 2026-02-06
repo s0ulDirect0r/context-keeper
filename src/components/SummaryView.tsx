@@ -9,12 +9,15 @@ import { ThemeBubbles } from './ThemeBubbles';
 import { AuthDialog } from './AuthDialog';
 import { Check, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
-import { copyRichText } from '@/lib/utils';
+import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
 import { SpeakerToolbar } from './SpeakerToolbar';
+import { StructuredSummaryView } from './StructuredSummaryView';
 import type { Theme, Speaker, SummaryContext } from '@/lib/claude';
+import type { SummaryContent } from '@/lib/summary-types';
+import { isStructuredSummary } from '@/lib/summary-types';
 
 interface Props {
-  summaries: string[];
+  summaries: SummaryContent;
   themes: Theme[];
   context: SummaryContext | null;
   onStartOver: () => void;
@@ -118,29 +121,40 @@ export function SummaryView({ summaries, themes, context, onStartOver, savedSumm
         </div>
       )}
 
-      {summaries.map((summary, index) => (
-        <Card key={index}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                {summaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(summary, index)}
-              >
-                {copiedIndex === index ? 'Copied!' : 'Copy'}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <Markdown>{summary}</Markdown>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      {isStructuredSummary(summaries) ? (
+        summaries.map((s, index) => (
+          <StructuredSummaryView
+            key={index}
+            summary={s}
+            index={index}
+            total={summaries.length}
+          />
+        ))
+      ) : (
+        summaries.map((summary, index) => (
+          <Card key={index}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {summaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(summary, index)}
+                >
+                  {copiedIndex === index ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <Markdown>{summary}</Markdown>
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
 
       <div className="flex justify-center pt-4">
         <Button variant="outline" onClick={onStartOver}>

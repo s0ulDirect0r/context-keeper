@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { SavedSummary } from '@/lib/supabase/types';
+import { getSummaryPreviewText, getSummarySearchText } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +26,7 @@ export function DashboardClient({ initialSummaries }: DashboardClientProps) {
     const query = searchQuery.toLowerCase();
     return (
       s.title.toLowerCase().includes(query) ||
-      s.summaries.some((summary) => summary.toLowerCase().includes(query))
+      getSummarySearchText(s.summaries).toLowerCase().includes(query)
     );
   });
 
@@ -123,7 +124,7 @@ export function DashboardClient({ initialSummaries }: DashboardClientProps) {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground line-clamp-3">
-                    {summary.summaries[0]?.replace(/[#*_]/g, '').slice(0, 200)}...
+                    {getSummaryPreviewText(summary.summaries).replace(/[#*_]/g, '').slice(0, 200)}...
                   </p>
                   <p className="text-xs text-muted-foreground mt-3">
                     {formatDate(summary.createdAt)}

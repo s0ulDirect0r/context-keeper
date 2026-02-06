@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import Markdown from 'react-markdown';
 import type { SavedSummary } from '@/lib/supabase/types';
 import type { Theme, Speaker } from '@/lib/claude';
+import { isStructuredSummary } from '@/lib/summary-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { ThemeBubbles } from '@/components/ThemeBubbles';
 import { SpeakerToolbar } from '@/components/SpeakerToolbar';
+import { StructuredSummaryView } from '@/components/StructuredSummaryView';
 import { copyRichText } from '@/lib/utils';
 import { Pencil, Loader2, Share2, Check, Link } from 'lucide-react';
 
@@ -24,6 +26,7 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [title, setTitle] = useState(summary.title);
   const [editingTitle, setEditingTitle] = useState(false);
+  const [savingTitle, setSavingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Edit context state
@@ -49,24 +52,29 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
   };
 
   const saveTitle = async (newTitle: string) => {
+    if (savingTitle) return;
     const trimmed = newTitle.trim();
     if (!trimmed || trimmed === summary.title) {
       setTitle(summary.title);
       setEditingTitle(false);
       return;
     }
+    setSavingTitle(true);
     try {
       await fetch(`/api/summaries/${summary.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: trimmed }),
       });
+      setSummary((prev) => ({ ...prev, title: trimmed }));
       setTitle(trimmed);
     } catch (err) {
       console.error('Failed to save title:', err);
       setTitle(summary.title);
+    } finally {
+      setSavingTitle(false);
+      setEditingTitle(false);
     }
-    setEditingTitle(false);
   };
 
   const handleRegenerate = async (mode: 'replace' | 'new') => {
@@ -291,29 +299,40 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
         </div>
       )}
 
-      {summary.summaries.map((summaryText, index) => (
-        <Card key={index}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                {summary.summaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(summaryText, index)}
-              >
-                {copiedIndex === index ? 'Copied!' : 'Copy'}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <Markdown>{summaryText}</Markdown>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      {isStructuredSummary(summary.summaries) ? (
+        summary.summaries.map((s, index) => (
+          <StructuredSummaryView
+            key={index}
+            summary={s}
+            index={index}
+            total={summary.summaries.length}
+          />
+        ))
+      ) : (
+        summary.summaries.map((summaryText, index) => (
+          <Card key={index}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {summary.summaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(summaryText, index)}
+                >
+                  {copiedIndex === index ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <Markdown>{summaryText}</Markdown>
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
 
       {/* Context card — read-only or editable */}
       <div className="pt-4">
