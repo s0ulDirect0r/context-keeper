@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
-import { generateTitle, type SummaryContext, type Theme } from '@/lib/claude';
+import { type SummaryContext, type Theme } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
+function deriveTitle(recordingTitles?: string[]): string {
+  if (!recordingTitles || recordingTitles.length === 0) return 'Untitled Summary';
+  if (recordingTitles.length === 1) return recordingTitles[0];
+  if (recordingTitles.length === 2) return recordingTitles.join(' & ');
+  return `${recordingTitles[0]} & ${recordingTitles[1]} + ${recordingTitles.length - 2} more`;
+}
+
 export async function POST(request: Request) {
   try {
-    const { summaries, themes, context } = await request.json();
+    const { summaries, themes, context, recordingTitles, transcripts, speakers } = await request.json();
 
     if (!summaries || !Array.isArray(summaries) || summaries.length === 0) {
       return NextResponse.json({ error: 'Summaries required' }, { status: 400 });
@@ -27,9 +34,7 @@ export async function POST(request: Request) {
       additionalContext: context.additionalContext,
     };
 
-    // Generate a punchy title
-    const combinedSummary = summaries.join('\n\n');
-    const title = await generateTitle(combinedSummary);
+    const title = deriveTitle(recordingTitles);
 
     const insertData: Database['public']['Tables']['summaries']['Insert'] = {
       user_id: user.id,
@@ -37,6 +42,8 @@ export async function POST(request: Request) {
       summaries: summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
       themes: (themes || []) as unknown as Database['public']['Tables']['summaries']['Insert']['themes'],
       context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
+      transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
+      speakers: (speakers || []) as unknown as Database['public']['Tables']['summaries']['Insert']['speakers'],
     };
 
     const { data, error: saveError } = await supabase
