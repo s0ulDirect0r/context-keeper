@@ -10,7 +10,8 @@ import { AuthDialog } from './AuthDialog';
 import { Check, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { copyRichText } from '@/lib/utils';
-import type { Theme, SummaryContext } from '@/lib/claude';
+import { SpeakerToolbar } from './SpeakerToolbar';
+import type { Theme, Speaker, SummaryContext } from '@/lib/claude';
 
 interface Props {
   summaries: string[];
@@ -19,9 +20,12 @@ interface Props {
   onStartOver: () => void;
   savedSummaryId?: string | null;
   onSaved?: (id: string) => void;
+  recordingTitles?: string[];
+  speakers?: Speaker[];
+  transcripts?: string[];
 }
 
-export function SummaryView({ summaries, themes, context, onStartOver, savedSummaryId, onSaved }: Props) {
+export function SummaryView({ summaries, themes, context, onStartOver, savedSummaryId, onSaved, recordingTitles, speakers = [], transcripts }: Props) {
   const { user } = useAuth();
   const router = useRouter();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -36,7 +40,7 @@ export function SummaryView({ summaries, themes, context, onStartOver, savedSumm
       fetch('/api/summaries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summaries, themes, context }),
+        body: JSON.stringify({ summaries, themes, context, recordingTitles, transcripts, speakers }),
       })
         .then((res) => res.json())
         .then((data) => {
@@ -102,6 +106,15 @@ export function SummaryView({ summaries, themes, context, onStartOver, savedSumm
             Key themes (click to see quotes)
           </p>
           <ThemeBubbles themes={themes} />
+        </div>
+      )}
+
+      {speakers.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-center text-sm text-muted-foreground">
+            Speakers (click to see quotes)
+          </p>
+          <SpeakerToolbar speakers={speakers} />
         </div>
       )}
 

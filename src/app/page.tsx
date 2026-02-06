@@ -18,7 +18,7 @@ import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
-import type { SummaryContext, Theme } from '@/lib/claude';
+import type { SummaryContext, Theme, Speaker } from '@/lib/claude';
 import {
   getStoredSession,
   storeSession,
@@ -50,6 +50,8 @@ export default function Home() {
   const [summaryMode, setSummaryMode] = useState<'combined' | 'separate'>('combined');
   const [summaries, setSummaries] = useState<string[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
+  const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,6 +219,11 @@ export default function Home() {
         throw new Error('No transcripts could be retrieved');
       }
 
+      // Capture Otter recording titles for use as summary title
+      const titles = recordingIds.map(
+        (id: string) => recordings.find((r) => r.id === id)?.title || 'Untitled'
+      );
+      setRecordingTitles(titles);
       setTranscripts(validTranscripts);
       setStep('context-wizard');
     } catch (err) {
@@ -227,6 +234,7 @@ export default function Home() {
   };
 
   const handleManualTranscript = (transcript: string) => {
+    setRecordingTitles([]);
     setTranscripts([transcript]);
     setStep('context-wizard');
   };
@@ -259,6 +267,7 @@ export default function Home() {
           context: ctx,
           mode,
           save: !!user,
+          recordingTitles,
         }),
       });
 
@@ -269,6 +278,7 @@ export default function Home() {
 
       setSummaries(data.summaries);
       setThemes(data.themes || []);
+      setSpeakers(data.speakers || []);
       setSavedSummaryId(data.savedSummaryId || null);
       setStep('summary');
     } catch (err) {
@@ -282,9 +292,11 @@ export default function Home() {
     setInputMethod(null);
     setRecordings([]);
     setTranscripts([]);
+    setRecordingTitles([]);
     setContext(null);
     setSummaries([]);
     setThemes([]);
+    setSpeakers([]);
     setSavedSummaryId(null);
     setError(null);
   };
@@ -376,6 +388,7 @@ export default function Home() {
             onBack={() =>
               goBack(inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
             }
+            recordingCount={transcripts.length}
           />
         )}
 
@@ -397,6 +410,9 @@ export default function Home() {
             onStartOver={handleStartOver}
             savedSummaryId={savedSummaryId}
             onSaved={setSavedSummaryId}
+            recordingTitles={recordingTitles}
+            speakers={speakers}
+            transcripts={transcripts}
           />
         )}
       </main>
