@@ -149,7 +149,10 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
         body: JSON.stringify({ is_shared: true }),
       });
       const data = await response.json();
-      if (data.share_token) setShareToken(data.share_token);
+      if (!response.ok || !data.share_token) {
+        throw new Error(data.error || 'Failed to generate share link');
+      }
+      setShareToken(data.share_token);
       setIsShared(true);
       setShowSharePanel(true);
     } catch (err) {
@@ -193,7 +196,7 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => saveTitle(title)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') saveTitle(title);
+              if (e.key === 'Enter') e.currentTarget.blur();
               if (e.key === 'Escape') { setTitle(summary.title); setEditingTitle(false); }
             }}
             autoFocus
