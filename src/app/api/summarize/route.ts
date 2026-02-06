@@ -34,7 +34,9 @@ export async function POST(request: Request) {
 
     // Run summary generation, theme extraction, and speaker extraction in parallel
     const [summaries, themes, speakers] = await Promise.all([
-      generateSummary(transcripts, summaryContext, summaryMode),
+      generateSummary(transcripts, summaryContext, summaryMode, {
+        titles: recordingTitles,
+      }),
       extractThemes(combinedTranscript, summaryContext),
       extractSpeakers(combinedTranscript, otterSpeakerNames),
     ]);

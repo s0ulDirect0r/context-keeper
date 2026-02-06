@@ -1,8 +1,23 @@
 import Anthropic from '@anthropic-ai/sdk';
 
+// Re-export shared types so server-side consumers can still import from claude.ts
+export type {
+  AttributedQuote,
+  QuestionAnswer,
+  EmergingTheme,
+  MomentumItem,
+  StructuredSummary,
+  SummaryContent,
+} from './summary-types';
+export { isStructuredSummary } from './summary-types';
+
+import type { StructuredSummary } from './summary-types';
+
 const client = new Anthropic();
 
-const SYSTEM_PROMPT = `You are a meeting summary assistant. Generate concise, scannable summaries tailored to what the recipient cares about.
+// ── Legacy prompt (kept for rollback safety) ──────────────────────────
+
+const _LEGACY_SYSTEM_PROMPT = `You are a meeting summary assistant. Generate concise, scannable summaries tailored to what the recipient cares about.
 
 Rules:
 - Output ONLY the summary content (no greetings, sign-offs, or meta-commentary)
@@ -10,6 +25,166 @@ Rules:
 - Focus on what's relevant to the recipient based on context provided
 - Be concise but don't omit important details
 - Use markdown formatting for structure`;
+
+// ── Structured summary prompt + tool ──────────────────────────────────
+
+const STRUCTURED_SYSTEM_PROMPT = `You are an expert meeting analyst. You produce structured, quote-driven summaries tailored to the recipient's needs.
+
+Your job is to call the structured_summary tool with sections that are warranted by the meeting content. Every section is optional — only include a section if the transcript contains strong, relevant content for it.
+
+## Section guidance
+
+**Key Moments** (1–3): The most pivotal statements — turning points, commitments, surprises, or moments of clarity. Choose quotes that would make someone say "I wish I'd been there for that." Always attribute to a speaker.
+
+**Questions & Answers** (1–3): Questions that were explicitly asked. Include the answer if one was given. Mark as unanswered if the question was deflected or left open. Unanswered questions are especially valuable.
+
+**Emerging Themes** (1–3): Abstract undercurrents — not agenda topics but the philosophical, emotional, or interpersonal dynamics at play. Each theme gets 2–4 concise bullet points explaining how it surfaced.
+
+**Key Insights** (1–3): Non-obvious realizations, data points, or conclusions that emerged. Quotes that reveal something the recipient might not have noticed.
+
+**Momentum** (AI determines count): Concrete next steps, action items, decisions made, or commitments. Only include if the meeting produced clear forward motion.
+
+**Observer's Perspective** (1–2 sentences): Your honest, conversational read on the meeting as a whole — the vibe, what it means, what's unspoken. Write as an insightful colleague, not a robot.
+
+## Quote selection philosophy
+- Prefer quotes that carry WEIGHT — emotion, commitment, disagreement, insight
+- Never paraphrase when a verbatim quote is available
+- Include timestamps when they appear in the transcript
+- Attribute every quote to a speaker
+
+## When to OMIT sections
+- No clear questions asked → omit Q&A
+- No action items or decisions → omit Momentum
+- Meeting was purely informational → omit Key Moments if nothing pivotal happened
+- Short or shallow meeting → fewer sections is better than padded sections
+
+## Title & Date
+- If title/date metadata is provided, use it directly
+- Otherwise, generate a concise descriptive title (not "Meeting Summary")
+- For date, attempt to extract from transcript content; omit if not determinable`;
+
+const STRUCTURED_SUMMARY_TOOL: Anthropic.Tool = {
+  name: 'structured_summary',
+  description: 'Submit a structured meeting summary with only the sections warranted by the content.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'Meeting title — use provided metadata or generate a descriptive one' },
+      date: { type: 'string', description: 'Meeting date if determinable (ISO 8601 or human-readable)' },
+      keyMoments: {
+        type: 'object',
+        properties: {
+          moments: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: { type: 'string', description: 'Verbatim quote' },
+                speaker: { type: 'string', description: 'Speaker name' },
+                timestamp: { type: 'string', description: 'Timestamp if available' },
+              },
+              required: ['text', 'speaker'],
+            },
+            minItems: 1,
+            maxItems: 3,
+          },
+        },
+        required: ['moments'],
+      },
+      questionsAndAnswers: {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                question: { type: 'string' },
+                questionSpeaker: { type: 'string' },
+                answer: { type: 'string' },
+                answerSpeaker: { type: 'string' },
+                unanswered: { type: 'boolean' },
+              },
+              required: ['question'],
+            },
+            minItems: 1,
+            maxItems: 3,
+          },
+        },
+        required: ['items'],
+      },
+      emergingThemes: {
+        type: 'object',
+        properties: {
+          themes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string', description: '1–2 word abstract concept' },
+                bullets: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  minItems: 2,
+                  maxItems: 4,
+                },
+              },
+              required: ['label', 'bullets'],
+            },
+            minItems: 1,
+            maxItems: 3,
+          },
+        },
+        required: ['themes'],
+      },
+      keyInsights: {
+        type: 'object',
+        properties: {
+          insights: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: { type: 'string', description: 'Verbatim quote' },
+                speaker: { type: 'string', description: 'Speaker name' },
+                timestamp: { type: 'string', description: 'Timestamp if available' },
+              },
+              required: ['text', 'speaker'],
+            },
+            minItems: 1,
+            maxItems: 3,
+          },
+        },
+        required: ['insights'],
+      },
+      momentum: {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: { type: 'string', description: 'Action item, decision, or next step' },
+              },
+              required: ['text'],
+            },
+          },
+        },
+        required: ['items'],
+      },
+      observersPerspective: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: '1–2 sentence honest read on the meeting' },
+        },
+        required: ['content'],
+      },
+    },
+    // All sections optional — Claude decides what to include
+    required: [],
+  },
+};
 
 export interface ThemeQuote {
   text: string;
@@ -33,35 +208,125 @@ export interface SummaryContext {
   additionalContext?: string;
 }
 
+export interface SummaryMetadata {
+  titles?: string[];
+  dates?: string[];
+}
+
 export async function generateSummary(
   transcripts: string[],
   context: SummaryContext,
-  mode: 'combined' | 'separate'
-): Promise<string[]> {
+  mode: 'combined' | 'separate',
+  metadata?: SummaryMetadata
+): Promise<StructuredSummary[]> {
   if (mode === 'combined' || transcripts.length === 1) {
     const combinedTranscript = transcripts.join('\n\n---\n\n');
-    const summary = await summarizeSingle(combinedTranscript, context);
+    const title = metadata?.titles?.length === 1
+      ? metadata.titles[0]
+      : metadata?.titles?.join(' & ');
+    const date = metadata?.dates?.[0];
+    const summary = await summarizeSingleStructured(combinedTranscript, context, title, date);
     return [summary];
   }
 
-  // Separate summaries
   const summaries = await Promise.all(
-    transcripts.map((transcript) => summarizeSingle(transcript, context))
+    transcripts.map((transcript, i) =>
+      summarizeSingleStructured(
+        transcript,
+        context,
+        metadata?.titles?.[i],
+        metadata?.dates?.[i]
+      )
+    )
   );
 
   return summaries;
 }
 
-async function summarizeSingle(
+async function summarizeSingleStructured(
+  transcript: string,
+  context: SummaryContext,
+  title?: string,
+  date?: string,
+): Promise<StructuredSummary> {
+  const userMessage = buildStructuredUserMessage(transcript, context, title, date);
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 6144,
+    system: STRUCTURED_SYSTEM_PROMPT,
+    tools: [STRUCTURED_SUMMARY_TOOL],
+    tool_choice: { type: 'tool', name: 'structured_summary' },
+    messages: [{ role: 'user', content: userMessage }],
+  });
+
+  // Extract tool call input
+  const toolBlock = response.content.find((block) => block.type === 'tool_use');
+  if (toolBlock && toolBlock.type === 'tool_use') {
+    const input = toolBlock.input as Omit<StructuredSummary, 'formatVersion'>;
+    return { formatVersion: 2, ...input };
+  }
+
+  // Fallback: try to parse text response as JSON
+  const textBlock = response.content.find((block) => block.type === 'text');
+  if (textBlock && textBlock.type === 'text') {
+    try {
+      const parsed = JSON.parse(textBlock.text);
+      return { formatVersion: 2, ...parsed };
+    } catch {
+      const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return { formatVersion: 2, ...parsed };
+        } catch {
+          // Fall through to legacy wrap
+        }
+      }
+    }
+  }
+
+  // Last resort: couldn't get structured output, throw so caller gets an error
+  throw new Error('Failed to get structured summary from Claude');
+}
+
+function buildStructuredUserMessage(
+  transcript: string,
+  context: SummaryContext,
+  title?: string,
+  date?: string,
+): string {
+  let message = `Analyze this meeting transcript and call the structured_summary tool with the appropriate sections.
+
+**What to extract:** ${context.extractionGoal}`;
+
+  if (context.additionalContext) {
+    message += `\n\n**Additional context:** ${context.additionalContext}`;
+  }
+
+  if (title) {
+    message += `\n\n**Meeting title (from recording metadata):** ${title}`;
+  }
+  if (date) {
+    message += `\n**Meeting date (from recording metadata):** ${date}`;
+  }
+
+  message += `\n\n---\n\n**Transcript:**\n${transcript}`;
+
+  return message;
+}
+
+// Legacy generation — kept for rollback safety
+async function summarizeSingleLegacy(
   transcript: string,
   context: SummaryContext
 ): Promise<string> {
-  const userMessage = buildUserMessage(transcript, context);
+  const userMessage = buildLegacyUserMessage(transcript, context);
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
-    system: SYSTEM_PROMPT,
+    system: _LEGACY_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userMessage }],
   });
 
@@ -73,7 +338,7 @@ async function summarizeSingle(
   return textBlock.text;
 }
 
-function buildUserMessage(
+function buildLegacyUserMessage(
   transcript: string,
   context: SummaryContext
 ): string {
