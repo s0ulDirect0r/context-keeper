@@ -1,4 +1,4 @@
-import type { SummaryContext, Theme } from '@/lib/claude';
+import type { SummaryContext, Theme, Speaker } from '@/lib/claude';
 
 export type Json =
   | string
@@ -19,6 +19,10 @@ export interface Database {
           summaries: Json;
           themes: Json;
           context: Json;
+          transcripts: Json | null;
+          speakers: Json;
+          share_token: string | null;
+          is_shared: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +33,10 @@ export interface Database {
           summaries: Json;
           themes?: Json;
           context: Json;
+          transcripts?: Json | null;
+          speakers?: Json;
+          share_token?: string;
+          is_shared?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -39,6 +47,10 @@ export interface Database {
           summaries?: Json;
           themes?: Json;
           context?: Json;
+          transcripts?: Json | null;
+          speakers?: Json;
+          share_token?: string;
+          is_shared?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -91,6 +103,10 @@ export interface SavedSummary {
   summaries: string[];
   themes: Theme[];
   context: SummaryContext;
+  transcripts: string[] | null;
+  speakers: Speaker[];
+  shareToken: string | null;
+  isShared: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,6 +118,10 @@ export function toSavedSummary(row: Database['public']['Tables']['summaries']['R
     summaries: row.summaries as unknown as string[],
     themes: row.themes as unknown as Theme[],
     context: row.context as unknown as SummaryContext,
+    transcripts: (row.transcripts as unknown as string[] | null) ?? null,
+    speakers: (row.speakers as unknown as Speaker[]) ?? [],
+    shareToken: row.share_token ?? null,
+    isShared: row.is_shared ?? false,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
