@@ -22,6 +22,12 @@ export interface Theme {
   quotes: ThemeQuote[];
 }
 
+export interface Speaker {
+  id: string;
+  name: string;
+  quotes: ThemeQuote[];
+}
+
 export interface SummaryContext {
   extractionGoal: string;
   additionalContext?: string;
@@ -114,38 +120,6 @@ Rules:
 - Each theme needs 2-5 supporting quotes
 - Focus on themes relevant to what the recipient cares about`;
 
-const TITLE_GENERATION_PROMPT = `Generate a punchy, memorable 2-5 word title for a meeting summary.
-
-The title should:
-- Be catchy and evocative (like a news headline or book chapter title)
-- Capture the essence or key conflict/topic of the meeting
-- NOT be generic (avoid "Team Meeting", "Weekly Sync", "Project Update")
-
-Good examples: "The Budget Showdown", "Alignment Crisis", "Launch Day Panic", "The Pivot Decision", "Hiring Debate"
-Bad examples: "Meeting Notes", "Summary of Discussion", "Team Call", "Q2 Planning"
-
-Respond with ONLY the title, no quotes or explanation.`;
-
-export async function generateTitle(summaryText: string): Promise<string> {
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 50,
-    system: TITLE_GENERATION_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `Generate a title for this meeting summary:\n\n${summaryText.slice(0, 2000)}`,
-      },
-    ],
-  });
-
-  const textBlock = response.content.find((block) => block.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    return 'Meeting Summary';
-  }
-
-  return textBlock.text.trim().replace(/^["']|["']$/g, '');
-}
 
 export async function extractThemes(
   transcript: string,
@@ -186,5 +160,65 @@ ${transcript}`;
       return parsed.themes || [];
     }
     throw new Error('Failed to parse themes response as JSON');
+  }
+}
+
+const SPEAKER_EXTRACTION_PROMPT = `You are analyzing a meeting transcript to identify all speakers and extract their key quotes.
+
+Return your response as valid JSON with this exact structure:
+{
+  "speakers": [
+    {
+      "id": "unique-id",
+      "name": "Speaker Name",
+      "quotes": [
+        { "text": "Exact verbatim quote from transcript" }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Identify all distinct speakers in the transcript
+- Use actual names when identifiable from the transcript text
+- Use "Speaker 1", "Speaker 2", etc. when names aren't identifiable
+- Group unattributed speech under "Unknown" if present
+- Extract 3-5 key/representative quotes per speaker (verbatim from transcript)
+- Order speakers by amount of speaking time (most first)
+- Quotes should capture that speaker's most important or characteristic contributions`;
+
+export async function extractSpeakers(
+  transcript: string,
+  knownSpeakerNames?: string[]
+): Promise<Speaker[]> {
+  const knownNames = knownSpeakerNames?.length
+    ? `\n\nThe known speakers in this meeting are: ${knownSpeakerNames.join(', ')}. Use these exact names.`
+    : '';
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: SPEAKER_EXTRACTION_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Identify all speakers and their key quotes from this transcript:${knownNames}\n\n${transcript}`,
+    }],
+  });
+
+  const textBlock = response.content.find((block) => block.type === 'text');
+  if (!textBlock || textBlock.type !== 'text') {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(textBlock.text);
+    return parsed.speakers || [];
+  } catch {
+    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed.speakers || [];
+    }
+    return [];
   }
 }

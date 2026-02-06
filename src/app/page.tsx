@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useAppMode } from '@/components/AppModeProvider';
 import { AuthDialog, type AuthMode } from '@/components/AuthDialog';
@@ -18,7 +19,7 @@ import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
-import type { SummaryContext, Theme } from '@/lib/claude';
+import type { SummaryContext, Theme, Speaker } from '@/lib/claude';
 import {
   getStoredSession,
   storeSession,
@@ -37,6 +38,7 @@ type Step =
   | 'summary';
 
 export default function Home() {
+  const router = useRouter();
   const { user } = useAuth();
   const { isAppMode, setAppMode } = useAppMode();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -50,6 +52,9 @@ export default function Home() {
   const [summaryMode, setSummaryMode] = useState<'combined' | 'separate'>('combined');
   const [summaries, setSummaries] = useState<string[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
+  const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
+  const [otterSpeakerNames, setOtterSpeakerNames] = useState<string[]>([]);
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,6 +222,12 @@ export default function Home() {
         throw new Error('No transcripts could be retrieved');
       }
 
+      // Capture Otter recording titles for use as summary title
+      const titles = recordingIds.map(
+        (id: string) => recordings.find((r) => r.id === id)?.title || 'Untitled'
+      );
+      setRecordingTitles(titles);
+      setOtterSpeakerNames(data.speakerNames || []);
       setTranscripts(validTranscripts);
       setStep('context-wizard');
     } catch (err) {
@@ -227,6 +238,8 @@ export default function Home() {
   };
 
   const handleManualTranscript = (transcript: string) => {
+    setRecordingTitles([]);
+    setOtterSpeakerNames([]);
     setTranscripts([transcript]);
     setStep('context-wizard');
   };
@@ -259,6 +272,8 @@ export default function Home() {
           context: ctx,
           mode,
           save: !!user,
+          recordingTitles,
+          otterSpeakerNames,
         }),
       });
 
@@ -267,9 +282,16 @@ export default function Home() {
         throw new Error(data.error || 'Failed to generate summary');
       }
 
+      // Logged-in users get redirected to the full saved view
+      if (data.savedSummaryId) {
+        router.push(`/summary/${data.savedSummaryId}`);
+        return;
+      }
+
+      // Guest users see the inline view
       setSummaries(data.summaries);
       setThemes(data.themes || []);
-      setSavedSummaryId(data.savedSummaryId || null);
+      setSpeakers(data.speakers || []);
       setStep('summary');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary');
@@ -282,9 +304,12 @@ export default function Home() {
     setInputMethod(null);
     setRecordings([]);
     setTranscripts([]);
+    setRecordingTitles([]);
+    setOtterSpeakerNames([]);
     setContext(null);
     setSummaries([]);
     setThemes([]);
+    setSpeakers([]);
     setSavedSummaryId(null);
     setError(null);
   };
@@ -376,6 +401,7 @@ export default function Home() {
             onBack={() =>
               goBack(inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
             }
+            recordingCount={transcripts.length}
           />
         )}
 
@@ -397,6 +423,9 @@ export default function Home() {
             onStartOver={handleStartOver}
             savedSummaryId={savedSummaryId}
             onSaved={setSavedSummaryId}
+            recordingTitles={recordingTitles}
+            speakers={speakers}
+            transcripts={transcripts}
           />
         )}
       </main>

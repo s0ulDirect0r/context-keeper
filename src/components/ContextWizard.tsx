@@ -9,12 +9,13 @@ import type { SummaryContext } from '@/lib/claude';
 interface Props {
   onComplete: (context: SummaryContext) => void;
   onBack: () => void;
+  recordingCount?: number;
 }
 
 const STEPS = ['extraction', 'additional'] as const;
 type Step = (typeof STEPS)[number];
 
-export function ContextWizard({ onComplete, onBack }: Props) {
+export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props) {
   const [step, setStep] = useState<Step>('extraction');
   const [extractionGoal, setExtractionGoal] = useState('');
   const [additional, setAdditional] = useState('');
@@ -55,7 +56,7 @@ export function ContextWizard({ onComplete, onBack }: Props) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>
-            {step === 'extraction' && 'What do you want to extract from this recording?'}
+            {step === 'extraction' && `What do you want to extract from ${recordingCount > 1 ? 'these recordings' : 'this recording'}?`}
             {step === 'additional' && 'Any other relevant context?'}
           </CardTitle>
           <span className="text-sm text-muted-foreground">
