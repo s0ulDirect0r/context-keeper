@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useAppMode } from '@/components/AppModeProvider';
 import { AuthDialog, type AuthMode } from '@/components/AuthDialog';
@@ -37,6 +38,7 @@ type Step =
   | 'summary';
 
 export default function Home() {
+  const router = useRouter();
   const { user } = useAuth();
   const { isAppMode, setAppMode } = useAppMode();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -280,10 +282,16 @@ export default function Home() {
         throw new Error(data.error || 'Failed to generate summary');
       }
 
+      // Logged-in users get redirected to the full saved view
+      if (data.savedSummaryId) {
+        router.push(`/summary/${data.savedSummaryId}`);
+        return;
+      }
+
+      // Guest users see the inline view
       setSummaries(data.summaries);
       setThemes(data.themes || []);
       setSpeakers(data.speakers || []);
-      setSavedSummaryId(data.savedSummaryId || null);
       setStep('summary');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary');
