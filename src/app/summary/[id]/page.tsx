@@ -26,6 +26,7 @@ export default async function SummaryPage({ params }: Props) {
     .from('summaries')
     .select('*')
     .eq('id', id)
+    .eq('user_id', user.id)
     .single();
 
   if (error || !row) {

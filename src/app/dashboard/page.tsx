@@ -17,6 +17,7 @@ export default async function DashboardPage() {
   const { data: rows, error } = await supabase
     .from('summaries')
     .select('*')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) {
