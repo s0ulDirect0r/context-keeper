@@ -354,19 +354,6 @@ Think about the EMOTIONAL and PHILOSOPHICAL SUBTEXT, not the literal agenda item
 
 For each theme, provide 2-5 verbatim quotes from the transcript that embody that theme. Include the speaker name if identifiable.
 
-Return your response as valid JSON with this exact structure:
-{
-  "themes": [
-    {
-      "id": "unique-id",
-      "label": "ThemeName",
-      "quotes": [
-        { "text": "Exact verbatim quote from transcript", "speaker": "Speaker Name" }
-      ]
-    }
-  ]
-}
-
 Rules:
 - Extract 5-7 themes
 - Labels should be 1-2 words, abstract concepts
@@ -374,6 +361,42 @@ Rules:
 - Each theme needs 2-5 supporting quotes
 - Focus on themes relevant to what the recipient cares about`;
 
+const THEME_EXTRACTION_TOOL: Anthropic.Tool = {
+  name: 'extract_themes',
+  description: 'Submit the extracted abstract conceptual themes from the meeting transcript.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      themes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Unique identifier for the theme' },
+            label: { type: 'string', description: '1-2 word abstract concept' },
+            quotes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  text: { type: 'string', description: 'Verbatim quote from transcript' },
+                  speaker: { type: 'string', description: 'Speaker name if identifiable' },
+                },
+                required: ['text'],
+              },
+              minItems: 2,
+              maxItems: 5,
+            },
+          },
+          required: ['id', 'label', 'quotes'],
+        },
+        minItems: 3,
+        maxItems: 7,
+      },
+    },
+    required: ['themes'],
+  },
+};
 
 export async function extractThemes(
   transcript: string,
@@ -395,42 +418,21 @@ ${transcript}`;
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
     system: THEME_EXTRACTION_PROMPT,
+    tools: [THEME_EXTRACTION_TOOL],
+    tool_choice: { type: 'tool', name: 'extract_themes' },
     messages: [{ role: 'user', content: userMessage }],
   });
 
-  const textBlock = response.content.find((block) => block.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('No text response from Claude');
+  const toolBlock = response.content.find((block) => block.type === 'tool_use');
+  if (toolBlock && toolBlock.type === 'tool_use') {
+    const input = toolBlock.input as { themes?: Theme[] };
+    return input.themes || [];
   }
 
-  try {
-    const parsed = JSON.parse(textBlock.text);
-    return parsed.themes || [];
-  } catch {
-    // Attempt to extract JSON from the response if it has extra text
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed.themes || [];
-    }
-    throw new Error('Failed to parse themes response as JSON');
-  }
+  throw new Error('Failed to extract themes from transcript');
 }
 
 const SPEAKER_EXTRACTION_PROMPT = `You are analyzing a meeting transcript to identify all speakers and extract their key quotes.
-
-Return your response as valid JSON with this exact structure:
-{
-  "speakers": [
-    {
-      "id": "unique-id",
-      "name": "Speaker Name",
-      "quotes": [
-        { "text": "Exact verbatim quote from transcript" }
-      ]
-    }
-  ]
-}
 
 Rules:
 - Identify all distinct speakers in the transcript
@@ -440,6 +442,40 @@ Rules:
 - Extract 3-5 key/representative quotes per speaker (verbatim from transcript)
 - Order speakers by amount of speaking time (most first)
 - Quotes should capture that speaker's most important or characteristic contributions`;
+
+const SPEAKER_EXTRACTION_TOOL: Anthropic.Tool = {
+  name: 'extract_speakers',
+  description: 'Submit the extracted speakers and their key quotes from the meeting transcript.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      speakers: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Unique identifier for the speaker' },
+            name: { type: 'string', description: 'Speaker name' },
+            quotes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  text: { type: 'string', description: 'Verbatim quote from transcript' },
+                },
+                required: ['text'],
+              },
+              minItems: 1,
+              maxItems: 5,
+            },
+          },
+          required: ['id', 'name', 'quotes'],
+        },
+      },
+    },
+    required: ['speakers'],
+  },
+};
 
 export async function extractSpeakers(
   transcript: string,
@@ -453,26 +489,19 @@ export async function extractSpeakers(
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
     system: SPEAKER_EXTRACTION_PROMPT,
+    tools: [SPEAKER_EXTRACTION_TOOL],
+    tool_choice: { type: 'tool', name: 'extract_speakers' },
     messages: [{
       role: 'user',
       content: `Identify all speakers and their key quotes from this transcript:${knownNames}\n\n${transcript}`,
     }],
   });
 
-  const textBlock = response.content.find((block) => block.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    return [];
+  const toolBlock = response.content.find((block) => block.type === 'tool_use');
+  if (toolBlock && toolBlock.type === 'tool_use') {
+    const input = toolBlock.input as { speakers?: Speaker[] };
+    return input.speakers || [];
   }
 
-  try {
-    const parsed = JSON.parse(textBlock.text);
-    return parsed.speakers || [];
-  } catch {
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed.speakers || [];
-    }
-    return [];
-  }
+  return [];
 }
