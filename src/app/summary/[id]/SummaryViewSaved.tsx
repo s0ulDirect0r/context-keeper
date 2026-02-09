@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Markdown from 'react-markdown';
 import type { SavedSummary } from '@/lib/supabase/types';
@@ -11,8 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { ThemeBubbles } from '@/components/ThemeBubbles';
 import { SpeakerToolbar } from '@/components/SpeakerToolbar';
-import { StructuredSummaryView } from '@/components/StructuredSummaryView';
-import { copyRichText } from '@/lib/utils';
+import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
 import { Pencil, Loader2, Share2, Check, Link } from 'lucide-react';
 
 interface Props {
@@ -190,6 +189,14 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
     setTimeout(() => setCopiedShareLink(false), 2000);
   };
 
+  // Convert old structured summaries to markdown for uniform rendering
+  const markdownSummaries = useMemo<string[]>(() =>
+    isStructuredSummary(summary.summaries)
+      ? summary.summaries.map(s => structuredSummaryToMarkdown(s))
+      : summary.summaries,
+    [summary.summaries]
+  );
+
   const hasTranscripts = summary.transcripts !== null && summary.transcripts.length > 0;
 
   return (
@@ -299,40 +306,29 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
         </div>
       )}
 
-      {isStructuredSummary(summary.summaries) ? (
-        summary.summaries.map((s, index) => (
-          <StructuredSummaryView
-            key={index}
-            summary={s}
-            index={index}
-            total={summary.summaries.length}
-          />
-        ))
-      ) : (
-        summary.summaries.map((summaryText, index) => (
-          <Card key={index}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  {summary.summaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(summaryText, index)}
-                >
-                  {copiedIndex === index ? 'Copied!' : 'Copy'}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <Markdown>{summaryText}</Markdown>
-              </div>
-            </CardContent>
-          </Card>
-        ))
-      )}
+      {markdownSummaries.map((summaryText, index) => (
+        <Card key={index}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">
+                {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(summaryText, index)}
+              >
+                {copiedIndex === index ? 'Copied!' : 'Copy'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <Markdown>{summaryText}</Markdown>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
 
       {/* Context card — read-only or editable */}
       <div className="pt-4">

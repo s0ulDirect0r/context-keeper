@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { generateSummary, extractThemes, extractSpeakers, type SummaryContext } from '@/lib/claude';
-import { isStructuredSummary } from '@/lib/summary-types';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
     const combinedTranscript = transcripts.join('\n\n---\n\n');
 
     // Run summary generation, theme extraction, and speaker extraction in parallel
-    const [summaries, themes, speakers] = await Promise.all([
+    const [generatedSummaries, themes, speakers] = await Promise.all([
       generateSummary(transcripts, summaryContext, summaryMode, {
         titles: recordingTitles,
         dates: recordingDates,
@@ -42,6 +41,9 @@ export async function POST(request: Request) {
       extractThemes(combinedTranscript, summaryContext),
       extractSpeakers(combinedTranscript, otterSpeakerNames),
     ]);
+
+    // Store as markdown strings in the DB
+    const summaries: string[] = generatedSummaries.map(s => s.markdown);
 
     let savedSummaryId: string | null = null;
 
@@ -51,10 +53,10 @@ export async function POST(request: Request) {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        // Use recording titles if available, otherwise pull AI-generated title from structured summary
+        // Use recording titles if available, otherwise pull AI-generated title
         let title = deriveTitle(recordingTitles);
-        if (title === 'Untitled Summary' && isStructuredSummary(summaries) && summaries[0].title) {
-          title = summaries[0].title;
+        if (title === 'Untitled Summary' && generatedSummaries[0]?.title) {
+          title = generatedSummaries[0].title;
         }
 
         const insertData: Database['public']['Tables']['summaries']['Insert'] = {

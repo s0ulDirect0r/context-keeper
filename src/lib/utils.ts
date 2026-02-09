@@ -118,7 +118,14 @@ export function getSummaryPreviewText(summaries: SummaryContent): string {
     if (s.emergingThemes?.themes.length) return s.emergingThemes.themes.map(t => t.label).join(', ');
     return s.title || '';
   }
-  return summaries[0] || '';
+  // Markdown string — strip markdown formatting and take first ~200 chars
+  const raw = (summaries[0] || '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/>\s*/gm, '')
+    .trim();
+  return raw.slice(0, 200);
 }
 
 /**
@@ -148,5 +155,6 @@ export function getSummarySearchText(summaries: SummaryContent): string {
     }
     return parts.join(' ');
   }
+  // Markdown strings — just join them
   return summaries.join(' ');
 }

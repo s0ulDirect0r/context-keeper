@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { type SummaryContext, type Theme } from '@/lib/claude';
-import { isStructuredSummary } from '@/lib/summary-types';
+import { type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -35,10 +34,7 @@ export async function POST(request: Request) {
       additionalContext: context.additionalContext,
     };
 
-    let title = deriveTitle(recordingTitles);
-    if (title === 'Untitled Summary' && isStructuredSummary(summaries) && summaries[0].title) {
-      title = summaries[0].title;
-    }
+    const title = deriveTitle(recordingTitles);
 
     const insertData: Database['public']['Tables']['summaries']['Insert'] = {
       user_id: user.id,
