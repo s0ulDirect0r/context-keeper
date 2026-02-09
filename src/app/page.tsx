@@ -19,7 +19,7 @@ import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
-import type { SummaryContext } from '@/lib/claude';
+import type { SummaryContext, Pearl } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
 import {
   getStoredSession,
@@ -54,6 +54,7 @@ export default function Home() {
   const [summaries, setSummaries] = useState<SummaryContent>([]);
   const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
   const [recordingDates, setRecordingDates] = useState<string[]>([]);
+  const [pearls, setPearls] = useState<Pearl[]>([]);
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -322,6 +323,7 @@ export default function Home() {
     setStreamingMarkdown('');
     streamingMarkdownRef.current = '';
     setIsStreaming(false);
+    setPearls([]);
     setStep('generating');
     setError(null);
     setSavedSummaryId(null);
@@ -399,6 +401,10 @@ export default function Home() {
         }
         break;
 
+      case 'pearls_done':
+        setPearls((data.pearls || []) as Pearl[]);
+        break;
+
       case 'complete': {
         if (data.savedSummaryId) {
           router.push(`/summary/${data.savedSummaryId}`);
@@ -406,6 +412,9 @@ export default function Home() {
         }
         if (data.summaries) {
           setSummaries(data.summaries as string[]);
+        }
+        if (data.pearls) {
+          setPearls(data.pearls as Pearl[]);
         }
         setStep('summary');
         break;
@@ -425,6 +434,7 @@ export default function Home() {
     setRecordingDates([]);
     setContext(null);
     setSummaries([]);
+    setPearls([]);
     setSavedSummaryId(null);
     setError(null);
     setStreamingMarkdown('');
@@ -543,13 +553,16 @@ export default function Home() {
 
         {step === 'summary' && (
           <SummaryView
-            summaries={summaries}
-            context={context}
-            onStartOver={handleStartOver}
+            data={{
+              summaries,
+              context,
+              transcripts,
+              recordingTitles,
+            }}
+            pearls={pearls}
             savedSummaryId={savedSummaryId}
             onSaved={setSavedSummaryId}
-            recordingTitles={recordingTitles}
-            transcripts={transcripts}
+            onStartOver={handleStartOver}
           />
         )}
       </main>
