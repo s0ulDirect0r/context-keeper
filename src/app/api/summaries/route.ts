@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { type SummaryContext } from '@/lib/claude';
+import { type SummaryContext, type Pearl } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -12,7 +12,7 @@ function deriveTitle(recordingTitles?: string[]): string {
 
 export async function POST(request: Request) {
   try {
-    const { summaries, context, recordingTitles, transcripts } = await request.json();
+    const { summaries, context, recordingTitles, transcripts, pearls } = await request.json();
 
     if (!summaries || !Array.isArray(summaries) || summaries.length === 0) {
       return NextResponse.json({ error: 'Summaries required' }, { status: 400 });
@@ -53,6 +53,25 @@ export async function POST(request: Request) {
     if (saveError) {
       console.error('Failed to save summary:', saveError);
       return NextResponse.json({ error: 'Failed to save summary' }, { status: 500 });
+    }
+
+    // Save pearls if provided (guest sign-up-to-save flow)
+    if (pearls && Array.isArray(pearls) && pearls.length > 0) {
+      const pearlRows = (pearls as Pearl[]).map((pearl) => ({
+        user_id: user.id,
+        summary_id: data.id,
+        insight: pearl.insight,
+        concepts: pearl.concepts,
+        quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
+      }));
+
+      const { error: pearlError } = await supabase
+        .from('pearls')
+        .insert(pearlRows);
+
+      if (pearlError) {
+        console.error('Failed to save pearls during summary save:', pearlError);
+      }
     }
 
     return NextResponse.json({ savedSummaryId: data.id, title });

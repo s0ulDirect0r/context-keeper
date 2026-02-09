@@ -1,4 +1,4 @@
-import { generateSummary, streamSummarySingle, type SummaryContext } from '@/lib/claude';
+import { generateSummary, extractPearls, streamSummarySingle, type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
   };
 
   const summaryMode = mode === 'separate' ? 'separate' : 'combined';
+  const combinedTranscript = transcripts.join('\n\n---\n\n');
 
   // Get user before streaming starts (calls cookies() internally)
   let userId: string | null = null;
@@ -58,6 +59,14 @@ export async function POST(request: Request) {
           const summaries = generatedSummaries.map(s => s.markdown);
           send('summary_done', { summaries });
 
+          // Phase 2: extract pearls (needs the generated summary)
+          const pearls = await extractPearls(
+            combinedTranscript,
+            summaries.join('\n\n---\n\n'),
+            summaryContext
+          );
+          send('pearls_done', { pearls });
+
           // Save to DB
           let savedSummaryId: string | null = null;
           if (userId && supabase) {
@@ -82,10 +91,29 @@ export async function POST(request: Request) {
               console.error('Failed to save summary:', saveError);
             } else {
               savedSummaryId = data.id;
+
+              // Save pearls
+              if (pearls.length > 0) {
+                const pearlRows = pearls.map((pearl) => ({
+                  user_id: userId!,
+                  summary_id: data.id,
+                  insight: pearl.insight,
+                  concepts: pearl.concepts,
+                  quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
+                }));
+
+                const { error: pearlError } = await supabase
+                  .from('pearls')
+                  .insert(pearlRows);
+
+                if (pearlError) {
+                  console.error('Failed to save pearls:', pearlError);
+                }
+              }
             }
           }
 
-          send('complete', { savedSummaryId, summaries });
+          send('complete', { savedSummaryId, summaries, pearls });
         } else {
           // Streaming mode: single/combined summary
           const title = recordingTitles?.length === 1
@@ -94,7 +122,7 @@ export async function POST(request: Request) {
           const date = recordingDates?.[0];
 
           const messageStream = streamSummarySingle(
-            transcripts.join('\n\n---\n\n'),
+            combinedTranscript,
             summaryContext,
             title,
             date,
@@ -108,6 +136,14 @@ export async function POST(request: Request) {
 
           await messageStream.finalMessage();
           send('summary_done', {});
+
+          // Phase 2: extract pearls (needs the generated summary)
+          const pearls = await extractPearls(
+            combinedTranscript,
+            accumulatedText,
+            summaryContext
+          );
+          send('pearls_done', { pearls });
 
           // Extract title from first heading in the accumulated markdown
           const titleMatch = accumulatedText.match(/^#\s+(.+)$/m);
@@ -138,10 +174,29 @@ export async function POST(request: Request) {
               console.error('Failed to save summary:', saveError);
             } else {
               savedSummaryId = data.id;
+
+              // Save pearls
+              if (pearls.length > 0) {
+                const pearlRows = pearls.map((pearl) => ({
+                  user_id: userId!,
+                  summary_id: data.id,
+                  insight: pearl.insight,
+                  concepts: pearl.concepts,
+                  quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
+                }));
+
+                const { error: pearlError } = await supabase
+                  .from('pearls')
+                  .insert(pearlRows);
+
+                if (pearlError) {
+                  console.error('Failed to save pearls:', pearlError);
+                }
+              }
             }
           }
 
-          send('complete', { savedSummaryId, summaries: [accumulatedText] });
+          send('complete', { savedSummaryId, summaries: [accumulatedText], pearls });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to generate summary';
