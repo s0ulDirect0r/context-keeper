@@ -26,11 +26,16 @@ export async function POST(request: Request) {
     }
 
     // Delete existing pearls for this summary (handles regeneration case)
-    await supabase
+    const { error: deleteError } = await supabase
       .from('pearls')
       .delete()
       .eq('summary_id', summaryId)
       .eq('user_id', user.id);
+
+    if (deleteError) {
+      console.error('Failed to delete existing pearls:', deleteError);
+      return NextResponse.json({ error: 'Failed to update pearls' }, { status: 500 });
+    }
 
     // Insert kept pearls
     const rows = pearls.map((pearl) => ({
