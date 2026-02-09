@@ -43,6 +43,18 @@ const SUMMARY_TOOL: Anthropic.Tool = {
   },
 };
 
+export interface ThemeQuote {
+  text: string;
+  speaker?: string;
+}
+
+export interface Pearl {
+  id: string;
+  insight: string;
+  concepts: string[];
+  quote?: ThemeQuote;
+}
+
 export interface SummaryContext {
   extractionGoal: string;
   additionalContext?: string;
@@ -173,3 +185,102 @@ export function streamSummarySingle(
   });
 }
 
+// ── Pearl extraction ──────────────────────────────────────────────────
+
+const PEARL_EXTRACTION_PROMPT = `You are a second-pass analyst. You've already seen the meeting summary — now you're looking for what it MISSED.
+
+Pearls are distilled truths: patterns, dynamics, tensions, or wisdom that live beneath the surface of a conversation. They're the things a thoughtful observer would notice but most people wouldn't articulate.
+
+Rules:
+- Extract 3-7 pearls
+- Each pearl is 1-2 sentences — a crisp, standalone insight
+- Be honest. If there's tension, name it. If someone is being evasive, say so.
+- Don't restate what the summary already covers. Find what it left out.
+- Tag each pearl with 1-3 abstract concept words (e.g. "trust", "ownership", "momentum")
+- Optionally ground a pearl with a verbatim quote when it strengthens the insight
+- Concepts should be abstract and reusable across meetings — not surface-level topics`;
+
+const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
+  name: 'extract_pearls',
+  description: 'Submit distilled pearls of insight from the meeting.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      pearls: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Unique identifier for the pearl' },
+            insight: { type: 'string', description: '1-2 sentence distilled truth' },
+            concepts: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 1,
+              maxItems: 3,
+              description: 'Abstract concept tags (e.g. "trust", "ownership")',
+            },
+            quote: {
+              type: 'object',
+              properties: {
+                text: { type: 'string', description: 'Verbatim quote from transcript' },
+                speaker: { type: 'string', description: 'Speaker name if identifiable' },
+              },
+              required: ['text'],
+              description: 'Optional grounding quote',
+            },
+          },
+          required: ['id', 'insight', 'concepts'],
+        },
+        minItems: 3,
+        maxItems: 7,
+      },
+    },
+    required: ['pearls'],
+  },
+};
+
+export async function extractPearls(
+  transcript: string,
+  summaryMarkdown: string,
+  context: SummaryContext
+): Promise<Pearl[]> {
+  try {
+    const userMessage = `Here is the meeting summary that was already generated:
+
+---
+${summaryMarkdown}
+---
+
+Now find what the summary missed. Extract pearls — hidden truths, patterns, dynamics, and wisdom from the original transcript.
+
+**What the user cares about:** ${context.extractionGoal}
+${context.additionalContext ? `\n**Additional context:** ${context.additionalContext}` : ''}
+
+---
+
+**Original transcript:**
+${transcript}`;
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      system: PEARL_EXTRACTION_PROMPT,
+      tools: [PEARL_EXTRACTION_TOOL],
+      tool_choice: { type: 'tool', name: 'extract_pearls' },
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const toolBlock = response.content.find((block) => block.type === 'tool_use');
+    if (toolBlock && toolBlock.type === 'tool_use') {
+      const input = toolBlock.input as { pearls?: Pearl[] };
+      return input.pearls || [];
+    }
+
+    return [];
+  } catch (error) {
+    // Pearl extraction is non-critical — log and return empty
+    console.error('Pearl extraction failed:', error);
+    return [];
+  }
+}
