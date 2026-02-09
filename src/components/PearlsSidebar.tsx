@@ -90,7 +90,7 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
         <h3 className="font-semibold text-sm">Pearls</h3>
       </div>
       <p className="text-xs text-muted-foreground">
-        Hidden truths the summary missed. Keep the ones that resonate.
+        Observations from the conversation. Keep the ones worth tracking.
       </p>
 
       <div className="space-y-3">

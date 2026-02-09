@@ -187,22 +187,27 @@ export function streamSummarySingle(
 
 // ── Pearl extraction ──────────────────────────────────────────────────
 
-const PEARL_EXTRACTION_PROMPT = `You are a second-pass analyst. You've already seen the meeting summary — now you're looking for what it MISSED.
+const PEARL_EXTRACTION_PROMPT = `You are a field researcher studying how people and teams actually work. Your job is to collect observations — units of evidence about patterns, dynamics, and trajectories in a conversation.
 
-Pearls are distilled truths: patterns, dynamics, tensions, or wisdom that live beneath the surface of a conversation. They're the things a thoughtful observer would notice but most people wouldn't articulate.
+A pearl is not a conclusion or advice. It's an observation that carries interpretive weight. Think field notes, not verdicts. Each pearl should be specific enough to be evidence and open enough to gain meaning alongside future observations.
+
+A good pearl makes someone think: "I wonder if that keeps showing up."
+
+You have the summary (how the meeting was understood) and the transcript (what was actually said). Look for patterns in both.
 
 Rules:
 - Extract 3-7 pearls
-- Each pearl is 1-2 sentences — a crisp, standalone insight
-- Be honest. If there's tension, name it. If someone is being evasive, say so.
-- Don't restate what the summary already covers. Find what it left out.
-- Tag each pearl with 1-3 abstract concept words (e.g. "trust", "ownership", "momentum")
-- Optionally ground a pearl with a verbatim quote when it strengthens the insight
-- Concepts should be abstract and reusable across meetings — not surface-level topics`;
+- Each pearl is 1-2 sentences — a specific, grounded observation
+- Observations, not prescriptions. "Trust is being extended before it's been earned" not "they should build more trust first."
+- Reflect what's genuinely there. Don't project dynamics that aren't present.
+- Name patterns with clarity, not judgment. "Authority is moving from decisions to questions" not "someone is losing control."
+- Tag each pearl with 1-3 concept words — these are the axes along which evidence accumulates across meetings. Make them abstract and reusable (e.g. "trust", "ownership", "momentum"), not surface-level topics (e.g. "Q2 budget", "hiring").
+- Ground with a verbatim quote when it strengthens the observation
+- Each pearl should stand alone as a meaningful data point, but become more powerful in a collection`;
 
 const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
   name: 'extract_pearls',
-  description: 'Submit distilled pearls of insight from the meeting.',
+  description: 'Submit field observations — evidence of patterns and dynamics from the meeting.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -246,13 +251,13 @@ export async function extractPearls(
   context: SummaryContext
 ): Promise<Pearl[]> {
   try {
-    const userMessage = `Here is the meeting summary that was already generated:
+    const userMessage = `Here is how this meeting was summarized:
 
 ---
 ${summaryMarkdown}
 ---
 
-Now find what the summary missed. Extract pearls — hidden truths, patterns, dynamics, and wisdom from the original transcript.
+Now collect observations. What patterns, dynamics, or trajectories do you see in the conversation? What evidence is here?
 
 **What the user cares about:** ${context.extractionGoal}
 ${context.additionalContext ? `\n**Additional context:** ${context.additionalContext}` : ''}
