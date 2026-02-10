@@ -151,8 +151,6 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
     }
   };
 
-  const isHeading = /^#{1,6}\s/.test(chunk);
-
   if (editing) {
     return (
       <div className="group relative">
@@ -167,7 +165,7 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
           }}
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
-          className="w-full resize-none rounded-md border border-ring bg-background px-3 py-2 text-sm font-mono leading-relaxed outline-none ring-2 ring-ring/30"
+          className="w-full resize-none rounded-md border border-ring bg-background pl-3 pr-10 py-2 text-sm font-mono leading-relaxed outline-none ring-2 ring-ring/30"
           rows={1}
         />
         <button
@@ -190,7 +188,7 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
       <div className="prose prose-sm dark:prose-invert max-w-none">
         <Markdown>{chunk}</Markdown>
       </div>
-      {!readOnly && !isHeading && (
+      {!readOnly && (
         <button
           onClick={() => setEditing(true)}
           className="absolute -right-1 top-0 rounded-md p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all"
