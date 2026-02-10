@@ -19,20 +19,82 @@ import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
-import type { SummaryContext, Pearl } from '@/lib/claude';
+import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
+import { SpeakerSelect } from '@/components/SpeakerSelect';
+import { TagSelector } from '@/components/TagSelector';
 import {
   getStoredSession,
   storeSession,
   clearSession,
   type StoredOtterSession,
 } from '@/lib/storage';
+import type { User } from '@supabase/supabase-js';
+
+/** Try to auto-match a speaker name to the logged-in user */
+function autoMatchUserSpeaker(
+  speakerNames: string[],
+  otterEmail?: string,
+  user?: User | null,
+): string | null {
+  if (speakerNames.length === 0) return null;
+
+  // Build candidate name fragments from available identity info
+  const candidates: string[] = [];
+
+  // From Otter email: e.g. "john.doe@gmail.com" -> ["john", "doe", "john doe"]
+  if (otterEmail) {
+    const localPart = otterEmail.split('@')[0].replace(/[._+]/g, ' ').trim();
+    candidates.push(localPart);
+    candidates.push(...localPart.split(' '));
+  }
+
+  // From Supabase user metadata
+  if (user) {
+    const meta = user.user_metadata;
+    if (meta?.full_name) candidates.push(meta.full_name);
+    if (meta?.name) candidates.push(meta.name);
+    if (meta?.first_name) candidates.push(meta.first_name);
+    // From user email
+    if (user.email) {
+      const localPart = user.email.split('@')[0].replace(/[._+]/g, ' ').trim();
+      candidates.push(localPart);
+      candidates.push(...localPart.split(' '));
+    }
+  }
+
+  // Case-insensitive match: check if any speaker name contains or matches a candidate
+  const lower = candidates.map(c => c.toLowerCase()).filter(c => c.length >= 2);
+
+  for (const speaker of speakerNames) {
+    const speakerLower = speaker.toLowerCase();
+    for (const candidate of lower) {
+      if (speakerLower === candidate || speakerLower.includes(candidate) || candidate.includes(speakerLower)) {
+        return speaker;
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Extract speaker names from transcript text with "Name: text" format */
+function parseSpeakerNames(transcript: string): string[] {
+  const speakerPattern = /^([A-Z][a-zA-Z]*(?:\s[A-Z][a-zA-Z]*)*):\s/gm;
+  const names = new Set<string>();
+  let match;
+  while ((match = speakerPattern.exec(transcript)) !== null) {
+    names.add(match[1]);
+  }
+  return [...names];
+}
 
 type Step =
   | 'choose-method'
   | 'otter-login'
   | 'otter-recordings'
   | 'manual-transcript'
+  | 'speaker-select'
   | 'context-wizard'
   | 'summary-mode'
   | 'generating'
@@ -55,9 +117,21 @@ export default function Home() {
   const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
   const [recordingDates, setRecordingDates] = useState<string[]>([]);
   const [pearls, setPearls] = useState<Pearl[]>([]);
+  const [conceptTags, setConceptTags] = useState<ConceptTag[]>([]);
+  const [generatingPearls, setGeneratingPearls] = useState(false);
+  // Lifted tag selection state so it survives generating→summary step transition
+  const [tagSelection, setTagSelection] = useState<Set<string>>(new Set());
+  const [tagCustomTags, setTagCustomTags] = useState<Set<string>>(new Set());
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
+
+  // Tag extraction state
+  const [tagsExtracting, setTagsExtracting] = useState(false);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Speaker identification state
+  const [speakerNames, setSpeakerNames] = useState<string[]>([]);
+  const [userSpeakerName, setUserSpeakerName] = useState<string | undefined>(undefined);
 
   // Streaming generation state
   const [streamingMarkdown, setStreamingMarkdown] = useState('');
@@ -288,8 +362,21 @@ export default function Home() {
       setRecordingTitles(selected.map((r) => r?.title || 'Untitled'));
       setRecordingDates(selected.map((r) => r?.createdAt?.toISOString() || ''));
 
+      // Capture speaker names and try to auto-identify the user
+      const returnedSpeakers: string[] = data.speakerNames ?? [];
+      setSpeakerNames(returnedSpeakers);
+
+      // Auto-match: try the Otter account email's local part or the user's display name
+      const matched = autoMatchUserSpeaker(returnedSpeakers, otterSession.email, user);
+      setUserSpeakerName(matched ?? undefined);
+
       setTranscripts(validTranscripts);
-      setStep('context-wizard');
+      if (returnedSpeakers.length > 1 && !matched) {
+        // Multiple speakers but couldn't auto-match — ask the user
+        setStep('speaker-select');
+      } else {
+        setStep('context-wizard');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch transcripts');
     } finally {
@@ -301,6 +388,22 @@ export default function Home() {
     setRecordingTitles([]);
     setRecordingDates([]);
     setTranscripts([transcript]);
+
+    // Try to extract speaker names from pasted transcript (lines like "Name: ...")
+    const parsedSpeakers = parseSpeakerNames(transcript);
+    setSpeakerNames(parsedSpeakers);
+
+    if (parsedSpeakers.length > 1) {
+      // Try auto-matching against user's display name or email
+      const matched = autoMatchUserSpeaker(parsedSpeakers, undefined, user);
+      setUserSpeakerName(matched ?? undefined);
+
+      if (!matched) {
+        setStep('speaker-select');
+        return;
+      }
+    }
+
     setStep('context-wizard');
   };
 
@@ -324,9 +427,13 @@ export default function Home() {
     streamingMarkdownRef.current = '';
     setIsStreaming(false);
     setPearls([]);
+    setConceptTags([]);
+    setTagSelection(new Set());
+    setTagCustomTags(new Set());
     setStep('generating');
     setError(null);
     setSavedSummaryId(null);
+    setTagsExtracting(false);
 
     try {
       const response = await fetch('/api/summarize', {
@@ -401,20 +508,24 @@ export default function Home() {
         }
         break;
 
-      case 'pearls_done':
-        setPearls((data.pearls || []) as Pearl[]);
+      case 'tags_extracting':
+        setTagsExtracting(true);
+        break;
+
+      case 'tags_done':
+        setTagsExtracting(false);
+        setConceptTags((data.tags || []) as ConceptTag[]);
         break;
 
       case 'complete': {
         if (data.savedSummaryId) {
-          router.push(`/summary/${data.savedSummaryId}`);
-          return;
+          setSavedSummaryId(data.savedSummaryId as string);
         }
         if (data.summaries) {
           setSummaries(data.summaries as string[]);
         }
-        if (data.pearls) {
-          setPearls(data.pearls as Pearl[]);
+        if (data.tags) {
+          setConceptTags(data.tags as ConceptTag[]);
         }
         setStep('summary');
         break;
@@ -423,6 +534,48 @@ export default function Home() {
       case 'error':
         break;
     }
+  };
+
+  const handleTagSelection = async (selectedTags: string[]) => {
+    setGeneratingPearls(true);
+    setError(null);
+
+    let generatedPearls: Pearl[] = [];
+    try {
+      const combinedTranscript = transcripts.join('\n\n---\n\n');
+      const summaryMarkdown = Array.isArray(summaries)
+        ? summaries.join('\n\n---\n\n')
+        : '';
+
+      const response = await fetch('/api/pearls/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: combinedTranscript,
+          summaryMarkdown,
+          context,
+          speakerIdentity: userSpeakerName ? { userName: userSpeakerName } : undefined,
+          selectedTags,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      generatedPearls = data.pearls || [];
+      setPearls(generatedPearls);
+    } catch (err) {
+      console.error('Pearl generation failed:', err);
+    }
+
+    // Don't auto-save pearls — let the user curate (keep/discard/edit) first.
+    // PearlsSidebar handles saving after curation.
+    setGeneratingPearls(false);
+    setStep('summary');
+  };
+
+  const handleTagSkip = async () => {
+    await handleTagSelection([]);
   };
 
   const handleStartOver = () => {
@@ -435,10 +588,16 @@ export default function Home() {
     setContext(null);
     setSummaries([]);
     setPearls([]);
+    setConceptTags([]);
+    setTagSelection(new Set());
+    setTagCustomTags(new Set());
     setSavedSummaryId(null);
     setError(null);
     setStreamingMarkdown('');
     streamingMarkdownRef.current = '';
+    setSpeakerNames([]);
+    setUserSpeakerName(undefined);
+    setTagsExtracting(false);
   };
 
   const handleDisconnectOtter = async () => {
@@ -526,6 +685,19 @@ export default function Home() {
           />
         )}
 
+        {step === 'speaker-select' && (
+          <SpeakerSelect
+            speakerNames={speakerNames}
+            onSelect={(name) => {
+              setUserSpeakerName(name ?? undefined);
+              setStep('context-wizard');
+            }}
+            onBack={() =>
+              goBack(inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
+            }
+          />
+        )}
+
         {step === 'context-wizard' && (
           <ContextWizard
             onComplete={handleContextComplete}
@@ -545,10 +717,39 @@ export default function Home() {
         )}
 
         {step === 'generating' && (
-          <StreamingGenerationView
-            markdown={streamingMarkdown}
-            isStreaming={isStreaming}
-          />
+          <div className="flex flex-col lg:flex-row gap-8">
+            <div className="min-w-0 flex-1 max-w-3xl">
+              <StreamingGenerationView
+                markdown={streamingMarkdown}
+                isStreaming={isStreaming}
+              />
+            </div>
+            <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
+              <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                  Focus your pearls
+                </h3>
+                {conceptTags.length > 0 ? (
+                  <TagSelector
+                    tags={conceptTags}
+                    generating={generatingPearls}
+                    onSubmit={handleTagSelection}
+                    onSkip={handleTagSkip}
+                    selected={tagSelection}
+                    onSelectedChange={setTagSelection}
+                    customTags={tagCustomTags}
+                    onCustomTagsChange={setTagCustomTags}
+                    compact
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                    Identifying themes...
+                  </div>
+                )}
+              </div>
+            </aside>
+          </div>
         )}
 
         {step === 'summary' && (
@@ -563,6 +764,14 @@ export default function Home() {
             savedSummaryId={savedSummaryId}
             onSaved={setSavedSummaryId}
             onStartOver={handleStartOver}
+            conceptTags={pearls.length === 0 ? conceptTags : undefined}
+            onTagSubmit={pearls.length === 0 ? handleTagSelection : undefined}
+            onTagSkip={pearls.length === 0 ? handleTagSkip : undefined}
+            generatingPearls={generatingPearls}
+            tagSelection={tagSelection}
+            onTagSelectionChange={setTagSelection}
+            tagCustomTags={tagCustomTags}
+            onTagCustomTagsChange={setTagCustomTags}
           />
         )}
       </main>

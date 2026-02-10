@@ -11,10 +11,11 @@ import { AuthDialog } from './AuthDialog';
 import { useAuth } from './AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
 import { Pencil, Loader2, Share2, Check, Link } from 'lucide-react';
-import type { SummaryContext, Pearl } from '@/lib/claude';
+import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
 import type { SavedSummary, SavedPearl } from '@/lib/supabase/types';
 import { isStructuredSummary } from '@/lib/summary-types';
+import { TagSelector } from './TagSelector';
 
 // ── Prop shapes ──────────────────────────────────────────────────────
 
@@ -45,6 +46,19 @@ interface InlineProps extends BaseProps {
   savedSummaryId?: string | null;
   /** Called when guest signs up and summary gets saved */
   onSaved?: (id: string) => void;
+  /** Tags for sidebar selection (when user dismissed the tag modal) */
+  conceptTags?: ConceptTag[];
+  /** Called when user submits tags from the sidebar */
+  onTagSubmit?: (selectedTags: string[]) => void;
+  /** Called when user skips tag selection from the sidebar */
+  onTagSkip?: () => void;
+  /** Whether pearls are currently being generated */
+  generatingPearls?: boolean;
+  /** Controlled tag selection state */
+  tagSelection?: Set<string>;
+  onTagSelectionChange?: (next: Set<string>) => void;
+  tagCustomTags?: Set<string>;
+  onTagCustomTagsChange?: (next: Set<string>) => void;
 }
 
 interface SavedProps extends BaseProps {
@@ -75,9 +89,15 @@ export function SummaryView(props: SummaryViewProps) {
   const [summaries, setSummaries] = useState(initialSummaries);
   const [context, setContext] = useState(initialContext);
 
-  // Pearl state
+  // Pearl state — sync from props when pearls arrive after initial render
   const [curatingPearls, setCuratingPearls] = useState<Pearl[] | undefined>(props.pearls);
   const [displayPearls, setDisplayPearls] = useState<SavedPearl[]>(props.savedPearls ?? []);
+
+  useEffect(() => {
+    if (props.pearls && props.pearls.length > 0) {
+      setCuratingPearls(props.pearls);
+    }
+  }, [props.pearls]);
 
   // Copy state
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -262,11 +282,9 @@ export function SummaryView(props: SummaryViewProps) {
         setContext(newContext);
         setEditingContext(false);
 
-        // Show new pearls for curation
-        if (data.pearls?.length > 0) {
-          setCuratingPearls(data.pearls);
-          setDisplayPearls([]);
-        }
+        // Clear existing pearls — user will need to regenerate via tag selection
+        setCuratingPearls(undefined);
+        setDisplayPearls([]);
       } else {
         if (data.savedSummaryId) {
           router.push(`/summary/${data.savedSummaryId}`);
@@ -328,11 +346,20 @@ export function SummaryView(props: SummaryViewProps) {
     props.onPearlsSaved?.(savedPearlList);
   };
 
-  // ── Determine pearl sidebar mode ───────────────────────────────
+  // ── Determine sidebar mode ─────────────────────────────────────
 
   const hasCuratingPearls = curatingPearls && curatingPearls.length > 0;
   const hasDisplayPearls = displayPearls.length > 0;
-  const showPearlsSidebar = hasCuratingPearls || hasDisplayPearls;
+  const inlineConceptTags = !saved ? (props as InlineProps).conceptTags : undefined;
+  const inlineOnTagSubmit = !saved ? (props as InlineProps).onTagSubmit : undefined;
+  const inlineOnTagSkip = !saved ? (props as InlineProps).onTagSkip : undefined;
+  const inlineGeneratingPearls = !saved ? (props as InlineProps).generatingPearls : false;
+  const inlineTagSelection = !saved ? (props as InlineProps).tagSelection : undefined;
+  const inlineOnTagSelectionChange = !saved ? (props as InlineProps).onTagSelectionChange : undefined;
+  const inlineTagCustomTags = !saved ? (props as InlineProps).tagCustomTags : undefined;
+  const inlineOnTagCustomTagsChange = !saved ? (props as InlineProps).onTagCustomTagsChange : undefined;
+  const hasTagsForSidebar = inlineConceptTags && inlineConceptTags.length > 0 && !hasCuratingPearls && !hasDisplayPearls;
+  const showPearlsSidebar = hasCuratingPearls || hasDisplayPearls || hasTagsForSidebar;
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -633,7 +660,7 @@ export function SummaryView(props: SummaryViewProps) {
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       {summaryContent}
-      <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0">
+      <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
         {hasCuratingPearls ? (
           <PearlsSidebar
             mode="curate"
@@ -642,9 +669,26 @@ export function SummaryView(props: SummaryViewProps) {
             onSaved={handlePearlsSaved}
             isLoggedIn={!!user}
           />
-        ) : (
+        ) : hasDisplayPearls ? (
           <PearlsSidebar mode="display" pearls={displayPearls} />
-        )}
+        ) : hasTagsForSidebar && inlineOnTagSubmit && inlineOnTagSkip && inlineTagSelection && inlineOnTagSelectionChange && inlineTagCustomTags && inlineOnTagCustomTagsChange ? (
+          <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+              Focus your pearls
+            </h3>
+            <TagSelector
+              tags={inlineConceptTags}
+              generating={inlineGeneratingPearls}
+              onSubmit={inlineOnTagSubmit}
+              onSkip={inlineOnTagSkip}
+              selected={inlineTagSelection}
+              onSelectedChange={inlineOnTagSelectionChange}
+              customTags={inlineTagCustomTags}
+              onCustomTagsChange={inlineOnTagCustomTagsChange}
+              compact
+            />
+          </div>
+        ) : null}
       </aside>
     </div>
   );
