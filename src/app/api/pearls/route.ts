@@ -5,9 +5,10 @@ import { toSavedPearl, type Database } from '@/lib/supabase/types';
 
 export async function POST(request: Request) {
   try {
-    const { pearls, summaryId } = await request.json() as {
+    const { pearls, summaryId, selectedTags } = await request.json() as {
       pearls: Pearl[];
       summaryId: string;
+      selectedTags?: string[];
     };
 
     if (!pearls || !Array.isArray(pearls) || pearls.length === 0) {
@@ -54,6 +55,15 @@ export async function POST(request: Request) {
     if (insertError) {
       console.error('Failed to save pearls:', insertError);
       return NextResponse.json({ error: 'Failed to save pearls' }, { status: 500 });
+    }
+
+    // Store selected tags on the summary if provided
+    if (selectedTags && selectedTags.length > 0) {
+      await supabase
+        .from('summaries')
+        .update({ selected_tags: selectedTags })
+        .eq('id', summaryId)
+        .eq('user_id', user.id);
     }
 
     type PearlRow = Database['public']['Tables']['pearls']['Row'];

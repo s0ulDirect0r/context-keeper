@@ -1,4 +1,4 @@
-import { generateSummary, extractPearls, streamSummarySingle, type SummaryContext } from '@/lib/claude';
+import { generateSummary, extractTags, streamSummarySingle, type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -49,6 +49,18 @@ export async function POST(request: Request) {
       };
 
       try {
+        // Start tag extraction in parallel — it only needs the transcript + context.
+        // Use .then() to send tags_done as soon as tags resolve, even if summary
+        // is still streaming (JS is single-threaded so enqueue calls are safe).
+        send('tags_extracting', {});
+        let resolvedTags: Awaited<ReturnType<typeof extractTags>> = [];
+        const tagPromise = extractTags(combinedTranscript, summaryContext)
+          .then(tags => {
+            resolvedTags = tags;
+            send('tags_done', { tags });
+            return tags;
+          });
+
         if (summaryMode === 'separate' && transcripts.length > 1) {
           // Non-streaming fallback for separate mode
           const generatedSummaries = await generateSummary(transcripts, summaryContext, 'separate', {
@@ -59,15 +71,10 @@ export async function POST(request: Request) {
           const summaries = generatedSummaries.map(s => s.markdown);
           send('summary_done', { summaries });
 
-          // Phase 2: extract pearls (needs the generated summary)
-          const pearls = await extractPearls(
-            combinedTranscript,
-            summaries.join('\n\n---\n\n'),
-            summaryContext
-          );
-          send('pearls_done', { pearls });
+          // Ensure tags are done before proceeding
+          await tagPromise;
 
-          // Save to DB
+          // Save summary to DB (pearls saved later after tag selection)
           let savedSummaryId: string | null = null;
           if (userId && supabase) {
             let title = deriveTitle(recordingTitles);
@@ -91,29 +98,10 @@ export async function POST(request: Request) {
               console.error('Failed to save summary:', saveError);
             } else {
               savedSummaryId = data.id;
-
-              // Save pearls
-              if (pearls.length > 0) {
-                const pearlRows = pearls.map((pearl) => ({
-                  user_id: userId!,
-                  summary_id: data.id,
-                  insight: pearl.insight,
-                  concepts: pearl.concepts,
-                  quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
-                }));
-
-                const { error: pearlError } = await supabase
-                  .from('pearls')
-                  .insert(pearlRows);
-
-                if (pearlError) {
-                  console.error('Failed to save pearls:', pearlError);
-                }
-              }
             }
           }
 
-          send('complete', { savedSummaryId, summaries, pearls });
+          send('complete', { savedSummaryId, summaries, tags: resolvedTags });
         } else {
           // Streaming mode: single/combined summary
           const title = recordingTitles?.length === 1
@@ -137,13 +125,8 @@ export async function POST(request: Request) {
           await messageStream.finalMessage();
           send('summary_done', {});
 
-          // Phase 2: extract pearls (needs the generated summary)
-          const pearls = await extractPearls(
-            combinedTranscript,
-            accumulatedText,
-            summaryContext
-          );
-          send('pearls_done', { pearls });
+          // Ensure tags are done before proceeding
+          await tagPromise;
 
           // Extract title from first heading in the accumulated markdown
           const titleMatch = accumulatedText.match(/^#\s+(.+)$/m);
@@ -155,7 +138,7 @@ export async function POST(request: Request) {
             displayTitle = extractedTitle;
           }
 
-          // Save to DB
+          // Save summary to DB (pearls saved later after tag selection)
           let savedSummaryId: string | null = null;
           if (userId && supabase) {
             const { data, error: saveError } = await supabase
@@ -174,29 +157,10 @@ export async function POST(request: Request) {
               console.error('Failed to save summary:', saveError);
             } else {
               savedSummaryId = data.id;
-
-              // Save pearls
-              if (pearls.length > 0) {
-                const pearlRows = pearls.map((pearl) => ({
-                  user_id: userId!,
-                  summary_id: data.id,
-                  insight: pearl.insight,
-                  concepts: pearl.concepts,
-                  quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
-                }));
-
-                const { error: pearlError } = await supabase
-                  .from('pearls')
-                  .insert(pearlRows);
-
-                if (pearlError) {
-                  console.error('Failed to save pearls:', pearlError);
-                }
-              }
             }
           }
 
-          send('complete', { savedSummaryId, summaries: [accumulatedText], pearls });
+          send('complete', { savedSummaryId, summaries: [accumulatedText], tags: resolvedTags });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to generate summary';

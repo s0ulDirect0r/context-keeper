@@ -46,6 +46,7 @@ const SUMMARY_TOOL: Anthropic.Tool = {
 export interface ThemeQuote {
   text: string;
   speaker?: string;
+  isUser?: boolean;
 }
 
 export interface Pearl {
@@ -185,7 +186,87 @@ export function streamSummarySingle(
   });
 }
 
-// ── Pearl extraction ──────────────────────────────────────────────────
+// ── Tag extraction (first pass) ──────────────────────────────────────
+
+const TAG_EXTRACTION_PROMPT = `You are a field researcher preparing to study a conversation. Before collecting observations, you need to identify the conceptual landscape — the themes, dynamics, and domains present in this meeting.
+
+Extract 10-15 concept tags that represent the key themes, dynamics, and patterns in this conversation. These tags should be:
+- EXACTLY ONE WORD each, matching the regex /^\\S+$/ — no spaces, no exceptions. If a concept is naturally two words (e.g. "team dynamics"), find the single word that captures the essence ("dynamics"). Hyphenated compounds like "decision-making" are acceptable.
+- Abstract and reusable (e.g. "trust", "ownership", "momentum", "alignment"), not surface-level topics
+- Mix of interpersonal dynamics ("conflict", "delegation"), process patterns ("prioritization"), and conceptual themes ("innovation", "risk")
+- Specific enough to be meaningful, broad enough to apply across meetings
+
+Think of these as the axes along which evidence might accumulate over time.`;
+
+const TAG_EXTRACTION_TOOL: Anthropic.Tool = {
+  name: 'extract_tags',
+  description: 'Submit concept tags identified in the conversation.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      tags: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'The concept tag (exactly one word, lowercase)' },
+            reason: { type: 'string', description: 'Brief explanation of why this tag is present (1 sentence)' },
+          },
+          required: ['name', 'reason'],
+        },
+        minItems: 10,
+        maxItems: 15,
+        description: 'Concept tags found in the conversation',
+      },
+    },
+    required: ['tags'],
+  },
+};
+
+export interface ConceptTag {
+  name: string;
+  reason: string;
+}
+
+export async function extractTags(
+  transcript: string,
+  context: SummaryContext
+): Promise<ConceptTag[]> {
+  try {
+    const userMessage = `What conceptual themes, dynamics, and patterns are present in this conversation?
+
+**What the user cares about:** ${context.extractionGoal}
+${context.additionalContext ? `\n**Additional context:** ${context.additionalContext}` : ''}
+
+---
+
+**Transcript:**
+${transcript}`;
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      system: TAG_EXTRACTION_PROMPT,
+      tools: [TAG_EXTRACTION_TOOL],
+      tool_choice: { type: 'tool', name: 'extract_tags' },
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const toolBlock = response.content.find((block) => block.type === 'tool_use');
+    if (toolBlock && toolBlock.type === 'tool_use') {
+      const input = toolBlock.input as { tags?: ConceptTag[] };
+      // Enforce single-word tags — drop any with whitespace
+      return (input.tags || []).filter(tag => /^\S+$/.test(tag.name));
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Tag extraction failed:', error);
+    return [];
+  }
+}
+
+// ── Pearl extraction (second pass — scoped to selected tags) ─────────
 
 const PEARL_EXTRACTION_PROMPT = `You are a field researcher studying how people and teams actually work. Your job is to collect observations — units of evidence about patterns, dynamics, and trajectories in a conversation.
 
@@ -203,8 +284,9 @@ Rules:
 - Reflect what's genuinely there. Don't project dynamics that aren't present.
 - Name patterns with clarity, not judgment. "Authority is moving from decisions to questions" not "someone is losing control."
 - Tag each pearl with 1-3 concept words — these are the axes along which evidence accumulates across meetings. Make them abstract and reusable (e.g. "trust", "ownership", "momentum"), not surface-level topics (e.g. "Q2 budget", "hiring").
-- Ground with a verbatim quote when it strengthens the observation
-- Each pearl should stand alone as a meaningful data point, but become more powerful in a collection`;
+- Ground with a verbatim quote when it strengthens the observation. Always attribute quotes to specific speakers when names are present in the transcript.
+- Each pearl should stand alone as a meaningful data point, but become more powerful in a collection
+- If you are told which speaker is the user, set is_user to true on quotes from that speaker. This helps distinguish "my quotes" from "team quotes" later.`;
 
 const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
   name: 'extract_pearls',
@@ -231,6 +313,7 @@ const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
               properties: {
                 text: { type: 'string', description: 'Verbatim quote from transcript' },
                 speaker: { type: 'string', description: 'Speaker name if identifiable' },
+                is_user: { type: 'boolean', description: 'True if this quote is from the user (the person reading the summary). Only set if user identity is provided.' },
               },
               required: ['text'],
               description: 'Optional grounding quote',
@@ -246,12 +329,29 @@ const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
   },
 };
 
+export interface SpeakerIdentity {
+  /** The speaker name in the transcript that corresponds to the logged-in user */
+  userName?: string;
+}
+
 export async function extractPearls(
   transcript: string,
   summaryMarkdown: string,
-  context: SummaryContext
+  context: SummaryContext,
+  speakerIdentity?: SpeakerIdentity,
+  selectedTags?: string[],
 ): Promise<Pearl[]> {
   try {
+    let userIdentityNote = '';
+    if (speakerIdentity?.userName) {
+      userIdentityNote = `\n\n**The user reading this summary is "${speakerIdentity.userName}" in the transcript.** When attributing quotes, set is_user to true for quotes from this speaker.`;
+    }
+
+    let tagFocusNote = '';
+    if (selectedTags && selectedTags.length > 0) {
+      tagFocusNote = `\n\n**Focus your observations on these concept areas:** ${selectedTags.join(', ')}. Use these tags (and closely related ones) for the concept labels on each pearl. Only extract pearls that are relevant to these themes.`;
+    }
+
     const userMessage = `Here is how this meeting was summarized:
 
 ---
@@ -261,7 +361,7 @@ ${summaryMarkdown}
 Now collect observations. What patterns, dynamics, or trajectories do you see in the conversation? What evidence is here?
 
 **What the user cares about:** ${context.extractionGoal}
-${context.additionalContext ? `\n**Additional context:** ${context.additionalContext}` : ''}
+${context.additionalContext ? `\n**Additional context:** ${context.additionalContext}` : ''}${userIdentityNote}${tagFocusNote}
 
 ---
 
@@ -279,8 +379,8 @@ ${transcript}`;
 
     const toolBlock = response.content.find((block) => block.type === 'tool_use');
     if (toolBlock && toolBlock.type === 'tool_use') {
-      const input = toolBlock.input as { pearls?: Pearl[] };
-      return input.pearls || [];
+      const input = toolBlock.input as { pearls?: RawPearl[] };
+      return (input.pearls || []).map(normalizePearl);
     }
 
     return [];
@@ -289,4 +389,29 @@ ${transcript}`;
     console.error('Pearl extraction failed:', error);
     return [];
   }
+}
+
+/** Raw pearl shape from Claude's tool response (uses snake_case) */
+interface RawPearl {
+  id: string;
+  insight: string;
+  concepts: string[];
+  quote?: { text: string; speaker?: string; is_user?: boolean };
+}
+
+/** Normalize snake_case tool response to camelCase Pearl type */
+function normalizePearl(raw: RawPearl): Pearl {
+  const pearl: Pearl = {
+    id: raw.id,
+    insight: raw.insight,
+    concepts: raw.concepts,
+  };
+  if (raw.quote) {
+    pearl.quote = {
+      text: raw.quote.text,
+      speaker: raw.quote.speaker,
+      isUser: raw.quote.is_user ?? false,
+    };
+  }
+  return pearl;
 }
