@@ -363,24 +363,24 @@ function PearlCard({ insight, concepts, quote }: {
 
   return (
     <div className="rounded-lg border border-amber-200/80 dark:border-amber-800/30 bg-white dark:bg-amber-950/30 shadow-sm p-3 text-sm space-y-2">
-      <p className="leading-relaxed text-foreground">{insight}</p>
+      {/* Quote as headline */}
       {quote && (
-        <blockquote className={`border-l-2 pl-2 text-xs italic ${
-          isUserQuote
-            ? 'border-blue-400/60 text-blue-700 dark:text-blue-300'
-            : 'border-amber-400/60 text-muted-foreground'
-        }`}>
-          &ldquo;{quote.text}&rdquo;
+        <div>
+          <p className="text-sm font-medium leading-snug text-foreground">
+            &ldquo;{quote.text}&rdquo;
+          </p>
           {quote.speaker && (
-            <span className="not-italic">
-              {' '}&mdash; {quote.speaker}
+            <p className="text-[11px] mt-1 text-muted-foreground">
+              &mdash; {quote.speaker}
               {isUserQuote && (
-                <span className="ml-1 text-[10px] font-medium text-blue-500 dark:text-blue-400">(you)</span>
+                <span className="ml-1 font-medium">(you)</span>
               )}
-            </span>
+            </p>
           )}
-        </blockquote>
+        </div>
       )}
+      {/* Insight as supporting text */}
+      <p className="text-xs leading-relaxed text-muted-foreground">{insight}</p>
       <div className="flex flex-wrap gap-1">
         {concepts.map((concept) => (
           <span

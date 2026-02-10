@@ -268,25 +268,42 @@ ${transcript}`;
 
 // ── Pearl extraction (second pass — scoped to selected tags) ─────────
 
-const PEARL_EXTRACTION_PROMPT = `You are a field researcher studying how people and teams actually work. Your job is to collect observations — units of evidence about patterns, dynamics, and trajectories in a conversation.
+const PEARL_EXTRACTION_PROMPT = `You are a reflective mirror — someone who watches conversations carefully and gently surfaces what's really happening for the person reading this.
 
-A pearl is not a conclusion or advice. It's an observation that carries interpretive weight. Think field notes, not verdicts. Each pearl should be specific enough to be evidence and open enough to gain meaning alongside future observations.
+Your job is to write pearls: short observations that help someone see patterns in their own work and relationships. Each pearl is anchored by a quote from the conversation and followed by a brief insight that connects the quote to something worth noticing.
 
-A good pearl makes someone think: "I wonder if that keeps showing up."
+A good pearl makes someone pause and think: "Huh... I hadn't seen it that way."
 
 You have the summary (how the meeting was understood) and the transcript (what was actually said). Look for patterns in both.
 
-Rules:
+## Voice
+
+Write insights in second person — speak directly to the reader using "you." Even when observing someone else's behavior, frame it relative to the reader: what it means for them, what pattern it reveals around them.
+
+If you know the reader's name, you may use it occasionally for warmth (e.g. "Sarah, there's a pattern here..."), but don't overdo it — mostly use "you."
+
+The tone is a reflective mirror: gentle, observational, not prescriptive. You surface what's there — you don't tell them what to do about it.
+
+Insights must be **short and punchy — 6 to 12 words.** Think caption, not commentary.
+
+- GOOD: "You extend trust before it's earned."
+- GOOD: "You pull back when Alex raises timelines."
+- GOOD: "You're carrying more weight than anyone sees."
+- BAD (too long): "There's a pattern of you extending trust early — something that seems to come naturally"
+- BAD (prescriptive): "You should be more careful with trust"
+
+## Rules
+
 - Extract 3-7 pearls
-- Each pearl is 1-2 sentences — a specific, grounded observation written entirely in your own analytical voice
+- **Every pearl must have a grounding quote.** No exceptions. The quote is the anchor — the insight explains why it matters.
+- The insight is **one short sentence, 6-12 words.** If it's longer, cut it. No em-dashes, no clauses, no elaboration.
 - The insight text must never contain quoted speech or transcript fragments. Quotes belong only in the quote field.
-- Observations, not prescriptions. "Trust is being extended before it's been earned" not "they should build more trust first."
+- Observations, not prescriptions. Surface patterns, don't give advice.
 - Reflect what's genuinely there. Don't project dynamics that aren't present.
-- Name patterns with clarity, not judgment. "Authority is moving from decisions to questions" not "someone is losing control."
-- Tag each pearl with 1-3 concept words — these are the axes along which evidence accumulates across meetings. Make them abstract and reusable (e.g. "trust", "ownership", "momentum"), not surface-level topics (e.g. "Q2 budget", "hiring").
-- Ground with a verbatim quote when it strengthens the observation. Always attribute quotes to specific speakers when names are present in the transcript.
-- Each pearl should stand alone as a meaningful data point, but become more powerful in a collection
-- If you are told which speaker is the user, set is_user to true on quotes from that speaker. This helps distinguish "my quotes" from "team quotes" later.`;
+- Tag each pearl with 1-3 concept words — abstract and reusable (e.g. "trust", "ownership", "momentum"), not surface-level topics.
+- Always attribute quotes to specific speakers when names are present in the transcript.
+- Each pearl should stand alone as a meaningful data point, but become more powerful in a collection.
+- If you are told which speaker is the user, set is_user to true on quotes from that speaker.`;
 
 const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
   name: 'extract_pearls',
@@ -300,7 +317,7 @@ const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Unique identifier for the pearl' },
-            insight: { type: 'string', description: '1-2 sentence observation in analytical voice. Never include quoted speech — use the quote field for that.' },
+            insight: { type: 'string', description: 'One punchy sentence, 6-12 words, addressed to "you." No quoted speech.' },
             concepts: {
               type: 'array',
               items: { type: 'string' },
@@ -311,15 +328,15 @@ const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
             quote: {
               type: 'object',
               properties: {
-                text: { type: 'string', description: 'Verbatim quote from transcript' },
+                text: { type: 'string', description: 'Verbatim quote from transcript — the anchor for this pearl' },
                 speaker: { type: 'string', description: 'Speaker name if identifiable' },
                 is_user: { type: 'boolean', description: 'True if this quote is from the user (the person reading the summary). Only set if user identity is provided.' },
               },
               required: ['text'],
-              description: 'Optional grounding quote',
+              description: 'Grounding quote from the conversation (required)',
             },
           },
-          required: ['id', 'insight', 'concepts'],
+          required: ['id', 'insight', 'concepts', 'quote'],
         },
         minItems: 3,
         maxItems: 7,
@@ -344,7 +361,7 @@ export async function extractPearls(
   try {
     let userIdentityNote = '';
     if (speakerIdentity?.userName) {
-      userIdentityNote = `\n\n**The user reading this summary is "${speakerIdentity.userName}" in the transcript.** When attributing quotes, set is_user to true for quotes from this speaker.`;
+      userIdentityNote = `\n\n**The person reading this is "${speakerIdentity.userName}" in the transcript.** Write insights addressed to them — use "you" and occasionally their name for warmth. Set is_user to true on quotes from this speaker.`;
     }
 
     let tagFocusNote = '';
