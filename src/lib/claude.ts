@@ -197,7 +197,8 @@ You have the summary (how the meeting was understood) and the transcript (what w
 
 Rules:
 - Extract 3-7 pearls
-- Each pearl is 1-2 sentences — a specific, grounded observation
+- Each pearl is 1-2 sentences — a specific, grounded observation written entirely in your own analytical voice
+- The insight text must never contain quoted speech or transcript fragments. Quotes belong only in the quote field.
 - Observations, not prescriptions. "Trust is being extended before it's been earned" not "they should build more trust first."
 - Reflect what's genuinely there. Don't project dynamics that aren't present.
 - Name patterns with clarity, not judgment. "Authority is moving from decisions to questions" not "someone is losing control."
@@ -217,7 +218,7 @@ const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Unique identifier for the pearl' },
-            insight: { type: 'string', description: '1-2 sentence distilled truth' },
+            insight: { type: 'string', description: '1-2 sentence observation in analytical voice. Never include quoted speech — use the quote field for that.' },
             concepts: {
               type: 'array',
               items: { type: 'string' },
