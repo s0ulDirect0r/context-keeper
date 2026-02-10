@@ -2,15 +2,17 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 
 interface Props {
   onSelect: (method: 'otter' | 'manual') => void;
   connectedOtterEmail?: string;
   onDisconnectOtter?: () => void;
+  /** null = still loading, number = ready count */
+  prefetchedRecordingCount?: number | null;
 }
 
-export function InputMethodPicker({ onSelect, connectedOtterEmail, onDisconnectOtter }: Props) {
+export function InputMethodPicker({ onSelect, connectedOtterEmail, onDisconnectOtter, prefetchedRecordingCount }: Props) {
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -32,9 +34,21 @@ export function InputMethodPicker({ onSelect, connectedOtterEmail, onDisconnectO
               <CardDescription>{connectedOtterEmail}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Select recordings from your connected Otter account.
-              </p>
+              {prefetchedRecordingCount != null ? (
+                <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5">
+                  <Check className="h-4 w-4" />
+                  {prefetchedRecordingCount} recording{prefetchedRecordingCount !== 1 ? 's' : ''} ready
+                </p>
+              ) : connectedOtterEmail && prefetchedRecordingCount === null ? (
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Loading recordings...
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Select recordings from your connected Otter account.
+                </p>
+              )}
               {onDisconnectOtter && (
                 <Button
                   variant="ghost"

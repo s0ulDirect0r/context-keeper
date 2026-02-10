@@ -53,7 +53,19 @@ export function RecordingList({ recordings, onSelect, onBack, loading }: Props) 
       </CardHeader>
       <CardContent className="space-y-4">
         {recordings.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No recordings found</p>
+          <div className="flex flex-col items-center justify-center py-8">
+            {loading ? (
+              <>
+                <div className="relative mb-4">
+                  <div className="h-8 w-8 rounded-full border-4 border-muted" />
+                  <div className="absolute top-0 left-0 h-8 w-8 rounded-full border-4 border-t-primary animate-spin" />
+                </div>
+                <p className="text-muted-foreground">Loading recordings...</p>
+              </>
+            ) : (
+              <p className="text-muted-foreground">No recordings found</p>
+            )}
+          </div>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {recordings.map((recording) => (

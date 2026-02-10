@@ -519,6 +519,7 @@ export default function Home() {
             onSelect={handleMethodSelect}
             connectedOtterEmail={otterSession?.email}
             onDisconnectOtter={handleDisconnectOtter}
+            prefetchedRecordingCount={prefetchedRecordings ? prefetchedRecordings.length : otterSession ? null : undefined}
           />
         )}
 
