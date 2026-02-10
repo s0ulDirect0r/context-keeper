@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Markdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EditableMarkdown } from './EditableMarkdown';
 import { AuthDialog } from './AuthDialog';
 import { Check, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
@@ -55,13 +55,46 @@ export function SummaryView({ summaries, context, onStartOver, savedSummaryId, o
     }
   }, [user, pendingSave, savedSummaryId, summaries, context, onSaved, router]);
 
-  // Convert old structured summaries to markdown for uniform rendering
-  const markdownSummaries = useMemo<string[]>(() =>
+  // Convert old structured summaries to markdown for uniform rendering,
+  // then track as mutable state so inline edits are reflected immediately.
+  const initialMarkdown = useMemo<string[]>(() =>
     isStructuredSummary(summaries)
       ? summaries.map(s => structuredSummaryToMarkdown(s))
       : summaries,
     [summaries]
   );
+  const [markdownSummaries, setMarkdownSummaries] = useState(initialMarkdown);
+
+  // Re-sync if summaries prop changes (e.g. regeneration)
+  useEffect(() => {
+    setMarkdownSummaries(initialMarkdown);
+  }, [initialMarkdown]);
+
+  // Persist guest edits to localStorage so they survive page refreshes
+  const persistGuestEdits = useCallback((updated: string[]) => {
+    try {
+      localStorage.setItem('context-keeper-guest-edits', JSON.stringify(updated));
+    } catch {
+      // localStorage full or unavailable — ignore
+    }
+  }, []);
+
+  // Restore guest edits on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('context-keeper-guest-edits');
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[];
+        if (parsed.length === initialMarkdown.length) {
+          setMarkdownSummaries(parsed);
+        } else {
+          localStorage.removeItem('context-keeper-guest-edits');
+        }
+      }
+    } catch {
+      // Corrupted data — ignore
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSignUpToSave = () => {
     setPendingSave(true);
@@ -123,9 +156,17 @@ export function SummaryView({ summaries, context, onStartOver, savedSummaryId, o
             </div>
           </CardHeader>
           <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <Markdown>{summaryText}</Markdown>
-            </div>
+            <EditableMarkdown
+              markdown={summaryText}
+              onChange={(newText) => {
+                setMarkdownSummaries(prev => {
+                  const updated = [...prev];
+                  updated[index] = newText;
+                  persistGuestEdits(updated);
+                  return updated;
+                });
+              }}
+            />
           </CardContent>
         </Card>
       ))}
