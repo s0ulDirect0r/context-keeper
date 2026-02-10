@@ -218,7 +218,7 @@ export function EditableMarkdown({ markdown, onChange, readOnly }: EditableMarkd
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-4">
       {chunks.map((chunk, index) => (
         <EditableChunk
           key={`${index}-${chunk.slice(0, 40)}`}
