@@ -32,6 +32,7 @@ export default async function SharedSummaryPage({ params }: Props) {
     summaries: row.summaries as unknown as SummaryContent,
     context: row.context as unknown as SummaryContext,
     transcripts: null, // Intentionally hidden for shared views
+    selectedTags: null,
     shareToken: row.share_token,
     isShared: row.is_shared,
     createdAt: new Date(row.created_at),

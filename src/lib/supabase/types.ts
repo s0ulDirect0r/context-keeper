@@ -20,6 +20,7 @@ export interface Database {
           summaries: Json;
           context: Json;
           transcripts: Json | null;
+          selected_tags: string[] | null;
           share_token: string | null;
           is_shared: boolean;
           created_at: string;
@@ -32,6 +33,7 @@ export interface Database {
           summaries: Json;
           context: Json;
           transcripts?: Json | null;
+          selected_tags?: string[] | null;
           share_token?: string;
           is_shared?: boolean;
           created_at?: string;
@@ -44,6 +46,7 @@ export interface Database {
           summaries?: Json;
           context?: Json;
           transcripts?: Json | null;
+          selected_tags?: string[] | null;
           share_token?: string;
           is_shared?: boolean;
           created_at?: string;
@@ -128,6 +131,7 @@ export interface SavedSummary {
   summaries: SummaryContent;
   context: SummaryContext;
   transcripts: string[] | null;
+  selectedTags: string[] | null;
   shareToken: string | null;
   isShared: boolean;
   createdAt: Date;
@@ -161,6 +165,7 @@ export function toSavedSummary(row: Database['public']['Tables']['summaries']['R
     summaries: row.summaries as unknown as SummaryContent,
     context: row.context as unknown as SummaryContext,
     transcripts: (row.transcripts as unknown as string[] | null) ?? null,
+    selectedTags: row.selected_tags ?? null,
     shareToken: row.share_token ?? null,
     isShared: row.is_shared ?? false,
     createdAt: new Date(row.created_at),
