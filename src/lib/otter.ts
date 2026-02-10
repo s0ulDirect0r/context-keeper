@@ -105,35 +105,60 @@ export async function otterLogin(
   };
 }
 
-export async function otterGetRecordings(
+async function fetchSpeeches(
   session: OtterSession,
-  pageSize = 20
-): Promise<Recording[]> {
-  const url = `${BASE_URL}/speeches?userid=${session.userId}&folder=0&page_size=${pageSize}&source=owned`;
+  source: string,
+  pageSize: number
+): Promise<SpeechData[]> {
+  const url = `${BASE_URL}/speeches?userid=${session.userId}&folder=0&page_size=${pageSize}&source=${source}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Cookie: session.cookies,
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Cookie: session.cookies,
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch recordings: ${response.status}`);
-  }
+    if (!response.ok) return [];
 
-  const result = (await response.json()) as { status: string; speeches?: SpeechData[] };
-
-  if (!result.speeches) {
+    const result = (await response.json()) as { status: string; speeches?: SpeechData[] };
+    return result.speeches || [];
+  } catch (e) {
+    console.error(`[otter] fetchSpeeches(${source}) error:`, e);
     return [];
   }
+}
 
-  return result.speeches.map((speech) => ({
-    id: speech.otid,
-    title: speech.title || 'Untitled',
-    createdAt: new Date(speech.created_at * 1000),
-    duration: speech.audio_duration || speech.duration || 0,
-    summary: speech.summary,
-  }));
+export async function otterGetRecordings(
+  session: OtterSession,
+  pageSize = 50
+): Promise<Recording[]> {
+  const [owned, shared] = await Promise.all([
+    fetchSpeeches(session, 'owned', pageSize),
+    fetchSpeeches(session, 'shared_with_me', pageSize),
+  ]);
+
+  const seen = new Set<string>();
+  const recordings: Recording[] = [];
+
+  for (const speech of [...owned, ...shared]) {
+    if (seen.has(speech.otid)) continue;
+    seen.add(speech.otid);
+
+    recordings.push({
+      id: speech.otid,
+      title: speech.title || 'Untitled',
+      createdAt: new Date(speech.created_at * 1000),
+      duration: speech.audio_duration || speech.duration || 0,
+      summary: speech.summary,
+    });
+  }
+
+  recordings.sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+
+  return recordings;
 }
 
 export interface TranscriptResult {
