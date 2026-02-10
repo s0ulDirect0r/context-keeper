@@ -73,19 +73,14 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
     setEditingId(pearl.id);
   };
 
-  const handleEditDone = (pearlId: string) => {
+  const handleEditDone = () => {
     setEditingId(null);
   };
 
   const handleEditCancel = (pearlId: string) => {
     setEditingId(null);
-    // Discard edits and clear decision so pearl returns to undecided
+    // Discard edits but preserve any existing keep/discard decision
     setEdits((prev) => {
-      const next = { ...prev };
-      delete next[pearlId];
-      return next;
-    });
-    setDecisions((prev) => {
       const next = { ...prev };
       delete next[pearlId];
       return next;
@@ -155,65 +150,15 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
             );
           }
 
-          // Show inline edit form when this pearl is being edited
           if (editingId === pearl.id) {
-            const draft = edits[pearl.id];
             return (
-              <div key={pearl.id} className="rounded-lg border border-amber-400/50 bg-card p-3 space-y-2">
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Insight</label>
-                <Textarea
-                  value={draft.insight}
-                  onChange={(e) => updateEdit(pearl.id, { insight: e.target.value })}
-                  className="text-sm min-h-[60px]"
-                />
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Concepts (comma-separated)</label>
-                <Input
-                  value={draft.concepts.join(', ')}
-                  onChange={(e) =>
-                    updateEdit(pearl.id, {
-                      concepts: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                    })
-                  }
-                  className="text-sm"
-                />
-                {draft.quote && (
-                  <>
-                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Quote</label>
-                    <Input
-                      value={draft.quote.text}
-                      onChange={(e) =>
-                        updateEdit(pearl.id, {
-                          quote: { ...draft.quote!, text: e.target.value },
-                        })
-                      }
-                      className="text-sm"
-                    />
-                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Speaker</label>
-                    <Input
-                      value={draft.quote.speaker ?? ''}
-                      onChange={(e) =>
-                        updateEdit(pearl.id, {
-                          quote: { ...draft.quote!, speaker: e.target.value || undefined },
-                        })
-                      }
-                      className="text-sm"
-                    />
-                  </>
-                )}
-                <div className="flex gap-1 pt-1">
-                  <Button size="sm" className="h-6 text-xs px-2" onClick={() => handleEditDone(pearl.id)}>
-                    Done
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs px-2 text-muted-foreground"
-                    onClick={() => handleEditCancel(pearl.id)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
+              <PearlEditForm
+                key={pearl.id}
+                draft={edits[pearl.id]}
+                onUpdate={(patch) => updateEdit(pearl.id, patch)}
+                onDone={handleEditDone}
+                onCancel={() => handleEditCancel(pearl.id)}
+              />
             );
           }
 
@@ -288,6 +233,67 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
           Sign up to save your pearls
         </p>
       )}
+    </div>
+  );
+}
+
+function PearlEditForm({ draft, onUpdate, onDone, onCancel }: {
+  draft: Pearl;
+  onUpdate: (patch: Partial<Pearl>) => void;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-amber-400/50 bg-card p-3 space-y-2">
+      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Insight</label>
+      <Textarea
+        value={draft.insight}
+        onChange={(e) => onUpdate({ insight: e.target.value })}
+        className="text-sm min-h-[60px]"
+      />
+      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Concepts (comma-separated)</label>
+      <Input
+        value={draft.concepts.join(', ')}
+        onChange={(e) =>
+          onUpdate({
+            concepts: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+          })
+        }
+        className="text-sm"
+      />
+      {draft.quote && (
+        <>
+          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Quote</label>
+          <Input
+            value={draft.quote.text}
+            onChange={(e) =>
+              onUpdate({ quote: { ...draft.quote!, text: e.target.value } })
+            }
+            className="text-sm"
+          />
+          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Speaker</label>
+          <Input
+            value={draft.quote.speaker ?? ''}
+            onChange={(e) =>
+              onUpdate({ quote: { ...draft.quote!, speaker: e.target.value || undefined } })
+            }
+            className="text-sm"
+          />
+        </>
+      )}
+      <div className="flex gap-1 pt-1">
+        <Button size="sm" className="h-6 text-xs px-2" onClick={onDone}>
+          Done
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 text-xs px-2 text-muted-foreground"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }
