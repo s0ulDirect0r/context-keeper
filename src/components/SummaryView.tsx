@@ -486,8 +486,8 @@ export function SummaryView(props: SummaryViewProps) {
         </Card>
       ))}
 
-      {/* Context card — saved mode only */}
-      {saved && (
+      {/* Context card */}
+      {context && (
         <div className="pt-4">
           <Card className="bg-muted/50">
             <CardHeader className="pb-2">
@@ -495,7 +495,7 @@ export function SummaryView(props: SummaryViewProps) {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Context used for this summary
                 </CardTitle>
-                {!readOnly && !editingContext && (
+                {saved && !readOnly && !editingContext && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -598,7 +598,7 @@ export function SummaryView(props: SummaryViewProps) {
                       {context.additionalContext}
                     </p>
                   )}
-                  {!hasTranscripts && !readOnly && (
+                  {saved && !hasTranscripts && !readOnly && (
                     <p className="text-xs text-muted-foreground italic">
                       Original transcript not available for re-generation
                     </p>
