@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Markdown from 'react-markdown';
 import type { SavedSummary } from '@/lib/supabase/types';
 import { isStructuredSummary } from '@/lib/summary-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EditableMarkdown } from '@/components/EditableMarkdown';
 import { Textarea } from '@/components/ui/textarea';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
 import { Pencil, Loader2, Share2, Check, Link } from 'lucide-react';
@@ -181,13 +181,33 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
     setTimeout(() => setCopiedShareLink(false), 2000);
   };
 
-  // Convert old structured summaries to markdown for uniform rendering
-  const markdownSummaries = useMemo<string[]>(() =>
+  // Convert old structured summaries to markdown for uniform rendering,
+  // then track as mutable state so inline edits are reflected immediately.
+  const initialMarkdown = useMemo<string[]>(() =>
     isStructuredSummary(summary.summaries)
       ? summary.summaries.map(s => structuredSummaryToMarkdown(s))
       : summary.summaries,
     [summary.summaries]
   );
+  const [markdownSummaries, setMarkdownSummaries] = useState(initialMarkdown);
+
+  // Re-sync if summary.summaries changes (e.g. after regeneration)
+  useEffect(() => {
+    setMarkdownSummaries(initialMarkdown);
+  }, [initialMarkdown]);
+
+  // Persist edited markdown summaries to Supabase
+  const persistSummaries = useCallback(async (updated: string[]) => {
+    try {
+      await fetch(`/api/summaries/${summary.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summaries: updated }),
+      });
+    } catch (err) {
+      console.error('Failed to save summary edit:', err);
+    }
+  }, [summary.id]);
 
   const hasTranscripts = summary.transcripts !== null && summary.transcripts.length > 0;
 
@@ -297,9 +317,18 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <Markdown>{summaryText}</Markdown>
-            </div>
+            <EditableMarkdown
+              markdown={summaryText}
+              onChange={(newText) => {
+                const updated = [...markdownSummaries];
+                updated[index] = newText;
+                setMarkdownSummaries(updated);
+                if (!readOnly) {
+                  persistSummaries(updated);
+                }
+              }}
+              readOnly={readOnly}
+            />
           </CardContent>
         </Card>
       ))}
