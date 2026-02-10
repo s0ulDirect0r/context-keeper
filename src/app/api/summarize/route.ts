@@ -123,7 +123,7 @@ export async function POST(request: Request) {
           });
 
           await messageStream.finalMessage();
-          send('summary_done', {});
+          send('summary_done', { summaries: [accumulatedText] });
 
           // Ensure tags are done before proceeding
           await tagPromise;

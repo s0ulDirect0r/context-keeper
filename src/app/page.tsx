@@ -543,9 +543,16 @@ export default function Home() {
     let generatedPearls: Pearl[] = [];
     try {
       const combinedTranscript = transcripts.join('\n\n---\n\n');
-      const summaryMarkdown = Array.isArray(summaries)
+
+      // Use finalized summaries if available, fall back to streaming markdown
+      // (tags_done can fire before summary_done, so summaries may still be empty)
+      let summaryMarkdown = Array.isArray(summaries) && summaries.length > 0
         ? summaries.join('\n\n---\n\n')
-        : '';
+        : streamingMarkdownRef.current;
+
+      if (!combinedTranscript || !summaryMarkdown || !context?.extractionGoal) {
+        throw new Error('Summary is still generating — please wait a moment and try again.');
+      }
 
       const response = await fetch('/api/pearls/generate', {
         method: 'POST',
@@ -571,7 +578,8 @@ export default function Home() {
     // Don't auto-save pearls — let the user curate (keep/discard/edit) first.
     // PearlsSidebar handles saving after curation.
     setGeneratingPearls(false);
-    setStep('summary');
+    // Don't force step transition — the 'complete' SSE event handles moving
+    // from 'generating' to 'summary'. If already on 'summary', no change needed.
   };
 
   const handleTagSkip = async () => {

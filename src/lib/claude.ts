@@ -278,9 +278,11 @@ You have the summary (how the meeting was understood) and the transcript (what w
 
 ## Voice
 
-Write insights in second person — speak directly to the reader using "you." Even when observing someone else's behavior, frame it relative to the reader: what it means for them, what pattern it reveals around them.
+The user message will tell you who the reader is (or that they're not a speaker). Follow those instructions for voice:
+- When the reader IS a speaker: use "you" for pearls about them, use the speaker's name (third person) for pearls about others.
+- When the reader is NOT a speaker: use the quoted speaker's name as the subject for all pearls. Never use "you."
 
-If you know the reader's name, you may use it occasionally for warmth (e.g. "Sarah, there's a pattern here..."), but don't overdo it — mostly use "you."
+If you know the reader's name, you may use it occasionally for warmth (e.g. "Sarah, there's a pattern here..."), but don't overdo it — mostly use "you" for their pearls.
 
 The tone is a reflective mirror: gentle, observational, not prescriptive. You surface what's there — you don't tell them what to do about it.
 
@@ -288,6 +290,7 @@ Insights must be **short and punchy — 6 to 12 words.** Think caption, not comm
 
 - GOOD: "You extend trust before it's earned."
 - GOOD: "You pull back when Alex raises timelines."
+- GOOD: "Alex deflects whenever ownership comes up."
 - GOOD: "You're carrying more weight than anyone sees."
 - BAD (too long): "There's a pattern of you extending trust early — something that seems to come naturally"
 - BAD (prescriptive): "You should be more careful with trust"
@@ -361,7 +364,9 @@ export async function extractPearls(
   try {
     let userIdentityNote = '';
     if (speakerIdentity?.userName) {
-      userIdentityNote = `\n\n**The person reading this is "${speakerIdentity.userName}" in the transcript.** Write insights addressed to them — use "you" and occasionally their name for warmth. Set is_user to true on quotes from this speaker.`;
+      userIdentityNote = `\n\n**The person reading this is "${speakerIdentity.userName}" in the transcript.** For pearls about this speaker, use "you" and occasionally their name for warmth. Set is_user to true on quotes from this speaker. You may also write pearls about OTHER speakers — for those, use the speaker's name as the subject (third person), not "you."`;
+    } else {
+      userIdentityNote = `\n\n**The reader is NOT one of the speakers in this conversation.** Do not use "you" in insight text. Instead, make the quoted speaker the subject of each insight (e.g. "Sarah extends trust before it's earned" instead of "You extend trust before it's earned").`;
     }
 
     let tagFocusNote = '';
