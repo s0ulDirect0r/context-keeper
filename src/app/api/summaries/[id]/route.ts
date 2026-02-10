@@ -34,7 +34,7 @@ export async function PATCH(request: Request, { params }: Props) {
     }
 
     // Build update object from allowed fields
-    const allowedFields = ['title', 'summaries', 'themes', 'speakers', 'context', 'is_shared', 'transcripts'];
+    const allowedFields = ['title', 'summaries', 'context', 'is_shared', 'transcripts'];
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
     for (const field of allowedFields) {

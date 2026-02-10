@@ -4,13 +4,10 @@ import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Markdown from 'react-markdown';
 import type { SavedSummary } from '@/lib/supabase/types';
-import type { Theme, Speaker } from '@/lib/claude';
 import { isStructuredSummary } from '@/lib/summary-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ThemeBubbles } from '@/components/ThemeBubbles';
-import { SpeakerToolbar } from '@/components/SpeakerToolbar';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
 import { Pencil, Loader2, Share2, Check, Link } from 'lucide-react';
 
@@ -86,7 +83,6 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
         additionalContext: editAdditional || undefined,
       };
 
-      // Generate new summary + themes + speakers
       const response = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,8 +104,6 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             summaries: data.summaries,
-            themes: data.themes,
-            speakers: data.speakers,
             context: newContext,
           }),
         });
@@ -118,8 +112,6 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
         setSummary({
           ...summary,
           summaries: data.summaries,
-          themes: data.themes || [],
-          speakers: data.speakers || [],
           context: newContext,
         });
         setEditingContext(false);
@@ -287,24 +279,6 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
           </div>
         )}
       </div>
-
-      {summary.themes.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Key themes (click to see quotes)
-          </p>
-          <ThemeBubbles themes={summary.themes} />
-        </div>
-      )}
-
-      {summary.speakers.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Speakers (click to see quotes)
-          </p>
-          <SpeakerToolbar speakers={summary.speakers} />
-        </div>
-      )}
 
       {markdownSummaries.map((summaryText, index) => (
         <Card key={index}>

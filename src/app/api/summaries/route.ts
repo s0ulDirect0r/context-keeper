@@ -12,7 +12,7 @@ function deriveTitle(recordingTitles?: string[]): string {
 
 export async function POST(request: Request) {
   try {
-    const { summaries, themes, context, recordingTitles, transcripts, speakers } = await request.json();
+    const { summaries, context, recordingTitles, transcripts } = await request.json();
 
     if (!summaries || !Array.isArray(summaries) || summaries.length === 0) {
       return NextResponse.json({ error: 'Summaries required' }, { status: 400 });
@@ -40,10 +40,8 @@ export async function POST(request: Request) {
       user_id: user.id,
       title,
       summaries: summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
-      themes: (themes || []) as unknown as Database['public']['Tables']['summaries']['Insert']['themes'],
       context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
       transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
-      speakers: (speakers || []) as unknown as Database['public']['Tables']['summaries']['Insert']['speakers'],
     };
 
     const { data, error: saveError } = await supabase

@@ -1,4 +1,4 @@
-import { generateSummary, extractThemes, extractSpeakers, streamSummarySingle, type SummaryContext } from '@/lib/claude';
+import { generateSummary, streamSummarySingle, type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -12,7 +12,7 @@ function deriveTitle(recordingTitles?: string[]): string {
 export async function POST(request: Request) {
   // Parse and validate before streaming — must access cookies() before writing response
   const body = await request.json();
-  const { transcripts, context, mode, save, recordingTitles, recordingDates, otterSpeakerNames } = body;
+  const { transcripts, context, mode, save, recordingTitles, recordingDates } = body;
 
   if (!transcripts || !Array.isArray(transcripts) || transcripts.length === 0) {
     return Response.json({ error: 'At least one transcript required' }, { status: 400 });
@@ -28,7 +28,6 @@ export async function POST(request: Request) {
   };
 
   const summaryMode = mode === 'separate' ? 'separate' : 'combined';
-  const combinedTranscript = transcripts.join('\n\n---\n\n');
 
   // Get user before streaming starts (calls cookies() internally)
   let userId: string | null = null;
@@ -51,38 +50,13 @@ export async function POST(request: Request) {
       try {
         if (summaryMode === 'separate' && transcripts.length > 1) {
           // Non-streaming fallback for separate mode
-          const [generatedSummaries, themes, speakers] = await Promise.allSettled([
-            generateSummary(transcripts, summaryContext, 'separate', {
-              titles: recordingTitles,
-              dates: recordingDates,
-            }),
-            extractThemes(combinedTranscript, summaryContext),
-            extractSpeakers(combinedTranscript, otterSpeakerNames),
-          ]).then(results => {
-            const summaries = results[0].status === 'fulfilled' ? results[0].value : null;
-            const themes = results[1].status === 'fulfilled' ? results[1].value : [];
-            const speakers = results[2].status === 'fulfilled' ? results[2].value : [];
-
-            if (results[1].status === 'rejected') {
-              send('error', { task: 'themes', message: results[1].reason?.message || 'Theme extraction failed' });
-            }
-            if (results[2].status === 'rejected') {
-              send('error', { task: 'speakers', message: results[2].reason?.message || 'Speaker extraction failed' });
-            }
-
-            return [summaries, themes, speakers] as const;
+          const generatedSummaries = await generateSummary(transcripts, summaryContext, 'separate', {
+            titles: recordingTitles,
+            dates: recordingDates,
           });
-
-          if (!generatedSummaries) {
-            send('error', { task: 'summary', message: 'Summary generation failed' });
-            controller.close();
-            return;
-          }
 
           const summaries = generatedSummaries.map(s => s.markdown);
           send('summary_done', { summaries });
-          send('themes_done', { themes });
-          send('speakers_done', { speakers });
 
           // Save to DB
           let savedSummaryId: string | null = null;
@@ -98,9 +72,7 @@ export async function POST(request: Request) {
                 user_id: userId,
                 title,
                 summaries: summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
-                themes: themes as unknown as Database['public']['Tables']['summaries']['Insert']['themes'],
                 context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-                speakers: speakers as unknown as Database['public']['Tables']['summaries']['Insert']['speakers'],
                 transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
               })
               .select('id')
@@ -121,7 +93,12 @@ export async function POST(request: Request) {
             : recordingTitles?.join(' & ');
           const date = recordingDates?.[0];
 
-          const messageStream = streamSummarySingle(combinedTranscript, summaryContext, title, date);
+          const messageStream = streamSummarySingle(
+            transcripts.join('\n\n---\n\n'),
+            summaryContext,
+            title,
+            date,
+          );
 
           let accumulatedText = '';
           messageStream.on('text', (chunk) => {
@@ -129,29 +106,8 @@ export async function POST(request: Request) {
             send('summary_chunk', { text: chunk });
           });
 
-          // Run summary stream + extractions in parallel
-          const [, themes, speakers] = await Promise.allSettled([
-            messageStream.finalMessage().then(() => {
-              send('summary_done', {});
-            }),
-            extractThemes(combinedTranscript, summaryContext)
-              .then(t => { send('themes_done', { themes: t }); return t; }),
-            extractSpeakers(combinedTranscript, otterSpeakerNames)
-              .then(s => { send('speakers_done', { speakers: s }); return s; }),
-          ]).then(results => {
-            if (results[1].status === 'rejected') {
-              send('error', { task: 'themes', message: results[1].reason?.message || 'Theme extraction failed' });
-            }
-            if (results[2].status === 'rejected') {
-              send('error', { task: 'speakers', message: results[2].reason?.message || 'Speaker extraction failed' });
-            }
-
-            return [
-              null,
-              results[1].status === 'fulfilled' ? results[1].value : [],
-              results[2].status === 'fulfilled' ? results[2].value : [],
-            ] as const;
-          });
+          await messageStream.finalMessage();
+          send('summary_done', {});
 
           // Extract title from first heading in the accumulated markdown
           const titleMatch = accumulatedText.match(/^#\s+(.+)$/m);
@@ -172,9 +128,7 @@ export async function POST(request: Request) {
                 user_id: userId,
                 title: displayTitle,
                 summaries: [accumulatedText] as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
-                themes: themes as unknown as Database['public']['Tables']['summaries']['Insert']['themes'],
                 context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-                speakers: speakers as unknown as Database['public']['Tables']['summaries']['Insert']['speakers'],
                 transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
               })
               .select('id')

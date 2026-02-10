@@ -5,29 +5,25 @@ import { useRouter } from 'next/navigation';
 import Markdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ThemeBubbles } from './ThemeBubbles';
 import { AuthDialog } from './AuthDialog';
 import { Check, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
-import { SpeakerToolbar } from './SpeakerToolbar';
-import type { Theme, Speaker, SummaryContext } from '@/lib/claude';
+import type { SummaryContext } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
 import { isStructuredSummary } from '@/lib/summary-types';
 
 interface Props {
   summaries: SummaryContent;
-  themes: Theme[];
   context: SummaryContext | null;
   onStartOver: () => void;
   savedSummaryId?: string | null;
   onSaved?: (id: string) => void;
   recordingTitles?: string[];
-  speakers?: Speaker[];
   transcripts?: string[];
 }
 
-export function SummaryView({ summaries, themes, context, onStartOver, savedSummaryId, onSaved, recordingTitles, speakers = [], transcripts }: Props) {
+export function SummaryView({ summaries, context, onStartOver, savedSummaryId, onSaved, recordingTitles, transcripts }: Props) {
   const { user } = useAuth();
   const router = useRouter();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -42,7 +38,7 @@ export function SummaryView({ summaries, themes, context, onStartOver, savedSumm
       fetch('/api/summaries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summaries, themes, context, recordingTitles, transcripts, speakers }),
+        body: JSON.stringify({ summaries, context, recordingTitles, transcripts }),
       })
         .then((res) => res.json())
         .then((data) => {
@@ -57,7 +53,7 @@ export function SummaryView({ summaries, themes, context, onStartOver, savedSumm
           setPendingSave(false);
         });
     }
-  }, [user, pendingSave, savedSummaryId, summaries, themes, context, onSaved, router]);
+  }, [user, pendingSave, savedSummaryId, summaries, context, onSaved, router]);
 
   // Convert old structured summaries to markdown for uniform rendering
   const markdownSummaries = useMemo<string[]>(() =>
@@ -109,24 +105,6 @@ export function SummaryView({ summaries, themes, context, onStartOver, savedSumm
           </div>
         )}
       </div>
-
-      {themes.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-center text-sm text-muted-foreground">
-            Key themes (click to see quotes)
-          </p>
-          <ThemeBubbles themes={themes} />
-        </div>
-      )}
-
-      {speakers.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-center text-sm text-muted-foreground">
-            Speakers (click to see quotes)
-          </p>
-          <SpeakerToolbar speakers={speakers} />
-        </div>
-      )}
 
       {markdownSummaries.map((summaryText, index) => (
         <Card key={index}>

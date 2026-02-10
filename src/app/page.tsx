@@ -13,13 +13,13 @@ import { ManualTranscript } from '@/components/ManualTranscript';
 import { ContextWizard } from '@/components/ContextWizard';
 import { SummaryModeSelector } from '@/components/SummaryModeSelector';
 import { SummaryView } from '@/components/SummaryView';
-import { StreamingGenerationView, type TaskStatuses } from '@/components/StreamingGenerationView';
+import { StreamingGenerationView } from '@/components/StreamingGenerationView';
 import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
-import type { SummaryContext, Theme, Speaker } from '@/lib/claude';
+import type { SummaryContext } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
 import {
   getStoredSession,
@@ -52,22 +52,15 @@ export default function Home() {
   const [context, setContext] = useState<SummaryContext | null>(null);
   const [summaryMode, setSummaryMode] = useState<'combined' | 'separate'>('combined');
   const [summaries, setSummaries] = useState<SummaryContent>([]);
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
   const [recordingDates, setRecordingDates] = useState<string[]>([]);
-  const [otterSpeakerNames, setOtterSpeakerNames] = useState<string[]>([]);
   const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Streaming generation state
   const [streamingMarkdown, setStreamingMarkdown] = useState('');
-  const [taskStatus, setTaskStatus] = useState<TaskStatuses>({
-    summary: 'pending',
-    themes: 'pending',
-    speakers: 'pending',
-  });
+  const [isStreaming, setIsStreaming] = useState(false);
   const streamingMarkdownRef = useRef('');
 
   // Prefetch state
@@ -294,7 +287,6 @@ export default function Home() {
       setRecordingTitles(selected.map((r) => r?.title || 'Untitled'));
       setRecordingDates(selected.map((r) => r?.createdAt?.toISOString() || ''));
 
-      setOtterSpeakerNames(data.speakerNames || []);
       setTranscripts(validTranscripts);
       setStep('context-wizard');
     } catch (err) {
@@ -307,7 +299,6 @@ export default function Home() {
   const handleManualTranscript = (transcript: string) => {
     setRecordingTitles([]);
     setRecordingDates([]);
-    setOtterSpeakerNames([]);
     setTranscripts([transcript]);
     setStep('context-wizard');
   };
@@ -330,7 +321,7 @@ export default function Home() {
     // Reset streaming state
     setStreamingMarkdown('');
     streamingMarkdownRef.current = '';
-    setTaskStatus({ summary: 'pending', themes: 'pending', speakers: 'pending' });
+    setIsStreaming(false);
     setStep('generating');
     setError(null);
     setSavedSummaryId(null);
@@ -346,7 +337,6 @@ export default function Home() {
           save: !!user,
           recordingTitles,
           recordingDates,
-          otterSpeakerNames,
         }),
       });
 
@@ -399,25 +389,14 @@ export default function Home() {
       case 'summary_chunk':
         streamingMarkdownRef.current += data.text as string;
         setStreamingMarkdown(streamingMarkdownRef.current);
-        setTaskStatus(prev => ({ ...prev, summary: 'streaming' }));
+        setIsStreaming(true);
         break;
 
       case 'summary_done':
-        setTaskStatus(prev => ({ ...prev, summary: 'done' }));
-        // Separate mode sends full summaries array here
+        setIsStreaming(false);
         if (data.summaries) {
           setSummaries(data.summaries as string[]);
         }
-        break;
-
-      case 'themes_done':
-        setThemes((data.themes || []) as Theme[]);
-        setTaskStatus(prev => ({ ...prev, themes: 'done' }));
-        break;
-
-      case 'speakers_done':
-        setSpeakers((data.speakers || []) as Speaker[]);
-        setTaskStatus(prev => ({ ...prev, speakers: 'done' }));
         break;
 
       case 'complete': {
@@ -425,7 +404,6 @@ export default function Home() {
           router.push(`/summary/${data.savedSummaryId}`);
           return;
         }
-        // Guest: use summaries from complete event (includes accumulated streaming text)
         if (data.summaries) {
           setSummaries(data.summaries as string[]);
         }
@@ -434,12 +412,6 @@ export default function Home() {
       }
 
       case 'error':
-        if (data.task) {
-          setTaskStatus(prev => ({
-            ...prev,
-            [data.task as string]: 'error',
-          }));
-        }
         break;
     }
   };
@@ -451,11 +423,8 @@ export default function Home() {
     setTranscripts([]);
     setRecordingTitles([]);
     setRecordingDates([]);
-    setOtterSpeakerNames([]);
     setContext(null);
     setSummaries([]);
-    setThemes([]);
-    setSpeakers([]);
     setSavedSummaryId(null);
     setError(null);
     setStreamingMarkdown('');
@@ -568,22 +537,18 @@ export default function Home() {
         {step === 'generating' && (
           <StreamingGenerationView
             markdown={streamingMarkdown}
-            taskStatus={taskStatus}
-            themesCount={themes.length}
-            speakersCount={speakers.length}
+            isStreaming={isStreaming}
           />
         )}
 
         {step === 'summary' && (
           <SummaryView
             summaries={summaries}
-            themes={themes}
             context={context}
             onStartOver={handleStartOver}
             savedSummaryId={savedSummaryId}
             onSaved={setSavedSummaryId}
             recordingTitles={recordingTitles}
-            speakers={speakers}
             transcripts={transcripts}
           />
         )}

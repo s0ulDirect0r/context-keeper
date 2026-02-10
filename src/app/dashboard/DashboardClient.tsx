@@ -129,23 +129,6 @@ export function DashboardClient({ initialSummaries }: DashboardClientProps) {
                   <p className="text-xs text-muted-foreground mt-3">
                     {formatDate(summary.createdAt)}
                   </p>
-                  {summary.themes.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {summary.themes.slice(0, 3).map((theme) => (
-                        <span
-                          key={theme.id}
-                          className="px-2 py-0.5 text-xs rounded-full bg-muted"
-                        >
-                          {theme.label}
-                        </span>
-                      ))}
-                      {summary.themes.length > 3 && (
-                        <span className="px-2 py-0.5 text-xs text-muted-foreground">
-                          +{summary.themes.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             ))}
