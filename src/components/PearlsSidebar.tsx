@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, X, Loader2, Gem } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Check, X, Loader2, Gem, Pencil } from 'lucide-react';
 import type { Pearl } from '@/lib/claude';
 import type { SavedPearl } from '@/lib/supabase/types';
 
@@ -50,14 +52,51 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
   const [decisions, setDecisions] = useState<Record<string, 'keep' | 'discard'>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [edits, setEdits] = useState<Record<string, Pearl>>({});
 
   if (pearls.length === 0) return null;
 
   const allDecided = pearls.every((p) => p.id in decisions);
-  const keptPearls = pearls.filter((p) => decisions[p.id] === 'keep');
+  // Overlay edits onto kept pearls so saves include user modifications
+  const keptPearls = pearls
+    .filter((p) => decisions[p.id] === 'keep')
+    .map((p) => edits[p.id] ?? p);
 
   const handleDecision = (pearlId: string, decision: 'keep' | 'discard') => {
     setDecisions((prev) => ({ ...prev, [pearlId]: decision }));
+  };
+
+  const startEditing = (pearl: Pearl) => {
+    // Seed edit form with current state (use existing edits if already modified)
+    setEdits((prev) => ({ ...prev, [pearl.id]: prev[pearl.id] ?? { ...pearl } }));
+    setEditingId(pearl.id);
+  };
+
+  const handleEditDone = (pearlId: string) => {
+    setEditingId(null);
+  };
+
+  const handleEditCancel = (pearlId: string) => {
+    setEditingId(null);
+    // Discard edits and clear decision so pearl returns to undecided
+    setEdits((prev) => {
+      const next = { ...prev };
+      delete next[pearlId];
+      return next;
+    });
+    setDecisions((prev) => {
+      const next = { ...prev };
+      delete next[pearlId];
+      return next;
+    });
+  };
+
+  const updateEdit = (pearlId: string, patch: Partial<Pearl>) => {
+    setEdits((prev) => ({
+      ...prev,
+      [pearlId]: { ...prev[pearlId], ...patch },
+    }));
   };
 
   const handleSave = async () => {
@@ -116,9 +155,73 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
             );
           }
 
+          // Show inline edit form when this pearl is being edited
+          if (editingId === pearl.id) {
+            const draft = edits[pearl.id];
+            return (
+              <div key={pearl.id} className="rounded-lg border border-amber-400/50 bg-card p-3 space-y-2">
+                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Insight</label>
+                <Textarea
+                  value={draft.insight}
+                  onChange={(e) => updateEdit(pearl.id, { insight: e.target.value })}
+                  className="text-sm min-h-[60px]"
+                />
+                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Concepts (comma-separated)</label>
+                <Input
+                  value={draft.concepts.join(', ')}
+                  onChange={(e) =>
+                    updateEdit(pearl.id, {
+                      concepts: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                    })
+                  }
+                  className="text-sm"
+                />
+                {draft.quote && (
+                  <>
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Quote</label>
+                    <Input
+                      value={draft.quote.text}
+                      onChange={(e) =>
+                        updateEdit(pearl.id, {
+                          quote: { ...draft.quote!, text: e.target.value },
+                        })
+                      }
+                      className="text-sm"
+                    />
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Speaker</label>
+                    <Input
+                      value={draft.quote.speaker ?? ''}
+                      onChange={(e) =>
+                        updateEdit(pearl.id, {
+                          quote: { ...draft.quote!, speaker: e.target.value || undefined },
+                        })
+                      }
+                      className="text-sm"
+                    />
+                  </>
+                )}
+                <div className="flex gap-1 pt-1">
+                  <Button size="sm" className="h-6 text-xs px-2" onClick={() => handleEditDone(pearl.id)}>
+                    Done
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2 text-muted-foreground"
+                    onClick={() => handleEditCancel(pearl.id)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            );
+          }
+
+          // Show the pearl card (with edits overlaid if previously edited)
+          const displayPearl = edits[pearl.id] ?? pearl;
           return (
             <div key={pearl.id} className={`relative ${decision === 'keep' ? 'ring-1 ring-amber-400/50 rounded-lg' : ''}`}>
-              <PearlCard insight={pearl.insight} concepts={pearl.concepts} quote={pearl.quote} />
+              <PearlCard insight={displayPearl.insight} concepts={displayPearl.concepts} quote={displayPearl.quote} />
               {!saved && (
                 <div className="flex gap-1 mt-1.5">
                   <Button
@@ -129,6 +232,15 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
                   >
                     <Check className="h-3 w-3 mr-1" />
                     Keep
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2 text-muted-foreground"
+                    onClick={() => startEditing(pearl)}
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Edit
                   </Button>
                   <Button
                     variant="ghost"
