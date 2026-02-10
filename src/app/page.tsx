@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useAppMode } from '@/components/AppModeProvider';
@@ -13,7 +13,7 @@ import { ManualTranscript } from '@/components/ManualTranscript';
 import { ContextWizard } from '@/components/ContextWizard';
 import { SummaryModeSelector } from '@/components/SummaryModeSelector';
 import { SummaryView } from '@/components/SummaryView';
-import { LoadingState } from '@/components/LoadingState';
+import { StreamingGenerationView, type TaskStatuses } from '@/components/StreamingGenerationView';
 import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
@@ -61,12 +61,23 @@ export default function Home() {
   const [loadingRecordings, setLoadingRecordings] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Streaming generation state
+  const [streamingMarkdown, setStreamingMarkdown] = useState('');
+  const [taskStatus, setTaskStatus] = useState<TaskStatuses>({
+    summary: 'pending',
+    themes: 'pending',
+    speakers: 'pending',
+  });
+  const streamingMarkdownRef = useRef('');
+
+  // Prefetch state
+  const [prefetchedRecordings, setPrefetchedRecordings] = useState<Recording[] | null>(null);
+  const prefetchedForSession = useRef<string | null>(null);
+  const prefetchPromise = useRef<Promise<Recording[] | null> | null>(null);
+
   // Load Otter connection based on auth state
-  // Logged in: Supabase is source of truth
-  // Guest: localStorage is source of truth
   useEffect(() => {
     const loadOtterConnection = async () => {
-      // Clear existing state first to avoid stale data
       setOtterSession(null);
 
       if (user) {
@@ -77,7 +88,6 @@ export default function Home() {
           .single();
 
         if (error) {
-          // PGRST116 = no rows found, which is fine
           if (error.code !== 'PGRST116') {
             console.error('Failed to load Otter connection:', error);
           }
@@ -94,7 +104,6 @@ export default function Home() {
           });
         }
       } else {
-        // Guest mode: use localStorage
         setOtterSession(getStoredSession());
       }
     };
@@ -102,19 +111,78 @@ export default function Home() {
     loadOtterConnection();
   }, [user]);
 
+  // Prefetch recordings when we have a cached Otter session
+  useEffect(() => {
+    if (!otterSession) return;
+
+    // Don't refetch for the same session
+    if (prefetchedForSession.current === otterSession.userId) return;
+    prefetchedForSession.current = otterSession.userId;
+
+    const doFetch = async (): Promise<Recording[] | null> => {
+      try {
+        const response = await fetch('/api/otter/recordings', {
+          headers: {
+            'X-Otter-UserId': otterSession.userId,
+            'X-Otter-Cookies': otterSession.cookies,
+          },
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        const recs = data.recordings.map((r: Recording & { createdAt: string }) => ({
+          ...r,
+          createdAt: new Date(r.createdAt),
+        }));
+
+        setPrefetchedRecordings(recs);
+        return recs;
+      } catch {
+        return null;
+      }
+    };
+
+    prefetchPromise.current = doFetch();
+  }, [otterSession]);
+
   const handleMethodSelect = async (method: 'otter' | 'manual') => {
     setInputMethod(method);
     if (method === 'manual') {
       setStep('manual-transcript');
-    } else {
-      // Check for existing session
-      if (otterSession) {
-        // Try to use existing session
-        await fetchRecordings(otterSession);
-      } else {
-        setStep('otter-login');
-      }
+      return;
     }
+
+    if (!otterSession) {
+      setStep('otter-login');
+      return;
+    }
+
+    // Prefetch already completed — use cached recordings instantly
+    if (prefetchedRecordings) {
+      setRecordings(prefetchedRecordings);
+      setStep('otter-recordings');
+      return;
+    }
+
+    // Prefetch in progress — show loading and wait for it
+    if (prefetchPromise.current) {
+      setLoadingRecordings(true);
+      setStep('otter-recordings');
+      const result = await prefetchPromise.current;
+      if (result) {
+        setRecordings(result);
+        setLoadingRecordings(false);
+      } else {
+        // Prefetch failed (likely expired session), fall through to normal fetch
+        setLoadingRecordings(false);
+        await fetchRecordings(otterSession);
+      }
+      return;
+    }
+
+    // No prefetch at all, do normal fetch
+    await fetchRecordings(otterSession);
   };
 
   const handleOtterLogin = async (email: string, password: string, remember: boolean) => {
@@ -136,9 +204,7 @@ export default function Home() {
       csrfToken: data.csrfToken,
     };
 
-    // Save Otter connection based on auth state
     if (user) {
-      // Logged in: save to Supabase
       const supabase = createClient();
       const { error } = await supabase.from('otter_connections').upsert({
         user_id: user.id,
@@ -151,7 +217,6 @@ export default function Home() {
         console.error('Failed to save Otter connection:', error);
       }
     } else if (remember) {
-      // Guest mode: save to localStorage if "remember me" checked
       storeSession(session);
     }
 
@@ -185,7 +250,6 @@ export default function Home() {
       setStep('otter-recordings');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch recordings');
-      // If session is invalid, clear it and go to login
       clearSession();
       setOtterSession(null);
       setStep('otter-login');
@@ -224,7 +288,6 @@ export default function Home() {
         throw new Error('No transcripts could be retrieved');
       }
 
-      // Capture Otter recording titles and dates for use as summary metadata
       const selected = recordingIds.map(
         (id: string) => recordings.find((r) => r.id === id)
       );
@@ -254,16 +317,20 @@ export default function Home() {
     if (transcripts.length > 1) {
       setStep('summary-mode');
     } else {
-      generateSummary(ctx, 'combined');
+      startSummaryGeneration(ctx, 'combined');
     }
   };
 
   const handleSummaryModeSelect = (mode: 'combined' | 'separate') => {
     setSummaryMode(mode);
-    generateSummary(context!, mode);
+    startSummaryGeneration(context!, mode);
   };
 
-  const generateSummary = async (ctx: SummaryContext, mode: 'combined' | 'separate') => {
+  const startSummaryGeneration = async (ctx: SummaryContext, mode: 'combined' | 'separate') => {
+    // Reset streaming state
+    setStreamingMarkdown('');
+    streamingMarkdownRef.current = '';
+    setTaskStatus({ summary: 'pending', themes: 'pending', speakers: 'pending' });
     setStep('generating');
     setError(null);
     setSavedSummaryId(null);
@@ -283,25 +350,97 @@ export default function Home() {
         }),
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate summary');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate summary');
       }
 
-      // Logged-in users get redirected to the full saved view
-      if (data.savedSummaryId) {
-        router.push(`/summary/${data.savedSummaryId}`);
-        return;
-      }
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      // Guest users see the inline view
-      setSummaries(data.summaries);
-      setThemes(data.themes || []);
-      setSpeakers(data.speakers || []);
-      setStep('summary');
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE events (separated by double newlines)
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const eventStr of events) {
+          if (!eventStr.trim()) continue;
+
+          let eventName = '';
+          let eventData = '';
+
+          for (const line of eventStr.split('\n')) {
+            if (line.startsWith('event: ')) {
+              eventName = line.slice(7);
+            } else if (line.startsWith('data: ')) {
+              eventData = line.slice(6);
+            }
+          }
+
+          if (eventName && eventData) {
+            handleSSEEvent(eventName, JSON.parse(eventData));
+          }
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary');
       setStep('context-wizard');
+    }
+  };
+
+  const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
+    switch (event) {
+      case 'summary_chunk':
+        streamingMarkdownRef.current += data.text as string;
+        setStreamingMarkdown(streamingMarkdownRef.current);
+        setTaskStatus(prev => ({ ...prev, summary: 'streaming' }));
+        break;
+
+      case 'summary_done':
+        setTaskStatus(prev => ({ ...prev, summary: 'done' }));
+        // Separate mode sends full summaries array here
+        if (data.summaries) {
+          setSummaries(data.summaries as string[]);
+        }
+        break;
+
+      case 'themes_done':
+        setThemes((data.themes || []) as Theme[]);
+        setTaskStatus(prev => ({ ...prev, themes: 'done' }));
+        break;
+
+      case 'speakers_done':
+        setSpeakers((data.speakers || []) as Speaker[]);
+        setTaskStatus(prev => ({ ...prev, speakers: 'done' }));
+        break;
+
+      case 'complete': {
+        if (data.savedSummaryId) {
+          router.push(`/summary/${data.savedSummaryId}`);
+          return;
+        }
+        // Guest: use summaries from complete event (includes accumulated streaming text)
+        if (data.summaries) {
+          setSummaries(data.summaries as string[]);
+        }
+        setStep('summary');
+        break;
+      }
+
+      case 'error':
+        if (data.task) {
+          setTaskStatus(prev => ({
+            ...prev,
+            [data.task as string]: 'error',
+          }));
+        }
+        break;
     }
   };
 
@@ -319,6 +458,8 @@ export default function Home() {
     setSpeakers([]);
     setSavedSummaryId(null);
     setError(null);
+    setStreamingMarkdown('');
+    streamingMarkdownRef.current = '';
   };
 
   const handleDisconnectOtter = async () => {
@@ -329,6 +470,9 @@ export default function Home() {
       clearSession();
     }
     setOtterSession(null);
+    setPrefetchedRecordings(null);
+    prefetchedForSession.current = null;
+    prefetchPromise.current = null;
   };
 
   const goBack = (to: Step) => {
@@ -420,7 +564,14 @@ export default function Home() {
           />
         )}
 
-        {step === 'generating' && <LoadingState />}
+        {step === 'generating' && (
+          <StreamingGenerationView
+            markdown={streamingMarkdown}
+            taskStatus={taskStatus}
+            themesCount={themes.length}
+            speakersCount={speakers.length}
+          />
+        )}
 
         {step === 'summary' && (
           <SummaryView

@@ -169,6 +169,27 @@ function buildUserMessage(
   return message;
 }
 
+// ── Streaming summary (no tool_use, raw markdown output) ────────────
+
+const STREAMING_SUMMARY_SYSTEM_PROMPT = SUMMARY_SYSTEM_PROMPT +
+  '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full summary below it. Do not wrap the output in a code block.';
+
+export function streamSummarySingle(
+  transcript: string,
+  context: SummaryContext,
+  title?: string,
+  date?: string,
+) {
+  const userMessage = buildUserMessage(transcript, context, title, date);
+
+  return client.messages.stream({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 6144,
+    system: STREAMING_SUMMARY_SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userMessage }],
+  });
+}
+
 const THEME_EXTRACTION_PROMPT = `You are analyzing meeting transcripts to identify abstract conceptual themes - the philosophical, emotional, or interpersonal undercurrents of the conversation.
 
 IMPORTANT DISTINCTION:
@@ -240,7 +261,7 @@ Filter themes to focus on what's relevant to these concerns.
 ${transcript}`;
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 4096,
     system: THEME_EXTRACTION_PROMPT,
     tools: [THEME_EXTRACTION_TOOL],
@@ -311,7 +332,7 @@ export async function extractSpeakers(
     : '';
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 4096,
     system: SPEAKER_EXTRACTION_PROMPT,
     tools: [SPEAKER_EXTRACTION_TOOL],
