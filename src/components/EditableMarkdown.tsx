@@ -185,14 +185,14 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
   }
 
   return (
-    <div className="group relative">
+    <div className="group relative pr-8">
       <div className="prose prose-sm dark:prose-invert max-w-none">
         <Markdown>{chunk}</Markdown>
       </div>
       {!readOnly && !isHeading && (
         <button
           onClick={() => setEditing(true)}
-          className="absolute right-0 top-0 rounded-md p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all"
+          className="absolute -right-1 top-0 rounded-md p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all"
           aria-label="Edit this section"
         >
           <Pencil className="h-3.5 w-3.5" />
