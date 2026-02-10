@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Markdown from 'react-markdown';
 import { Pencil, Check } from 'lucide-react';
 
@@ -26,18 +26,19 @@ function parseChunks(markdown: string): string[] {
     const line = lines[i];
     const trimmed = line.trimStart();
 
-    // Bullet point: each one is its own chunk
+    // Bullet point: each one is its own chunk (includes nested sub-bullets)
     if (/^[-*+]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
       flushBlock();
-      // Collect continuation lines (indented non-bullet, non-blank lines)
+      const baseIndent = line.length - line.trimStart().length;
       const bulletLines = [line];
+      // Collect continuation and nested lines (anything more indented than base)
       while (
         i + 1 < lines.length &&
         lines[i + 1].trim() !== '' &&
-        !/^[-*+]\s/.test(lines[i + 1].trimStart()) &&
-        !/^\d+\.\s/.test(lines[i + 1].trimStart()) &&
         !/^#{1,6}\s/.test(lines[i + 1].trimStart()) &&
-        (lines[i + 1].startsWith('  ') || lines[i + 1].startsWith('\t'))
+        (lines[i + 1].length - lines[i + 1].trimStart().length > baseIndent ||
+          (!(/^[-*+]\s/.test(lines[i + 1].trimStart()) || /^\d+\.\s/.test(lines[i + 1].trimStart())) &&
+            (lines[i + 1].startsWith('  ') || lines[i + 1].startsWith('\t'))))
       ) {
         i++;
         bulletLines.push(lines[i]);
@@ -209,19 +210,19 @@ interface EditableMarkdownProps {
 }
 
 export function EditableMarkdown({ markdown, onChange, readOnly }: EditableMarkdownProps) {
-  const chunks = parseChunks(markdown);
+  const chunks = useMemo(() => parseChunks(markdown), [markdown]);
 
-  const handleChunkSave = (index: number, newText: string) => {
+  const handleChunkSave = useCallback((index: number, newText: string) => {
     const updated = [...chunks];
     updated[index] = newText;
     onChange(assembleChunks(updated));
-  };
+  }, [chunks, onChange]);
 
   return (
     <div className="space-y-4">
       {chunks.map((chunk, index) => (
         <EditableChunk
-          key={`${index}-${chunk.slice(0, 40)}`}
+          key={index}
           chunk={chunk}
           onSave={(newText) => handleChunkSave(index, newText)}
           readOnly={readOnly}

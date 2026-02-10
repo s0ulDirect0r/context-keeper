@@ -196,17 +196,26 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
     setMarkdownSummaries(initialMarkdown);
   }, [initialMarkdown]);
 
-  // Persist edited markdown summaries to Supabase
-  const persistSummaries = useCallback(async (updated: string[]) => {
-    try {
-      await fetch(`/api/summaries/${summary.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summaries: updated }),
-      });
-    } catch (err) {
-      console.error('Failed to save summary edit:', err);
-    }
+  // Persist edited markdown summaries to Supabase (debounced)
+  const [saveError, setSaveError] = useState(false);
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistSummaries = useCallback((updated: string[]) => {
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    setSaveError(false);
+    persistTimerRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/summaries/${summary.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summaries: updated }),
+        });
+        if (!response.ok) throw new Error('Save failed');
+        setSaveError(false);
+      } catch (err) {
+        console.error('Failed to save summary edit:', err);
+        setSaveError(true);
+      }
+    }, 800);
   }, [summary.id]);
 
   const hasTranscripts = summary.transcripts !== null && summary.transcripts.length > 0;
@@ -299,6 +308,12 @@ export function SummaryViewSaved({ summary: initialSummary, readOnly }: Props) {
           </div>
         )}
       </div>
+
+      {saveError && (
+        <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 px-4 py-2 text-sm text-red-700 dark:text-red-300">
+          Failed to save edit. Your changes may not be persisted.
+        </div>
+      )}
 
       {markdownSummaries.map((summaryText, index) => (
         <Card key={index}>

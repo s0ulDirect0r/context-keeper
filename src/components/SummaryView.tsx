@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,6 +70,32 @@ export function SummaryView({ summaries, context, onStartOver, savedSummaryId, o
     setMarkdownSummaries(initialMarkdown);
   }, [initialMarkdown]);
 
+  // Persist guest edits to localStorage so they survive page refreshes
+  const persistGuestEdits = useCallback((updated: string[]) => {
+    try {
+      localStorage.setItem('context-keeper-guest-edits', JSON.stringify(updated));
+    } catch {
+      // localStorage full or unavailable — ignore
+    }
+  }, []);
+
+  // Restore guest edits on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('context-keeper-guest-edits');
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[];
+        if (parsed.length === initialMarkdown.length) {
+          setMarkdownSummaries(parsed);
+        } else {
+          localStorage.removeItem('context-keeper-guest-edits');
+        }
+      }
+    } catch {
+      // Corrupted data — ignore
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSignUpToSave = () => {
     setPendingSave(true);
     setAuthDialogOpen(true);
@@ -136,6 +162,7 @@ export function SummaryView({ summaries, context, onStartOver, savedSummaryId, o
                 setMarkdownSummaries(prev => {
                   const updated = [...prev];
                   updated[index] = newText;
+                  persistGuestEdits(updated);
                   return updated;
                 });
               }}
