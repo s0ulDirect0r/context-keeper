@@ -50,6 +50,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
+              ...(isVercelNonProd ? ["frame-src https://vercel.live"] : []),
               `connect-src ${connectSrc}`,
             ].join("; "),
           },
