@@ -141,6 +141,17 @@
     font-size: 12pt;
   }
 
+  /* Flatten flex/sticky layouts so content flows naturally */
+  main,
+  main > * {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   /* Remove card borders/shadows for cleaner print */
   [data-slot="card"] {
     border: none !important;
