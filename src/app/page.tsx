@@ -21,6 +21,7 @@ type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row
 import type { SummaryContext, ConceptTag } from '@/lib/claude';
 import { SpeakerSelect } from '@/components/SpeakerSelect';
 import { TagSelector } from '@/components/TagSelector';
+import { PearlsGeneratingView } from '@/components/PearlsGeneratingView';
 import {
   getStoredSession,
   storeSession,
@@ -659,29 +660,33 @@ export default function Home() {
               />
             </div>
             <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
-              <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-                  Focus your pearls
-                </h3>
-                {state.conceptTags.length > 0 ? (
-                  <TagSelector
-                    tags={state.conceptTags}
-                    generating={state.phase.pearlsGenerating}
-                    onSubmit={handleTagSelection}
-                    onSkip={handleTagSkip}
-                    selected={state.tagSelection}
-                    onSelectedChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
-                    customTags={state.tagCustomTags}
-                    onCustomTagsChange={(next) => dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })}
-                    compact
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-                    Identifying themes...
-                  </div>
-                )}
-              </div>
+              {state.phase.pearlsGenerating ? (
+                <PearlsGeneratingView selectedTags={Array.from(state.tagSelection)} />
+              ) : (
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                    Focus your pearls
+                  </h3>
+                  {state.conceptTags.length > 0 ? (
+                    <TagSelector
+                      tags={state.conceptTags}
+                      generating={false}
+                      onSubmit={handleTagSelection}
+                      onSkip={handleTagSkip}
+                      selected={state.tagSelection}
+                      onSelectedChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
+                      customTags={state.tagCustomTags}
+                      onCustomTagsChange={(next) => dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })}
+                      compact
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                      Identifying themes...
+                    </div>
+                  )}
+                </div>
+              )}
             </aside>
           </div>
         )}

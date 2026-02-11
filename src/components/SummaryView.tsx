@@ -16,6 +16,7 @@ import type { SummaryContent } from '@/lib/summary-types';
 import type { SavedSummary, SavedPearl } from '@/lib/supabase/types';
 import { isStructuredSummary } from '@/lib/summary-types';
 import { TagSelector } from './TagSelector';
+import { PearlsGeneratingView } from './PearlsGeneratingView';
 
 // ── Prop shapes ──────────────────────────────────────────────────────
 
@@ -346,8 +347,9 @@ export function SummaryView(props: SummaryViewProps) {
   const hasCuratingPearls = curatingPearls && curatingPearls.length > 0;
   const hasDisplayPearls = displayPearls.length > 0;
   const inlineProps = !saved ? (props as InlineProps) : null;
+  const isGeneratingPearls = inlineProps?.generatingPearls ?? false;
   const hasTagsForSidebar = inlineProps?.conceptTags && inlineProps.conceptTags.length > 0 && !hasCuratingPearls && !hasDisplayPearls;
-  const showPearlsSidebar = hasCuratingPearls || hasDisplayPearls || hasTagsForSidebar;
+  const showPearlsSidebar = hasCuratingPearls || hasDisplayPearls || hasTagsForSidebar || isGeneratingPearls;
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -659,6 +661,8 @@ export function SummaryView(props: SummaryViewProps) {
           />
         ) : hasDisplayPearls ? (
           <PearlsSidebar mode="display" pearls={displayPearls} />
+        ) : isGeneratingPearls ? (
+          <PearlsGeneratingView selectedTags={inlineProps?.tagSelection ? Array.from(inlineProps.tagSelection) : undefined} />
         ) : hasTagsForSidebar && inlineProps?.onTagSubmit && inlineProps.onTagSkip && inlineProps.tagSelection && inlineProps.onTagSelectionChange && inlineProps.tagCustomTags && inlineProps.onTagCustomTagsChange ? (
           <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
@@ -666,7 +670,7 @@ export function SummaryView(props: SummaryViewProps) {
             </h3>
             <TagSelector
               tags={inlineProps.conceptTags!}
-              generating={inlineProps.generatingPearls}
+              generating={false}
               onSubmit={inlineProps.onTagSubmit}
               onSkip={inlineProps.onTagSkip}
               selected={inlineProps.tagSelection}
