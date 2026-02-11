@@ -13,9 +13,7 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
   const [isAppMode, setAppMode] = useState(false);
 
   return (
-    <AppModeContext.Provider value={{ isAppMode, setAppMode }}>
-      {children}
-    </AppModeContext.Provider>
+    <AppModeContext.Provider value={{ isAppMode, setAppMode }}>{children}</AppModeContext.Provider>
   );
 }
 

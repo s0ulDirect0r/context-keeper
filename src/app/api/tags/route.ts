@@ -3,16 +3,13 @@ import { extractTags, type SummaryContext } from '@/lib/claude';
 
 export async function POST(request: Request) {
   try {
-    const { transcript, context } = await request.json() as {
+    const { transcript, context } = (await request.json()) as {
       transcript: string;
       context: SummaryContext;
     };
 
     if (!transcript || !context?.extractionGoal) {
-      return NextResponse.json(
-        { error: 'transcript and context required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'transcript and context required' }, { status: 400 });
     }
 
     const tags = await extractTags(transcript, context);

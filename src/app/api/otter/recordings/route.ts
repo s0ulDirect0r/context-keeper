@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         } catch (error) {
           return { id, text: null, speakerNames: [], error: (error as Error).message };
         }
-      })
+      }),
     );
 
     // Deduplicate speaker names across all recordings

@@ -32,13 +32,7 @@ export function NavBar() {
           {user && (
             <nav className="hidden sm:flex items-center gap-1">
               <Link href="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    pathname === '/' && 'bg-muted'
-                  )}
-                >
+                <Button variant="ghost" size="sm" className={cn(pathname === '/' && 'bg-muted')}>
                   <Plus className="h-4 w-4 mr-1" />
                   New Summary
                 </Button>
@@ -47,9 +41,7 @@ export function NavBar() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn(
-                    pathname === '/dashboard' && 'bg-muted'
-                  )}
+                  className={cn(pathname === '/dashboard' && 'bg-muted')}
                 >
                   <LayoutDashboard className="h-4 w-4 mr-1" />
                   Dashboard
@@ -93,10 +85,7 @@ export function NavBar() {
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                'w-full justify-start',
-                pathname === '/' && 'bg-muted'
-              )}
+              className={cn('w-full justify-start', pathname === '/' && 'bg-muted')}
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -106,10 +95,7 @@ export function NavBar() {
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                'w-full justify-start',
-                pathname === '/dashboard' && 'bg-muted'
-              )}
+              className={cn('w-full justify-start', pathname === '/dashboard' && 'bg-muted')}
             >
               <LayoutDashboard className="h-4 w-4 mr-1" />
               Dashboard

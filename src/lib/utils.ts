@@ -1,11 +1,11 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import { marked } from "marked"
-import type { StructuredSummary, SummaryContent } from '@/lib/summary-types'
-import { isStructuredSummary } from '@/lib/summary-types'
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { marked } from 'marked';
+import type { StructuredSummary, SummaryContent } from '@/lib/summary-types';
+import { isStructuredSummary } from '@/lib/summary-types';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -113,9 +113,10 @@ export function getSummaryPreviewText(summaries: SummaryContent): string {
   if (isStructuredSummary(summaries)) {
     const s = summaries[0];
     if (s.observersPerspective) return s.observersPerspective.content;
-    if (s.keyMoments?.moments.length) return s.keyMoments.moments.map(m => m.text).join(' ');
-    if (s.keyInsights?.insights.length) return s.keyInsights.insights.map(i => i.text).join(' ');
-    if (s.emergingThemes?.themes.length) return s.emergingThemes.themes.map(t => t.label).join(', ');
+    if (s.keyMoments?.moments.length) return s.keyMoments.moments.map((m) => m.text).join(' ');
+    if (s.keyInsights?.insights.length) return s.keyInsights.insights.map((i) => i.text).join(' ');
+    if (s.emergingThemes?.themes.length)
+      return s.emergingThemes.themes.map((t) => t.label).join(', ');
     return s.title || '';
   }
   // Markdown string — strip markdown formatting and take first ~200 chars
@@ -137,7 +138,7 @@ export function getSummarySearchText(summaries: SummaryContent): string {
     for (const s of summaries) {
       if (s.title) parts.push(s.title);
       if (s.observersPerspective) parts.push(s.observersPerspective.content);
-      if (s.keyMoments) parts.push(...s.keyMoments.moments.map(m => `${m.text} ${m.speaker}`));
+      if (s.keyMoments) parts.push(...s.keyMoments.moments.map((m) => `${m.text} ${m.speaker}`));
       if (s.questionsAndAnswers) {
         for (const qa of s.questionsAndAnswers.items) {
           parts.push(qa.question);
@@ -150,8 +151,8 @@ export function getSummarySearchText(summaries: SummaryContent): string {
           parts.push(...t.bullets);
         }
       }
-      if (s.keyInsights) parts.push(...s.keyInsights.insights.map(i => `${i.text} ${i.speaker}`));
-      if (s.momentum) parts.push(...s.momentum.items.map(i => i.text));
+      if (s.keyInsights) parts.push(...s.keyInsights.insights.map((i) => `${i.text} ${i.speaker}`));
+      if (s.momentum) parts.push(...s.momentum.items.map((i) => i.text));
     }
     return parts.join(' ');
   }

@@ -43,12 +43,12 @@ supabase migration new <name>  # Create new migration
 
 ### API Routes
 
-| Route | Purpose |
-|-------|---------|
-| `POST /api/summarize` | Generate summaries via Claude, extract themes, auto-save |
-| `POST /api/otter/login` | Authenticate with Otter.ai |
-| `GET /api/otter/recordings` | Fetch user's Otter recordings |
-| `POST /api/otter/recordings` | Get transcripts for selected recordings |
+| Route                        | Purpose                                                  |
+| ---------------------------- | -------------------------------------------------------- |
+| `POST /api/summarize`        | Generate summaries via Claude, extract themes, auto-save |
+| `POST /api/otter/login`      | Authenticate with Otter.ai                               |
+| `GET /api/otter/recordings`  | Fetch user's Otter recordings                            |
+| `POST /api/otter/recordings` | Get transcripts for selected recordings                  |
 
 ### Database Tables
 
@@ -60,6 +60,7 @@ Both tables have Row Level Security enforcing user-only access.
 ## Environment Variables
 
 Required in `.env.local`:
+
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co

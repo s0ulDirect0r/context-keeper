@@ -72,9 +72,7 @@ export function RecordingList({ recordings, onSelect, onBack, loading }: Props) 
               <div
                 key={recording.id}
                 className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  selected.has(recording.id)
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:bg-muted/50'
+                  selected.has(recording.id) ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
                 }`}
                 onClick={() => toggleSelection(recording.id)}
               >
@@ -108,7 +106,9 @@ export function RecordingList({ recordings, onSelect, onBack, loading }: Props) 
             onClick={handleContinue}
             disabled={selected.size === 0 || loading}
           >
-            {loading ? 'Loading...' : `Continue with ${selected.size} recording${selected.size !== 1 ? 's' : ''}`}
+            {loading
+              ? 'Loading...'
+              : `Continue with ${selected.size} recording${selected.size !== 1 ? 's' : ''}`}
           </Button>
         </div>
       </CardContent>

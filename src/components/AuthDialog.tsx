@@ -30,7 +30,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'sign-in' }: Auth
 
   // Sync mode when the dialog opens with a different initialMode
   useEffect(() => {
-    if (open) setMode(initialMode);
+    if (open) setMode(initialMode); // eslint-disable-line react-hooks/set-state-in-effect -- intentional prop-to-state sync on open
   }, [open, initialMode]);
 
   const supabase = createClient();
@@ -147,7 +147,10 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'sign-in' }: Auth
         ) : (
           <div className="space-y-4">
             {(mode === 'sign-in' || mode === 'sign-up') && (
-              <form onSubmit={mode === 'sign-in' ? handleSignIn : handleSignUp} className="space-y-4">
+              <form
+                onSubmit={mode === 'sign-in' ? handleSignIn : handleSignUp}
+                className="space-y-4"
+              >
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input

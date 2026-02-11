@@ -12,12 +12,19 @@ interface Props {
   prefetchedRecordingCount?: number | null;
 }
 
-export function InputMethodPicker({ onSelect, connectedOtterEmail, onDisconnectOtter, prefetchedRecordingCount }: Props) {
+export function InputMethodPicker({
+  onSelect,
+  connectedOtterEmail,
+  onDisconnectOtter,
+  prefetchedRecordingCount,
+}: Props) {
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight">Context Keeper</h1>
-        <p className="text-muted-foreground mt-2">Generate AI summaries tailored to your audience</p>
+        <p className="text-muted-foreground mt-2">
+          Generate AI summaries tailored to your audience
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -37,7 +44,8 @@ export function InputMethodPicker({ onSelect, connectedOtterEmail, onDisconnectO
               {prefetchedRecordingCount != null ? (
                 <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5">
                   <Check className="h-4 w-4" />
-                  {prefetchedRecordingCount} recording{prefetchedRecordingCount !== 1 ? 's' : ''} ready
+                  {prefetchedRecordingCount} recording{prefetchedRecordingCount !== 1 ? 's' : ''}{' '}
+                  ready
                 </p>
               ) : connectedOtterEmail && prefetchedRecordingCount === null ? (
                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
@@ -92,7 +100,8 @@ export function InputMethodPicker({ onSelect, connectedOtterEmail, onDisconnectO
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Have a transcript from another source? Upload a file or paste it directly to generate a summary.
+              Have a transcript from another source? Upload a file or paste it directly to generate
+              a summary.
             </p>
           </CardContent>
         </Card>

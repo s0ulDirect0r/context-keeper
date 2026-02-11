@@ -31,10 +31,6 @@ interface SpeechData {
   summary?: string;
 }
 
-interface SpeechesResponse {
-  speeches: SpeechData[];
-}
-
 interface OtterSpeaker {
   id: number;
   speaker_name: string;
@@ -61,10 +57,7 @@ interface SpeechDetailResponse {
   };
 }
 
-export async function otterLogin(
-  email: string,
-  password: string
-): Promise<OtterSession> {
+export async function otterLogin(email: string, password: string): Promise<OtterSession> {
   const authHeader = Buffer.from(`${email}:${password}`).toString('base64');
 
   const response = await fetch(`${BASE_URL}/login?username=${encodeURIComponent(email)}`, {
@@ -108,7 +101,7 @@ export async function otterLogin(
 async function fetchSpeeches(
   session: OtterSession,
   source: string,
-  pageSize: number
+  pageSize: number,
 ): Promise<SpeechData[]> {
   const url = `${BASE_URL}/speeches?userid=${session.userId}&folder=0&page_size=${pageSize}&source=${source}`;
 
@@ -131,7 +124,7 @@ async function fetchSpeeches(
 
 export async function otterGetRecordings(
   session: OtterSession,
-  pageSize = 50
+  pageSize = 50,
 ): Promise<Recording[]> {
   const [owned, shared] = await Promise.all([
     fetchSpeeches(session, 'owned', pageSize),
@@ -154,9 +147,7 @@ export async function otterGetRecordings(
     });
   }
 
-  recordings.sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  );
+  recordings.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return recordings;
 }
@@ -168,7 +159,7 @@ export interface TranscriptResult {
 
 export async function otterGetTranscript(
   session: OtterSession,
-  speechId: string
+  speechId: string,
 ): Promise<TranscriptResult> {
   const url = `${BASE_URL}/speech?userid=${session.userId}&otid=${speechId}`;
 
@@ -182,7 +173,10 @@ export async function otterGetTranscript(
     throw new Error(`Failed to fetch transcript: ${response.status}`);
   }
 
-  const result = (await response.json()) as { status: string; speech?: SpeechDetailResponse['speech'] };
+  const result = (await response.json()) as {
+    status: string;
+    speech?: SpeechDetailResponse['speech'];
+  };
 
   // Try to extract transcript text from various possible formats
   const speech = result.speech;

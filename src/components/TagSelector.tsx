@@ -19,7 +19,17 @@ interface TagSelectorProps {
   onCustomTagsChange: (next: Set<string>) => void;
 }
 
-export function TagSelector({ tags, generating, onSubmit, onSkip, compact, selected, onSelectedChange, customTags, onCustomTagsChange }: TagSelectorProps) {
+export function TagSelector({
+  tags,
+  generating,
+  onSubmit,
+  onSkip,
+  compact,
+  selected,
+  onSelectedChange,
+  customTags,
+  onCustomTagsChange,
+}: TagSelectorProps) {
   const [customInput, setCustomInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -142,8 +152,7 @@ export function TagSelector({ tags, generating, onSubmit, onSkip, compact, selec
         >
           {generating
             ? 'Generating pearls...'
-            : `Generate pearls${selectedCount > 0 ? ` (${selectedCount})` : ''}`
-          }
+            : `Generate pearls${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
         </Button>
         <Button
           variant="ghost"

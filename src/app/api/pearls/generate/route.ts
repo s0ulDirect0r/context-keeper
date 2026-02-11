@@ -3,18 +3,19 @@ import { extractPearls, type SummaryContext, type SpeakerIdentity } from '@/lib/
 
 export async function POST(request: Request) {
   try {
-    const { transcript, summaryMarkdown, context, speakerIdentity, selectedTags } = await request.json() as {
-      transcript: string;
-      summaryMarkdown: string;
-      context: SummaryContext;
-      speakerIdentity?: SpeakerIdentity;
-      selectedTags?: string[];
-    };
+    const { transcript, summaryMarkdown, context, speakerIdentity, selectedTags } =
+      (await request.json()) as {
+        transcript: string;
+        summaryMarkdown: string;
+        context: SummaryContext;
+        speakerIdentity?: SpeakerIdentity;
+        selectedTags?: string[];
+      };
 
     if (!transcript || !summaryMarkdown || !context?.extractionGoal) {
       return NextResponse.json(
         { error: 'transcript, summaryMarkdown, and context required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 

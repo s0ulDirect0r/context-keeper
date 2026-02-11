@@ -18,32 +18,38 @@ const TEMPLATES = [
     label: 'For my manager',
     description: 'Decisions, blockers, and status updates',
     extractionGoal: 'Key decisions, blockers raised, and status updates',
-    step2Hint: 'Tip: Mention what your manager tracks — e.g., "She\'s focused on the Q2 deadline" or "He wasn\'t in last week\'s standup." This shapes the summary to what they actually need.',
+    step2Hint:
+      'Tip: Mention what your manager tracks — e.g., "She\'s focused on the Q2 deadline" or "He wasn\'t in last week\'s standup." This shapes the summary to what they actually need.',
   },
   {
     id: 'team',
     label: 'For the team',
     description: 'Action items, owners, and next steps',
     extractionGoal: 'Action items with owners, decisions made, and next steps',
-    step2Hint: 'Tip: Mention who needs to know what — e.g., "Backend team needs the API changes" or "Design wasn\'t represented." This ensures the right details reach the right people.',
+    step2Hint:
+      'Tip: Mention who needs to know what — e.g., "Backend team needs the API changes" or "Design wasn\'t represented." This ensures the right details reach the right people.',
   },
   {
     id: 'stakeholder',
     label: 'For a stakeholder',
     description: 'High-level outcomes, no jargon',
     extractionGoal: 'High-level outcomes, key decisions, and strategic implications',
-    step2Hint: 'Tip: Add their context — e.g., "She\'s evaluating whether to fund phase 2" or "He cares about customer impact, not technical details."',
+    step2Hint:
+      'Tip: Add their context — e.g., "She\'s evaluating whether to fund phase 2" or "He cares about customer impact, not technical details."',
   },
   {
     id: 'self',
     label: 'For myself',
     description: 'Deep notes with verbatim quotes',
-    extractionGoal: 'Comprehensive notes with important quotes, nuances, and details I might forget',
-    step2Hint: 'Tip: Flag what matters to you — e.g., "I need to prep a proposal from this" or "Track what Alice said about the timeline." Your future self will thank you.',
+    extractionGoal:
+      'Comprehensive notes with important quotes, nuances, and details I might forget',
+    step2Hint:
+      'Tip: Flag what matters to you — e.g., "I need to prep a proposal from this" or "Track what Alice said about the timeline." Your future self will thank you.',
   },
 ] as const;
 
-const GENERIC_HINT = 'Tip: Tell us who this is for and what they care about. The more context, the better the summary.';
+const GENERIC_HINT =
+  'Tip: Tell us who this is for and what they care about. The more context, the better the summary.';
 
 const STEPS = ['extraction', 'additional'] as const;
 type Step = (typeof STEPS)[number];
@@ -117,7 +123,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>
-            {step === 'extraction' && `What do you want to extract from ${recordingCount > 1 ? 'these recordings' : 'this recording'}?`}
+            {step === 'extraction' &&
+              `What do you want to extract from ${recordingCount > 1 ? 'these recordings' : 'this recording'}?`}
             {step === 'additional' && 'Any other relevant context?'}
           </CardTitle>
           <span className="text-sm text-muted-foreground">
@@ -126,7 +133,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
         </div>
         <CardDescription>
           {step === 'extraction' && 'Pick a template or write your own'}
-          {step === 'additional' && 'Optional: About what you want, how you want it, or who it\'s for'}
+          {step === 'additional' &&
+            "Optional: About what you want, how you want it, or who it's for"}
         </CardDescription>
         {step === 'additional' && (
           <p className="text-sm text-muted-foreground italic bg-muted/50 rounded-md p-3 mt-1">
