@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useReducer } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useAppMode } from '@/components/AppModeProvider';
 import { AuthDialog, type AuthMode } from '@/components/AuthDialog';
@@ -19,52 +18,91 @@ import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
-import type { SummaryContext } from '@/lib/claude';
-import type { SummaryContent } from '@/lib/summary-types';
+import type { SummaryContext, ConceptTag } from '@/lib/claude';
+import { SpeakerSelect } from '@/components/SpeakerSelect';
+import { TagSelector } from '@/components/TagSelector';
+import { PearlsGeneratingView } from '@/components/PearlsGeneratingView';
 import {
   getStoredSession,
   storeSession,
   clearSession,
   type StoredOtterSession,
 } from '@/lib/storage';
+import type { User } from '@supabase/supabase-js';
+import { generationReducer, initialState } from '@/lib/generation-reducer';
 
-type Step =
-  | 'choose-method'
-  | 'otter-login'
-  | 'otter-recordings'
-  | 'manual-transcript'
-  | 'context-wizard'
-  | 'summary-mode'
-  | 'generating'
-  | 'summary';
+/** Try to auto-match a speaker name to the logged-in user */
+function autoMatchUserSpeaker(
+  speakerNames: string[],
+  otterEmail?: string,
+  user?: User | null,
+): string | null {
+  if (speakerNames.length === 0) return null;
+
+  // Build candidate name fragments from available identity info
+  const candidates: string[] = [];
+
+  // From Otter email: e.g. "john.doe@gmail.com" -> ["john", "doe", "john doe"]
+  if (otterEmail) {
+    const localPart = otterEmail.split('@')[0].replace(/[._+]/g, ' ').trim();
+    candidates.push(localPart);
+    candidates.push(...localPart.split(' '));
+  }
+
+  // From Supabase user metadata
+  if (user) {
+    const meta = user.user_metadata;
+    if (meta?.full_name) candidates.push(meta.full_name);
+    if (meta?.name) candidates.push(meta.name);
+    if (meta?.first_name) candidates.push(meta.first_name);
+    // From user email
+    if (user.email) {
+      const localPart = user.email.split('@')[0].replace(/[._+]/g, ' ').trim();
+      candidates.push(localPart);
+      candidates.push(...localPart.split(' '));
+    }
+  }
+
+  // Case-insensitive match: check if any speaker name contains or matches a candidate
+  const lower = candidates.map(c => c.toLowerCase()).filter(c => c.length >= 2);
+
+  for (const speaker of speakerNames) {
+    const speakerLower = speaker.toLowerCase();
+    for (const candidate of lower) {
+      if (speakerLower === candidate || speakerLower.includes(candidate) || candidate.includes(speakerLower)) {
+        return speaker;
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Extract speaker names from transcript text with "Name: text" format */
+function parseSpeakerNames(transcript: string): string[] {
+  const speakerPattern = /^([A-Z][a-zA-Z]*(?:\s[A-Z][a-zA-Z]*)*):\s/gm;
+  const names = new Set<string>();
+  let match;
+  while ((match = speakerPattern.exec(transcript)) !== null) {
+    names.add(match[1]);
+  }
+  return [...names];
+}
 
 export default function Home() {
-  const router = useRouter();
   const { user } = useAuth();
   const { isAppMode, setAppMode } = useAppMode();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in');
-  const [step, setStep] = useState<Step>('choose-method');
-  const [inputMethod, setInputMethod] = useState<'otter' | 'manual' | null>(null);
+
+  // Consolidated generation state
+  const [state, dispatch] = useReducer(generationReducer, initialState);
+
+  // Otter session — external to reducer (loaded from DB/localStorage)
   const [otterSession, setOtterSession] = useState<StoredOtterSession | null>(null);
-  const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [transcripts, setTranscripts] = useState<string[]>([]);
-  const [context, setContext] = useState<SummaryContext | null>(null);
-  const [summaryMode, setSummaryMode] = useState<'combined' | 'separate'>('combined');
-  const [summaries, setSummaries] = useState<SummaryContent>([]);
-  const [recordingTitles, setRecordingTitles] = useState<string[]>([]);
-  const [recordingDates, setRecordingDates] = useState<string[]>([]);
-  const [savedSummaryId, setSavedSummaryId] = useState<string | null>(null);
-  const [loadingRecordings, setLoadingRecordings] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Streaming generation state
-  const [streamingMarkdown, setStreamingMarkdown] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
+  // Refs that can't live in the reducer
   const streamingMarkdownRef = useRef('');
-
-  // Prefetch state
-  const [prefetchedRecordings, setPrefetchedRecordings] = useState<Recording[] | null>(null);
   const prefetchedForSession = useRef<string | null>(null);
   const prefetchPromise = useRef<Promise<Recording[] | null> | null>(null);
 
@@ -129,7 +167,7 @@ export default function Home() {
           createdAt: new Date(r.createdAt),
         }));
 
-        setPrefetchedRecordings(recs);
+        dispatch({ type: 'SET_PREFETCHED_RECORDINGS', recordings: recs });
         return recs;
       } catch {
         return null;
@@ -140,35 +178,35 @@ export default function Home() {
   }, [otterSession]);
 
   const handleMethodSelect = async (method: 'otter' | 'manual') => {
-    setInputMethod(method);
+    dispatch({ type: 'SET_INPUT_METHOD', method });
     if (method === 'manual') {
-      setStep('manual-transcript');
+      dispatch({ type: 'SET_STEP', step: 'manual-transcript' });
       return;
     }
 
     if (!otterSession) {
-      setStep('otter-login');
+      dispatch({ type: 'SET_STEP', step: 'otter-login' });
       return;
     }
 
     // Prefetch already completed — use cached recordings instantly
-    if (prefetchedRecordings) {
-      setRecordings(prefetchedRecordings);
-      setStep('otter-recordings');
+    if (state.prefetchedRecordings) {
+      dispatch({ type: 'SET_RECORDINGS', recordings: state.prefetchedRecordings });
+      dispatch({ type: 'SET_STEP', step: 'otter-recordings' });
       return;
     }
 
     // Prefetch in progress — show loading and wait for it
     if (prefetchPromise.current) {
-      setLoadingRecordings(true);
-      setStep('otter-recordings');
+      dispatch({ type: 'SET_LOADING_RECORDINGS', loading: true });
+      dispatch({ type: 'SET_STEP', step: 'otter-recordings' });
       const result = await prefetchPromise.current;
       if (result) {
-        setRecordings(result);
-        setLoadingRecordings(false);
+        dispatch({ type: 'SET_RECORDINGS', recordings: result });
+        dispatch({ type: 'SET_LOADING_RECORDINGS', loading: false });
       } else {
         // Prefetch failed (likely expired session), fall through to normal fetch
-        setLoadingRecordings(false);
+        dispatch({ type: 'SET_LOADING_RECORDINGS', loading: false });
         await fetchRecordings(otterSession);
       }
       return;
@@ -218,8 +256,8 @@ export default function Home() {
   };
 
   const fetchRecordings = async (session: StoredOtterSession) => {
-    setLoadingRecordings(true);
-    setError(null);
+    dispatch({ type: 'SET_LOADING_RECORDINGS', loading: true });
+    dispatch({ type: 'SET_ERROR', error: null });
 
     try {
       const response = await fetch('/api/otter/recordings', {
@@ -234,28 +272,29 @@ export default function Home() {
         throw new Error(data.error || 'Failed to fetch recordings');
       }
 
-      setRecordings(
-        data.recordings.map((r: Recording & { createdAt: string }) => ({
+      dispatch({
+        type: 'SET_RECORDINGS',
+        recordings: data.recordings.map((r: Recording & { createdAt: string }) => ({
           ...r,
           createdAt: new Date(r.createdAt),
-        }))
-      );
-      setStep('otter-recordings');
+        })),
+      });
+      dispatch({ type: 'SET_STEP', step: 'otter-recordings' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch recordings');
+      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to fetch recordings' });
       clearSession();
       setOtterSession(null);
-      setStep('otter-login');
+      dispatch({ type: 'SET_STEP', step: 'otter-login' });
     } finally {
-      setLoadingRecordings(false);
+      dispatch({ type: 'SET_LOADING_RECORDINGS', loading: false });
     }
   };
 
   const handleRecordingSelect = async (recordingIds: string[]) => {
     if (!otterSession) return;
 
-    setLoadingRecordings(true);
-    setError(null);
+    dispatch({ type: 'SET_LOADING_RECORDINGS', loading: true });
+    dispatch({ type: 'SET_ERROR', error: null });
 
     try {
       const response = await fetch('/api/otter/recordings', {
@@ -282,61 +321,88 @@ export default function Home() {
       }
 
       const selected = recordingIds.map(
-        (id: string) => recordings.find((r) => r.id === id)
+        (id: string) => state.recordings.find((r) => r.id === id)
       );
-      setRecordingTitles(selected.map((r) => r?.title || 'Untitled'));
-      setRecordingDates(selected.map((r) => r?.createdAt?.toISOString() || ''));
+      const titles = selected.map((r) => r?.title || 'Untitled');
+      const dates = selected.map((r) => r?.createdAt?.toISOString() || '');
 
-      setTranscripts(validTranscripts);
-      setStep('context-wizard');
+      // Capture speaker names and try to auto-identify the user
+      const returnedSpeakers: string[] = data.speakerNames ?? [];
+      const matched = autoMatchUserSpeaker(returnedSpeakers, otterSession.email, user);
+
+      const nextStep = (returnedSpeakers.length > 1 && !matched)
+        ? 'speaker-select' as const
+        : 'context-wizard' as const;
+
+      dispatch({
+        type: 'TRANSCRIPTS_LOADED',
+        transcripts: validTranscripts,
+        recordingTitles: titles,
+        recordingDates: dates,
+        speakerNames: returnedSpeakers,
+        userSpeakerName: matched ?? undefined,
+        nextStep,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch transcripts');
+      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to fetch transcripts' });
     } finally {
-      setLoadingRecordings(false);
+      dispatch({ type: 'SET_LOADING_RECORDINGS', loading: false });
     }
   };
 
   const handleManualTranscript = (transcript: string) => {
-    setRecordingTitles([]);
-    setRecordingDates([]);
-    setTranscripts([transcript]);
-    setStep('context-wizard');
+    // Try to extract speaker names from pasted transcript (lines like "Name: ...")
+    const parsedSpeakers = parseSpeakerNames(transcript);
+    const matched = parsedSpeakers.length > 1
+      ? autoMatchUserSpeaker(parsedSpeakers, undefined, user)
+      : null;
+
+    let nextStep: 'speaker-select' | 'context-wizard' = 'context-wizard';
+    if (parsedSpeakers.length > 1 && !matched) {
+      nextStep = 'speaker-select';
+    }
+
+    dispatch({
+      type: 'TRANSCRIPTS_LOADED',
+      transcripts: [transcript],
+      recordingTitles: [],
+      recordingDates: [],
+      speakerNames: parsedSpeakers,
+      userSpeakerName: matched ?? undefined,
+      nextStep,
+    });
   };
 
   const handleContextComplete = (ctx: SummaryContext) => {
-    setContext(ctx);
-    if (transcripts.length > 1) {
-      setStep('summary-mode');
+    dispatch({ type: 'SET_CONTEXT', context: ctx });
+    if (state.transcripts.length > 1) {
+      dispatch({ type: 'SET_STEP', step: 'summary-mode' });
     } else {
       startSummaryGeneration(ctx, 'combined');
     }
   };
 
   const handleSummaryModeSelect = (mode: 'combined' | 'separate') => {
-    setSummaryMode(mode);
-    startSummaryGeneration(context!, mode);
+    dispatch({ type: 'SET_SUMMARY_MODE', mode });
+    startSummaryGeneration(state.context!, mode);
   };
 
   const startSummaryGeneration = async (ctx: SummaryContext, mode: 'combined' | 'separate') => {
-    // Reset streaming state
-    setStreamingMarkdown('');
+    // Reset streaming ref (can't be in reducer)
     streamingMarkdownRef.current = '';
-    setIsStreaming(false);
-    setStep('generating');
-    setError(null);
-    setSavedSummaryId(null);
+    dispatch({ type: 'GENERATION_START' });
 
     try {
       const response = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transcripts,
+          transcripts: state.transcripts,
           context: ctx,
           mode,
           save: !!user,
-          recordingTitles,
-          recordingDates,
+          recordingTitles: state.recordingTitles,
+          recordingDates: state.recordingDates,
         }),
       });
 
@@ -379,8 +445,8 @@ export default function Home() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate summary');
-      setStep('context-wizard');
+      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to generate summary' });
+      dispatch({ type: 'SET_STEP', step: 'context-wizard' });
     }
   };
 
@@ -388,47 +454,86 @@ export default function Home() {
     switch (event) {
       case 'summary_chunk':
         streamingMarkdownRef.current += data.text as string;
-        setStreamingMarkdown(streamingMarkdownRef.current);
-        setIsStreaming(true);
+        dispatch({ type: 'SSE_SUMMARY_CHUNK', text: data.text as string });
         break;
 
       case 'summary_done':
-        setIsStreaming(false);
-        if (data.summaries) {
-          setSummaries(data.summaries as string[]);
-        }
+        dispatch({
+          type: 'SSE_SUMMARY_DONE',
+          summaries: data.summaries as string[] | undefined,
+        });
         break;
 
-      case 'complete': {
-        if (data.savedSummaryId) {
-          router.push(`/summary/${data.savedSummaryId}`);
-          return;
-        }
-        if (data.summaries) {
-          setSummaries(data.summaries as string[]);
-        }
-        setStep('summary');
+      case 'tags_extracting':
+        dispatch({ type: 'SSE_TAGS_EXTRACTING' });
         break;
-      }
+
+      case 'tags_done':
+        dispatch({
+          type: 'SSE_TAGS_DONE',
+          tags: (data.tags || []) as ConceptTag[],
+        });
+        break;
+
+      case 'complete':
+        dispatch({
+          type: 'SSE_COMPLETE',
+          savedSummaryId: data.savedSummaryId as string | undefined,
+          summaries: data.summaries as string[] | undefined,
+          tags: data.tags as ConceptTag[] | undefined,
+        });
+        break;
 
       case 'error':
         break;
     }
   };
 
+  const handleTagSelection = async (selectedTags: string[]) => {
+    dispatch({ type: 'PEARLS_GENERATING' });
+
+    try {
+      const combinedTranscript = state.transcripts.join('\n\n---\n\n');
+
+      // Use finalized summaries if available, fall back to streaming markdown
+      // (tags_done can fire before summary_done, so summaries may still be empty)
+      const summaryMarkdown = Array.isArray(state.summaries) && state.summaries.length > 0
+        ? (state.summaries as string[]).join('\n\n---\n\n')
+        : streamingMarkdownRef.current;
+
+      if (!combinedTranscript || !summaryMarkdown || !state.context?.extractionGoal) {
+        throw new Error('Summary is still generating — please wait a moment and try again.');
+      }
+
+      const response = await fetch('/api/pearls/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: combinedTranscript,
+          summaryMarkdown,
+          context: state.context,
+          speakerIdentity: state.userSpeakerName ? { userName: state.userSpeakerName } : undefined,
+          selectedTags,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      dispatch({ type: 'PEARLS_DONE', pearls: data.pearls || [] });
+    } catch (err) {
+      console.error('Pearl generation failed:', err);
+      dispatch({ type: 'PEARLS_FAILED' });
+    }
+  };
+
+  const handleTagSkip = async () => {
+    await handleTagSelection([]);
+  };
+
   const handleStartOver = () => {
-    setStep('choose-method');
-    setInputMethod(null);
-    setRecordings([]);
-    setTranscripts([]);
-    setRecordingTitles([]);
-    setRecordingDates([]);
-    setContext(null);
-    setSummaries([]);
-    setSavedSummaryId(null);
-    setError(null);
-    setStreamingMarkdown('');
     streamingMarkdownRef.current = '';
+    dispatch({ type: 'START_OVER' });
   };
 
   const handleDisconnectOtter = async () => {
@@ -439,14 +544,13 @@ export default function Home() {
       clearSession();
     }
     setOtterSession(null);
-    setPrefetchedRecordings(null);
+    dispatch({ type: 'SET_PREFETCHED_RECORDINGS', recordings: null });
     prefetchedForSession.current = null;
     prefetchPromise.current = null;
   };
 
-  const goBack = (to: Step) => {
-    setError(null);
-    setStep(to);
+  const goBack = (to: typeof state.step) => {
+    dispatch({ type: 'SET_STEP', step: to });
   };
 
   // Landing page for non-authenticated users who haven't clicked "Try it out"
@@ -477,22 +581,22 @@ export default function Home() {
 
   return (
     <main className="container mx-auto px-4 py-12">
-        {error && (
+        {state.error && (
           <div className="max-w-2xl mx-auto mb-6 rounded-md bg-red-50 dark:bg-red-950 p-4 text-red-800 dark:text-red-200">
-            {error}
+            {state.error}
           </div>
         )}
 
-        {step === 'choose-method' && (
+        {state.step === 'choose-method' && (
           <InputMethodPicker
             onSelect={handleMethodSelect}
             connectedOtterEmail={otterSession?.email}
             onDisconnectOtter={handleDisconnectOtter}
-            prefetchedRecordingCount={prefetchedRecordings ? prefetchedRecordings.length : otterSession ? null : undefined}
+            prefetchedRecordingCount={state.prefetchedRecordings ? state.prefetchedRecordings.length : otterSession ? null : undefined}
           />
         )}
 
-        {step === 'otter-login' && (
+        {state.step === 'otter-login' && (
           <OtterLogin
             onLogin={handleOtterLogin}
             onBack={() => goBack('choose-method')}
@@ -500,56 +604,113 @@ export default function Home() {
           />
         )}
 
-        {step === 'otter-recordings' && (
+        {state.step === 'otter-recordings' && (
           <RecordingList
-            recordings={recordings}
+            recordings={state.recordings}
             onSelect={handleRecordingSelect}
             onBack={() => goBack('choose-method')}
-            loading={loadingRecordings}
+            loading={state.loadingRecordings}
           />
         )}
 
-        {step === 'manual-transcript' && (
+        {state.step === 'manual-transcript' && (
           <ManualTranscript
             onSubmit={handleManualTranscript}
             onBack={() => goBack('choose-method')}
           />
         )}
 
-        {step === 'context-wizard' && (
-          <ContextWizard
-            onComplete={handleContextComplete}
+        {state.step === 'speaker-select' && (
+          <SpeakerSelect
+            speakerNames={state.speakerNames}
+            onSelect={(name) => {
+              dispatch({ type: 'SET_USER_SPEAKER', name: name ?? undefined });
+              dispatch({ type: 'SET_STEP', step: 'context-wizard' });
+            }}
             onBack={() =>
-              goBack(inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
+              goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
             }
-            recordingCount={transcripts.length}
           />
         )}
 
-        {step === 'summary-mode' && (
+        {state.step === 'context-wizard' && (
+          <ContextWizard
+            onComplete={handleContextComplete}
+            onBack={() =>
+              goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
+            }
+            recordingCount={state.transcripts.length}
+          />
+        )}
+
+        {state.step === 'summary-mode' && (
           <SummaryModeSelector
-            recordingCount={transcripts.length}
+            recordingCount={state.transcripts.length}
             onSelect={handleSummaryModeSelect}
             onBack={() => goBack('context-wizard')}
           />
         )}
 
-        {step === 'generating' && (
-          <StreamingGenerationView
-            markdown={streamingMarkdown}
-            isStreaming={isStreaming}
-          />
+        {state.step === 'generating' && (
+          <div className="flex flex-col lg:flex-row gap-8">
+            <div className="min-w-0 flex-1 max-w-3xl">
+              <StreamingGenerationView
+                markdown={state.streamingMarkdown}
+                isStreaming={state.isStreaming}
+              />
+            </div>
+            <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
+              {state.phase.pearlsGenerating ? (
+                <PearlsGeneratingView selectedTags={Array.from(state.tagSelection)} />
+              ) : (
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                    Focus your pearls
+                  </h3>
+                  {state.conceptTags.length > 0 ? (
+                    <TagSelector
+                      tags={state.conceptTags}
+                      generating={false}
+                      onSubmit={handleTagSelection}
+                      onSkip={handleTagSkip}
+                      selected={state.tagSelection}
+                      onSelectedChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
+                      customTags={state.tagCustomTags}
+                      onCustomTagsChange={(next) => dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })}
+                      compact
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                      Identifying themes...
+                    </div>
+                  )}
+                </div>
+              )}
+            </aside>
+          </div>
         )}
 
-        {step === 'summary' && (
+        {state.step === 'summary' && (
           <SummaryView
-            summaries={summaries}
-            context={context}
+            data={{
+              summaries: state.summaries,
+              context: state.context,
+              transcripts: state.transcripts,
+              recordingTitles: state.recordingTitles,
+            }}
+            pearls={state.pearls}
+            savedSummaryId={state.savedSummaryId}
+            onSaved={(id) => dispatch({ type: 'SET_SAVED_SUMMARY_ID', id })}
             onStartOver={handleStartOver}
-            savedSummaryId={savedSummaryId}
-            onSaved={setSavedSummaryId}
-            recordingTitles={recordingTitles}
-            transcripts={transcripts}
+            conceptTags={state.pearls.length === 0 && state.phase.tagsReady ? state.conceptTags : undefined}
+            onTagSubmit={state.pearls.length === 0 ? handleTagSelection : undefined}
+            onTagSkip={state.pearls.length === 0 ? handleTagSkip : undefined}
+            generatingPearls={state.phase.pearlsGenerating}
+            tagSelection={state.tagSelection}
+            onTagSelectionChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
+            tagCustomTags={state.tagCustomTags}
+            onTagCustomTagsChange={(next) => dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })}
           />
         )}
       </main>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { SummaryViewSaved } from '@/app/summary/[id]/SummaryViewSaved';
+import { SummaryView } from '@/components/SummaryView';
+import { toSavedPearl, type Database } from '@/lib/supabase/types';
 import type { SavedSummary } from '@/lib/supabase/types';
 import type { SummaryContext } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
@@ -31,16 +32,27 @@ export default async function SharedSummaryPage({ params }: Props) {
     summaries: row.summaries as unknown as SummaryContent,
     context: row.context as unknown as SummaryContext,
     transcripts: null, // Intentionally hidden for shared views
+    selectedTags: null,
     shareToken: row.share_token,
     isShared: row.is_shared,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
 
+  // Fetch pearls for this shared summary
+  const { data: pearlRows } = await supabase
+    .from('pearls')
+    .select('*')
+    .eq('summary_id', row.id)
+    .order('created_at', { ascending: true });
+
+  type PearlRow = Database['public']['Tables']['pearls']['Row'];
+  const savedPearls = ((pearlRows ?? []) as PearlRow[]).map(toSavedPearl);
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-3xl mx-auto">
-        <SummaryViewSaved summary={summary} readOnly />
+      <div className="max-w-6xl mx-auto">
+        <SummaryView summary={summary} savedPearls={savedPearls} readOnly />
       </div>
     </div>
   );

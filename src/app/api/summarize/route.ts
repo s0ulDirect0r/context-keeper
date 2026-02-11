@@ -1,4 +1,4 @@
-import { generateSummary, streamSummarySingle, type SummaryContext } from '@/lib/claude';
+import { generateSummary, extractTags, streamSummarySingle, type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
   };
 
   const summaryMode = mode === 'separate' ? 'separate' : 'combined';
+  const combinedTranscript = transcripts.join('\n\n---\n\n');
 
   // Get user before streaming starts (calls cookies() internally)
   let userId: string | null = null;
@@ -48,6 +49,18 @@ export async function POST(request: Request) {
       };
 
       try {
+        // Start tag extraction in parallel — it only needs the transcript + context.
+        // Use .then() to send tags_done as soon as tags resolve, even if summary
+        // is still streaming (JS is single-threaded so enqueue calls are safe).
+        send('tags_extracting', {});
+        let resolvedTags: Awaited<ReturnType<typeof extractTags>> = [];
+        const tagPromise = extractTags(combinedTranscript, summaryContext)
+          .then(tags => {
+            resolvedTags = tags;
+            send('tags_done', { tags });
+            return tags;
+          });
+
         if (summaryMode === 'separate' && transcripts.length > 1) {
           // Non-streaming fallback for separate mode
           const generatedSummaries = await generateSummary(transcripts, summaryContext, 'separate', {
@@ -58,7 +71,10 @@ export async function POST(request: Request) {
           const summaries = generatedSummaries.map(s => s.markdown);
           send('summary_done', { summaries });
 
-          // Save to DB
+          // Ensure tags are done before proceeding
+          await tagPromise;
+
+          // Save summary to DB (pearls saved later after tag selection)
           let savedSummaryId: string | null = null;
           if (userId && supabase) {
             let title = deriveTitle(recordingTitles);
@@ -85,7 +101,7 @@ export async function POST(request: Request) {
             }
           }
 
-          send('complete', { savedSummaryId, summaries });
+          send('complete', { savedSummaryId, summaries, tags: resolvedTags });
         } else {
           // Streaming mode: single/combined summary
           const title = recordingTitles?.length === 1
@@ -94,7 +110,7 @@ export async function POST(request: Request) {
           const date = recordingDates?.[0];
 
           const messageStream = streamSummarySingle(
-            transcripts.join('\n\n---\n\n'),
+            combinedTranscript,
             summaryContext,
             title,
             date,
@@ -107,7 +123,10 @@ export async function POST(request: Request) {
           });
 
           await messageStream.finalMessage();
-          send('summary_done', {});
+          send('summary_done', { summaries: [accumulatedText] });
+
+          // Ensure tags are done before proceeding
+          await tagPromise;
 
           // Extract title from first heading in the accumulated markdown
           const titleMatch = accumulatedText.match(/^#\s+(.+)$/m);
@@ -119,7 +138,7 @@ export async function POST(request: Request) {
             displayTitle = extractedTitle;
           }
 
-          // Save to DB
+          // Save summary to DB (pearls saved later after tag selection)
           let savedSummaryId: string | null = null;
           if (userId && supabase) {
             const { data, error: saveError } = await supabase
@@ -141,7 +160,7 @@ export async function POST(request: Request) {
             }
           }
 
-          send('complete', { savedSummaryId, summaries: [accumulatedText] });
+          send('complete', { savedSummaryId, summaries: [accumulatedText], tags: resolvedTags });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to generate summary';

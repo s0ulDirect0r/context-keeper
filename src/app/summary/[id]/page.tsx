@@ -1,8 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedSummary, type Database } from '@/lib/supabase/types';
-import { SummaryViewSaved } from './SummaryViewSaved';
+import { toSavedSummary, toSavedPearl, type Database } from '@/lib/supabase/types';
+import { SummaryView } from '@/components/SummaryView';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
@@ -35,9 +35,19 @@ export default async function SummaryPage({ params }: Props) {
 
   const summary = toSavedSummary(row as SummaryRow);
 
+  // Fetch pearls for this summary
+  const { data: pearlRows } = await supabase
+    .from('pearls')
+    .select('*')
+    .eq('summary_id', id)
+    .order('created_at', { ascending: true });
+
+  type PearlRow = Database['public']['Tables']['pearls']['Row'];
+  const savedPearls = ((pearlRows ?? []) as PearlRow[]).map(toSavedPearl);
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="mb-6">
           <Link href="/dashboard">
             <Button variant="ghost" size="sm">
@@ -47,7 +57,7 @@ export default async function SummaryPage({ params }: Props) {
           </Link>
         </div>
 
-        <SummaryViewSaved summary={summary} />
+        <SummaryView summary={summary} savedPearls={savedPearls} />
       </div>
     </div>
   );
