@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const isDev = process.env.NODE_ENV === "development";
+const isVercelPreview = process.env.VERCEL_ENV === "preview";
 
-// In dev, allow local Supabase; in prod, only remote Supabase + Sentry ingest
+// In dev, allow local Supabase; on Vercel preview, allow the toolbar
 const connectSrc = [
   "'self'",
   "https://*.supabase.co",
@@ -12,6 +13,14 @@ const connectSrc = [
   "https://otter.ai",
   "https://*.ingest.sentry.io",
   ...(isDev ? ["http://127.0.0.1:*", "ws://127.0.0.1:*"] : []),
+  ...(isVercelPreview ? ["https://vercel.live", "wss://ws-us3.pusher.com"] : []),
+].join(" ");
+
+const scriptSrc = [
+  "'self'",
+  "'unsafe-inline'",
+  "'unsafe-eval'",
+  ...(isVercelPreview ? ["https://vercel.live"] : []),
 ].join(" ");
 
 const nextConfig: NextConfig = {
@@ -35,7 +44,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              `script-src ${scriptSrc}`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
