@@ -124,3 +124,38 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Hide non-content elements */
+  nav,
+  aside,
+  button,
+  [data-slot="card-action"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Clean layout */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  /* Remove card borders/shadows for cleaner print */
+  [data-slot="card"] {
+    border: none !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* Ensure good page breaks */
+  h1, h2, h3, h4, h5, h6 {
+    break-after: avoid;
+  }
+
+  /* Clean up markdown content */
+  .prose {
+    max-width: none !important;
+  }
+}
