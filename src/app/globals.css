@@ -129,7 +129,6 @@
   /* Hide non-content elements */
   nav,
   aside,
-  button,
   [data-slot="card-action"],
   .no-print {
     display: none !important;

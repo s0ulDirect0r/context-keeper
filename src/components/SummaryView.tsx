@@ -205,7 +205,7 @@ export function SummaryView(props: SummaryViewProps) {
     if (recordingTitles && recordingTitles.length > 0) {
       return recordingTitles[index] || recordingTitles[0] || 'summary';
     }
-    return saved ? (title || 'summary') : 'summary';
+    return saved ? (props.summary.title || 'summary') : 'summary';
   };
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -486,7 +486,7 @@ export function SummaryView(props: SummaryViewProps) {
               <CardTitle className="text-lg">
                 {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
               </CardTitle>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 no-print">
                 <Button
                   variant="outline"
                   size="sm"
