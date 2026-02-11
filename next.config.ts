@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+const isDev = process.env.NODE_ENV === "development";
+
+// In dev, allow local Supabase; in prod, only remote Supabase + Sentry ingest
+const connectSrc = [
+  "'self'",
+  "https://*.supabase.co",
+  "wss://*.supabase.co",
+  "https://api.anthropic.com",
+  "https://otter.ai",
+  "https://*.ingest.sentry.io",
+  ...(isDev ? ["http://127.0.0.1:*", "ws://127.0.0.1:*"] : []),
+].join(" ");
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -26,7 +39,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://otter.ai",
+              `connect-src ${connectSrc}`,
             ].join("; "),
           },
         ],
