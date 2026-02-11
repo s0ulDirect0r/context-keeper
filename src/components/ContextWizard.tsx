@@ -142,6 +142,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                 <button
                   key={template.id}
                   type="button"
+                  aria-pressed={selectedTemplate === template.id}
                   onClick={() => handleTemplateClick(template.id)}
                   className={`rounded-lg border p-3 text-left transition-colors hover:bg-accent/50 ${
                     selectedTemplate === template.id
