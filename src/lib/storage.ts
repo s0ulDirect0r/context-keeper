@@ -58,3 +58,15 @@ export function setPreferences(prefs: Preferences): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(PREFERENCES_KEY, JSON.stringify(prefs));
 }
+
+const ONBOARDING_KEY = 'context-keeper:onboarding-complete';
+
+export function hasCompletedOnboarding(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(ONBOARDING_KEY) === 'true';
+}
+
+export function markOnboardingComplete(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(ONBOARDING_KEY, 'true');
+}
