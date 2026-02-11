@@ -89,15 +89,10 @@ export function SummaryView(props: SummaryViewProps) {
   const [summaries, setSummaries] = useState(initialSummaries);
   const [context, setContext] = useState(initialContext);
 
-  // Pearl state — sync from props when pearls arrive after initial render
-  const [curatingPearls, setCuratingPearls] = useState<Pearl[] | undefined>(props.pearls);
+  // Pearl state — derive curation pearls from props, dismiss after save
+  const [curationDismissed, setCurationDismissed] = useState(false);
+  const curatingPearls = curationDismissed ? undefined : props.pearls;
   const [displayPearls, setDisplayPearls] = useState<SavedPearl[]>(props.savedPearls ?? []);
-
-  useEffect(() => {
-    if (props.pearls && props.pearls.length > 0) {
-      setCuratingPearls(props.pearls);
-    }
-  }, [props.pearls]);
 
   // Copy state
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -283,7 +278,7 @@ export function SummaryView(props: SummaryViewProps) {
         setEditingContext(false);
 
         // Clear existing pearls — user will need to regenerate via tag selection
-        setCuratingPearls(undefined);
+        setCurationDismissed(true);
         setDisplayPearls([]);
       } else {
         if (data.savedSummaryId) {
@@ -342,7 +337,7 @@ export function SummaryView(props: SummaryViewProps) {
 
   const handlePearlsSaved = (savedPearlList: SavedPearl[]) => {
     setDisplayPearls(savedPearlList);
-    setCuratingPearls(undefined);
+    setCurationDismissed(true);
     props.onPearlsSaved?.(savedPearlList);
   };
 
@@ -350,15 +345,8 @@ export function SummaryView(props: SummaryViewProps) {
 
   const hasCuratingPearls = curatingPearls && curatingPearls.length > 0;
   const hasDisplayPearls = displayPearls.length > 0;
-  const inlineConceptTags = !saved ? (props as InlineProps).conceptTags : undefined;
-  const inlineOnTagSubmit = !saved ? (props as InlineProps).onTagSubmit : undefined;
-  const inlineOnTagSkip = !saved ? (props as InlineProps).onTagSkip : undefined;
-  const inlineGeneratingPearls = !saved ? (props as InlineProps).generatingPearls : false;
-  const inlineTagSelection = !saved ? (props as InlineProps).tagSelection : undefined;
-  const inlineOnTagSelectionChange = !saved ? (props as InlineProps).onTagSelectionChange : undefined;
-  const inlineTagCustomTags = !saved ? (props as InlineProps).tagCustomTags : undefined;
-  const inlineOnTagCustomTagsChange = !saved ? (props as InlineProps).onTagCustomTagsChange : undefined;
-  const hasTagsForSidebar = inlineConceptTags && inlineConceptTags.length > 0 && !hasCuratingPearls && !hasDisplayPearls;
+  const inlineProps = !saved ? (props as InlineProps) : null;
+  const hasTagsForSidebar = inlineProps?.conceptTags && inlineProps.conceptTags.length > 0 && !hasCuratingPearls && !hasDisplayPearls;
   const showPearlsSidebar = hasCuratingPearls || hasDisplayPearls || hasTagsForSidebar;
 
   // ── Render ─────────────────────────────────────────────────────
@@ -671,20 +659,20 @@ export function SummaryView(props: SummaryViewProps) {
           />
         ) : hasDisplayPearls ? (
           <PearlsSidebar mode="display" pearls={displayPearls} />
-        ) : hasTagsForSidebar && inlineOnTagSubmit && inlineOnTagSkip && inlineTagSelection && inlineOnTagSelectionChange && inlineTagCustomTags && inlineOnTagCustomTagsChange ? (
+        ) : hasTagsForSidebar && inlineProps?.onTagSubmit && inlineProps.onTagSkip && inlineProps.tagSelection && inlineProps.onTagSelectionChange && inlineProps.tagCustomTags && inlineProps.onTagCustomTagsChange ? (
           <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
               Focus your pearls
             </h3>
             <TagSelector
-              tags={inlineConceptTags}
-              generating={inlineGeneratingPearls}
-              onSubmit={inlineOnTagSubmit}
-              onSkip={inlineOnTagSkip}
-              selected={inlineTagSelection}
-              onSelectedChange={inlineOnTagSelectionChange}
-              customTags={inlineTagCustomTags}
-              onCustomTagsChange={inlineOnTagCustomTagsChange}
+              tags={inlineProps.conceptTags!}
+              generating={inlineProps.generatingPearls}
+              onSubmit={inlineProps.onTagSubmit}
+              onSkip={inlineProps.onTagSkip}
+              selected={inlineProps.tagSelection}
+              onSelectedChange={inlineProps.onTagSelectionChange}
+              customTags={inlineProps.tagCustomTags}
+              onCustomTagsChange={inlineProps.onTagCustomTagsChange}
               compact
             />
           </div>
