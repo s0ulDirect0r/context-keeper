@@ -5,6 +5,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useAppMode } from '@/components/AppModeProvider';
 import { AuthDialog, type AuthMode } from '@/components/AuthDialog';
 import { Button } from '@/components/ui/button';
+import { LandingPage } from '@/components/LandingPage';
 import { InputMethodPicker } from '@/components/InputMethodPicker';
 import { OtterLogin } from '@/components/OtterLogin';
 import { RecordingList } from '@/components/RecordingList';
@@ -556,26 +557,14 @@ export default function Home() {
   // Landing page for non-authenticated users who haven't clicked "Try it out"
   if (!user && !isAppMode) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4">
-        <div className="text-center space-y-6">
-          <h1 className="text-5xl font-bold tracking-tight">Context Keeper</h1>
-          <p className="text-xl text-muted-foreground">
-            Stay connected to what matters the most
-          </p>
-          <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
-            <Button size="lg" onClick={() => { setAuthMode('sign-up'); setAuthDialogOpen(true); }}>
-              Sign Up
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => { setAuthMode('sign-in'); setAuthDialogOpen(true); }}>
-              Sign In
-            </Button>
-            <Button size="lg" variant="ghost" onClick={() => setAppMode(true)}>
-              Try it out
-            </Button>
-          </div>
-        </div>
+      <>
+        <LandingPage
+          onTryFree={() => setAppMode(true)}
+          onSignUp={() => { setAuthMode('sign-up'); setAuthDialogOpen(true); }}
+          onSignIn={() => { setAuthMode('sign-in'); setAuthDialogOpen(true); }}
+        />
         <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} initialMode={authMode} />
-      </main>
+      </>
     );
   }
 
