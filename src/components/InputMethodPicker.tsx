@@ -87,12 +87,12 @@ export function InputMethodPicker({ onSelect, connectedOtterEmail, onDisconnectO
           onClick={() => onSelect('manual')}
         >
           <CardHeader>
-            <CardTitle>Paste transcript manually</CardTitle>
-            <CardDescription>Copy and paste your transcript text</CardDescription>
+            <CardTitle>Paste or upload transcript</CardTitle>
+            <CardDescription>Upload .txt, .srt, .vtt or paste text directly</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Have a transcript from another source? Paste it directly to generate a summary.
+              Have a transcript from another source? Upload a file or paste it directly to generate a summary.
             </p>
           </CardContent>
         </Card>

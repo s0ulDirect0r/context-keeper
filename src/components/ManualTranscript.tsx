@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Upload, X } from 'lucide-react';
+import { isSupportedFile, parseTranscriptFile } from '@/lib/transcript-parsers';
 
 interface Props {
   onSubmit: (transcript: string) => void;
@@ -12,6 +14,52 @@ interface Props {
 
 export function ManualTranscript({ onSubmit, onBack }: Props) {
   const [transcript, setTranscript] = useState('');
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    setFileError(null);
+
+    if (!isSupportedFile(file.name)) {
+      setFileError('Unsupported file type. Please use .txt, .srt, or .vtt files.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const parsed = parseTranscriptFile(content, file.name);
+      setTranscript(parsed);
+      setFileName(file.name);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+  };
+
+  const clearFile = () => {
+    setFileName(null);
+    setTranscript('');
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,13 +71,70 @@ export function ManualTranscript({ onSubmit, onBack }: Props) {
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Paste your transcript</CardTitle>
+        <CardTitle>Paste or upload your transcript</CardTitle>
         <CardDescription>
-          Copy and paste your meeting transcript, notes, or any text you want to summarize.
+          Upload a file (.txt, .srt, .vtt) or paste your meeting transcript directly.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Drop zone */}
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors ${
+              dragActive
+                ? 'border-primary ring-2 ring-primary bg-primary/5'
+                : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+            }`}
+          >
+            {fileName ? (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium">{fileName}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearFile();
+                  }}
+                  className="rounded-full p-0.5 hover:bg-muted"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Drop a file here, or <span className="text-primary underline">Browse</span>
+                </p>
+                <p className="text-xs text-muted-foreground/70">.txt, .srt, .vtt</p>
+              </>
+            )}
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.srt,.vtt"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+            }}
+          />
+
+          {fileError && (
+            <div className="flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <span>{fileError}</span>
+              <button type="button" onClick={() => setFileError(null)} className="ml-2">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <Textarea
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
