@@ -18,5 +18,6 @@ export function downloadMarkdown(markdown: string, title: string): void {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Delay revocation so the browser has time to initiate the download
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
