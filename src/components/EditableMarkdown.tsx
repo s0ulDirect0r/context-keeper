@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Pencil, Check } from 'lucide-react';
 
 /**
@@ -186,7 +187,7 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
   return (
     <div className="group relative pr-8">
       <div className="prose prose-sm dark:prose-invert max-w-none">
-        <Markdown>{chunk}</Markdown>
+        <Markdown remarkPlugins={[remarkGfm]}>{chunk}</Markdown>
       </div>
       {!readOnly && (
         <button
