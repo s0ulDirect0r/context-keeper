@@ -84,8 +84,11 @@ export function SummaryView(props: SummaryViewProps) {
   // Normalize data — either from saved summary or inline generation
   const initialSummaries = saved ? props.summary.summaries : props.data.summaries;
   const initialContext = saved ? props.summary.context : props.data.context;
-  const transcripts = saved ? props.summary.transcripts : props.data.transcripts;
+  const inlineTranscripts = saved ? undefined : props.data.transcripts;
   const recordingTitles = saved ? undefined : props.data.recordingTitles;
+
+  // Transcript state — sourced from sessionStorage, never from DB
+  const [transcripts, setTranscripts] = useState<string[] | undefined>(inlineTranscripts);
 
   // Mutable state for regeneration
   const [summaries, setSummaries] = useState(initialSummaries);
@@ -117,6 +120,9 @@ export function SummaryView(props: SummaryViewProps) {
   const [editAdditional, setEditAdditional] = useState(context?.additionalContext ?? '');
   const [regenerating, setRegenerating] = useState(false);
 
+  // Re-paste transcript for regeneration when original is unavailable
+  const [repasteText, setRepasteText] = useState('');
+
   // Share state (saved mode only)
   const [isShared, setIsShared] = useState(saved ? props.summary.isShared : false);
   const [shareToken, setShareToken] = useState(saved ? props.summary.shareToken : null);
@@ -126,6 +132,30 @@ export function SummaryView(props: SummaryViewProps) {
   const readOnly = props.readOnly ?? false;
   const summaryId = saved ? props.summary.id : savedSummaryId;
   const hasTranscripts = transcripts !== null && transcripts !== undefined && transcripts.length > 0;
+
+  // sessionStorage: persist transcripts for regeneration within the browser session
+  const transcriptStorageKey = summaryId ? `ck:transcripts:${summaryId}` : null;
+
+  // On mount — write inline transcripts to sessionStorage, or read them for saved summaries
+  useEffect(() => {
+    if (!transcriptStorageKey) return;
+
+    if (inlineTranscripts && inlineTranscripts.length > 0) {
+      // Just generated — cache for regeneration
+      try {
+        sessionStorage.setItem(transcriptStorageKey, JSON.stringify(inlineTranscripts));
+      } catch { /* sessionStorage full — ignore */ }
+    } else if (saved) {
+      // Opened a saved summary — try to recover transcripts from this session
+      try {
+        const stored = sessionStorage.getItem(transcriptStorageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored) as string[];
+          if (parsed.length > 0) setTranscripts(parsed);
+        }
+      } catch { /* corrupted data — ignore */ }
+    }
+  }, [transcriptStorageKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Guest sign-up-to-save flow
   useEffect(() => {
@@ -139,13 +169,21 @@ export function SummaryView(props: SummaryViewProps) {
           summaries,
           context,
           recordingTitles: inlineProps.data.recordingTitles,
-          transcripts: inlineProps.data.transcripts,
           pearls: curatingPearls?.filter((p) => p.id),
         }),
       })
         .then((res) => res.json())
         .then((data) => {
           if (data.savedSummaryId) {
+            // Cache transcripts for regeneration in this session
+            if (transcripts && transcripts.length > 0) {
+              try {
+                sessionStorage.setItem(
+                  `ck:transcripts:${data.savedSummaryId}`,
+                  JSON.stringify(transcripts),
+                );
+              } catch { /* ignore */ }
+            }
             inlineProps.onSaved?.(data.savedSummaryId);
             router.push(`/summary/${data.savedSummaryId}`);
           }
@@ -249,7 +287,7 @@ export function SummaryView(props: SummaryViewProps) {
   };
 
   const handleRegenerate = async (mode: 'replace' | 'new') => {
-    if (!saved || !transcripts) return;
+    if (!transcripts) return;
 
     setRegenerating(true);
     try {
@@ -265,24 +303,62 @@ export function SummaryView(props: SummaryViewProps) {
           transcripts,
           context: newContext,
           mode: summaries.length > 1 ? 'separate' : 'combined',
-          save: mode === 'new',
+          save: saved && mode === 'new',
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to regenerate');
+      }
+
+      // /api/summarize returns an SSE stream — read it and extract the complete event
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let result: { summaries?: string[]; savedSummaryId?: string } = {};
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const eventStr of events) {
+          if (!eventStr.trim()) continue;
+          let eventName = '';
+          let eventData = '';
+          for (const line of eventStr.split('\n')) {
+            if (line.startsWith('event: ')) eventName = line.slice(7);
+            else if (line.startsWith('data: ')) eventData = line.slice(6);
+          }
+          if (eventName === 'complete' && eventData) {
+            result = JSON.parse(eventData);
+          } else if (eventName === 'error' && eventData) {
+            const err = JSON.parse(eventData);
+            throw new Error(err.message || 'Generation failed');
+          }
+        }
+      }
+
+      if (!result.summaries) throw new Error('No summaries received');
 
       if (mode === 'replace') {
-        await fetch(`/api/summaries/${props.summary.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            summaries: data.summaries,
-            context: newContext,
-          }),
-        });
+        // Persist to DB if this is a saved summary
+        if (saved) {
+          await fetch(`/api/summaries/${props.summary.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              summaries: result.summaries,
+              context: newContext,
+            }),
+          });
+        }
 
-        setSummaries(data.summaries);
+        setSummaries(result.summaries);
         setContext(newContext);
         setEditingContext(false);
 
@@ -290,8 +366,8 @@ export function SummaryView(props: SummaryViewProps) {
         setCurationDismissed(true);
         setDisplayPearls([]);
       } else {
-        if (data.savedSummaryId) {
-          router.push(`/summary/${data.savedSummaryId}`);
+        if (result.savedSummaryId) {
+          router.push(`/summary/${result.savedSummaryId}`);
         }
       }
     } catch (err) {
@@ -542,7 +618,7 @@ export function SummaryView(props: SummaryViewProps) {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Context used for this summary
                 </CardTitle>
-                {saved && !readOnly && !editingContext && (
+                {!readOnly && !editingContext && hasTranscripts && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -551,11 +627,9 @@ export function SummaryView(props: SummaryViewProps) {
                       setEditAdditional(context?.additionalContext ?? '');
                       setEditingContext(true);
                     }}
-                    disabled={!hasTranscripts}
-                    title={!hasTranscripts ? 'Original transcript not available' : undefined}
                   >
                     <Pencil className="h-3 w-3 mr-1" />
-                    Edit
+                    Edit & Regenerate
                   </Button>
                 )}
               </div>
@@ -590,18 +664,20 @@ export function SummaryView(props: SummaryViewProps) {
                       <Button
                         size="sm"
                         onClick={() => handleRegenerate('replace')}
-                        disabled={!editExtractionGoal.trim()}
+                        disabled={!editExtractionGoal.trim() || !hasTranscripts}
                       >
-                        Replace current
+                        {saved ? 'Replace current' : 'Regenerate'}
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRegenerate('new')}
-                        disabled={!editExtractionGoal.trim()}
-                      >
-                        Save as new
-                      </Button>
+                      {saved && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRegenerate('new')}
+                          disabled={!editExtractionGoal.trim() || !hasTranscripts}
+                        >
+                          Save as new
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -646,9 +722,33 @@ export function SummaryView(props: SummaryViewProps) {
                     </p>
                   )}
                   {saved && !hasTranscripts && !readOnly && (
-                    <p className="text-xs text-muted-foreground italic">
-                      Original transcript not available for re-generation
-                    </p>
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs text-muted-foreground italic">
+                        Paste your transcript to regenerate with different settings
+                      </p>
+                      <Textarea
+                        placeholder="Paste your meeting transcript here..."
+                        value={repasteText}
+                        onChange={(e) => setRepasteText(e.target.value)}
+                        className="min-h-20 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!repasteText.trim()}
+                        onClick={() => {
+                          const t = [repasteText.trim()];
+                          setTranscripts(t);
+                          setRepasteText('');
+                          if (transcriptStorageKey) {
+                            try {
+                              sessionStorage.setItem(transcriptStorageKey, JSON.stringify(t));
+                            } catch { /* ignore */ }
+                          }
+                        }}
+                      >
+                        Load transcript
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}

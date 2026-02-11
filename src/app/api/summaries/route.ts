@@ -17,7 +17,6 @@ const saveSummarySchema = z.object({
     additionalContext: z.string().max(2000).optional(),
   }),
   recordingTitles: z.array(z.string()).optional(),
-  transcripts: z.array(z.string()).optional(),
   pearls: z.array(pearlSchema).optional(),
 });
 
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { summaries, context, recordingTitles, transcripts, pearls } = parsed.data;
+    const { summaries, context, recordingTitles, pearls } = parsed.data;
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -61,7 +60,6 @@ export async function POST(request: Request) {
       title,
       summaries: summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
       context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-      transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
     };
 
     const { data, error: saveError } = await supabase

@@ -126,7 +126,6 @@ export async function POST(request: Request) {
                 title,
                 summaries: summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
                 context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-                transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
               })
               .select('id')
               .single();
@@ -185,7 +184,6 @@ export async function POST(request: Request) {
                 title: displayTitle,
                 summaries: [accumulatedText] as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
                 context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-                transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
               })
               .select('id')
               .single();

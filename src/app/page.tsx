@@ -476,14 +476,25 @@ export default function Home() {
         });
         break;
 
-      case 'complete':
+      case 'complete': {
+        const completeSummaryId = data.savedSummaryId as string | undefined;
         dispatch({
           type: 'SSE_COMPLETE',
-          savedSummaryId: data.savedSummaryId as string | undefined,
+          savedSummaryId: completeSummaryId,
           summaries: data.summaries as string[] | undefined,
           tags: data.tags as ConceptTag[] | undefined,
         });
+        // Cache transcripts in sessionStorage for regeneration within this browser session
+        if (completeSummaryId && state.transcripts.length > 0) {
+          try {
+            sessionStorage.setItem(
+              `ck:transcripts:${completeSummaryId}`,
+              JSON.stringify(state.transcripts),
+            );
+          } catch { /* sessionStorage full — ignore */ }
+        }
         break;
+      }
 
       case 'error':
         break;

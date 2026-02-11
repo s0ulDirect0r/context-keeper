@@ -11,7 +11,6 @@ const patchSummarySchema = z.object({
     additionalContext: z.string().max(2000).optional(),
   }).optional(),
   is_shared: z.boolean().optional(),
-  transcripts: z.array(z.string()).optional(),
 });
 
 interface Props {
@@ -62,7 +61,6 @@ export async function PATCH(request: Request, { params }: Props) {
     if (validatedBody.summaries !== undefined) updateData.summaries = validatedBody.summaries;
     if (validatedBody.context !== undefined) updateData.context = validatedBody.context;
     if (validatedBody.is_shared !== undefined) updateData.is_shared = validatedBody.is_shared;
-    if (validatedBody.transcripts !== undefined) updateData.transcripts = validatedBody.transcripts;
 
     // Generate share token when enabling sharing for the first time
     if (validatedBody.is_shared === true && !existing.share_token) {
