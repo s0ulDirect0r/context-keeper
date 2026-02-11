@@ -1,16 +1,28 @@
+import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { otterGetRecordings, otterGetTranscript, type OtterSession } from '@/lib/otter';
 
+const recordingsPostSchema = z.object({
+  recordingIds: z
+    .array(z.string().min(1))
+    .min(1, 'At least one recording ID required')
+    .max(20, 'Maximum 20 recordings'),
+});
+
+function getOtterSession(request: Request): OtterSession | null {
+  const userId = request.headers.get('X-Otter-UserId');
+  const cookies = request.headers.get('X-Otter-Cookies');
+  if (!userId || !cookies) return null;
+  return { userId, cookies };
+}
+
 export async function GET(request: Request) {
   try {
-    const userId = request.headers.get('X-Otter-UserId');
-    const cookies = request.headers.get('X-Otter-Cookies');
-
-    if (!userId || !cookies) {
+    const session = getOtterSession(request);
+    if (!session) {
       return NextResponse.json({ error: 'Missing Otter session' }, { status: 401 });
     }
 
-    const session: OtterSession = { userId, cookies };
     const recordings = await otterGetRecordings(session);
 
     return NextResponse.json({ recordings });
@@ -21,21 +33,23 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Fetch transcripts for specific recordings
   try {
-    const userId = request.headers.get('X-Otter-UserId');
-    const cookies = request.headers.get('X-Otter-Cookies');
-    const { recordingIds } = await request.json();
-
-    if (!userId || !cookies) {
+    const session = getOtterSession(request);
+    if (!session) {
       return NextResponse.json({ error: 'Missing Otter session' }, { status: 401 });
     }
 
-    if (!recordingIds || !Array.isArray(recordingIds)) {
-      return NextResponse.json({ error: 'recordingIds array required' }, { status: 400 });
+    const body = await request.json();
+
+    const parsed = recordingsPostSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.issues.map((i) => i.message) },
+        { status: 400 },
+      );
     }
 
-    const session: OtterSession = { userId, cookies };
+    const { recordingIds } = parsed.data;
 
     const results = await Promise.all(
       recordingIds.map(async (id: string) => {
