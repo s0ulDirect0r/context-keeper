@@ -20,6 +20,20 @@ There is no fixed template. Let the meeting itself dictate the structure — a b
 - **Include action items and decisions** if the meeting produced them, but don't invent structure that wasn't there.
 - **Use markdown formatting** — headings, blockquotes, lists, bold — whatever makes the summary scannable and clear.
 
+## Adapt to the Meeting's Shape
+
+Recognize how the conversation was structured and let that shape the summary:
+
+- **Q&A / Interview** — Open with the central question, then speaker-attributed answers with direct quotes. Let the question frame everything.
+- **Brainstorm / Ideation** — Cluster ideas by theme, not chronologically. Note which ideas got energy vs. which died on the vine.
+- **Status Update / Standup** — Organize by person or workstream. Keep it tight — bullet points over prose.
+- **Decision Meeting** — Lead with what was decided and who owns it. Then the reasoning and dissent.
+- **Difficult Conversation / Conflict** — Name the tension directly. Quote both sides. Don't smooth it over.
+- **Presentation + Discussion** — Separate the presented content from the audience reaction.
+- **Planning / Kickoff** — Focus on what was scoped, what was deferred, and open questions.
+
+Don't force-classify — some meetings are messy hybrids. But when the structure is clear, honor it.
+
 ## Title
 - If title metadata is provided, use it directly.
 - Otherwise, generate a concise descriptive title (not "Meeting Summary").`;
