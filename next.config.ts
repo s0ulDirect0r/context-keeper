@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const isDev = process.env.NODE_ENV === "development";
-const isVercelPreview = process.env.VERCEL_ENV === "preview";
+// Vercel injects its toolbar on non-production deploys (preview, staging, etc.)
+const isVercelNonProd =
+  !!process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production";
 
 // In dev, allow local Supabase; on Vercel preview, allow the toolbar
 const connectSrc = [
@@ -13,14 +15,14 @@ const connectSrc = [
   "https://otter.ai",
   "https://*.ingest.sentry.io",
   ...(isDev ? ["http://127.0.0.1:*", "ws://127.0.0.1:*"] : []),
-  ...(isVercelPreview ? ["https://vercel.live", "wss://ws-us3.pusher.com"] : []),
+  ...(isVercelNonProd ? ["https://vercel.live", "wss://ws-us3.pusher.com"] : []),
 ].join(" ");
 
 const scriptSrc = [
   "'self'",
   "'unsafe-inline'",
   "'unsafe-eval'",
-  ...(isVercelPreview ? ["https://vercel.live"] : []),
+  ...(isVercelNonProd ? ["https://vercel.live"] : []),
 ].join(" ");
 
 const nextConfig: NextConfig = {
