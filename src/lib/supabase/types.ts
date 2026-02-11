@@ -1,13 +1,7 @@
 import type { SummaryContext, ThemeQuote } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
   public: {
@@ -23,6 +17,7 @@ export interface Database {
           selected_tags: string[] | null;
           share_token: string | null;
           is_shared: boolean;
+          search_text: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -36,6 +31,7 @@ export interface Database {
           selected_tags?: string[] | null;
           share_token?: string;
           is_shared?: boolean;
+          search_text?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -49,6 +45,7 @@ export interface Database {
           selected_tags?: string[] | null;
           share_token?: string;
           is_shared?: boolean;
+          search_text?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -158,7 +155,9 @@ export function toSavedPearl(row: Database['public']['Tables']['pearls']['Row'])
   };
 }
 
-export function toSavedSummary(row: Database['public']['Tables']['summaries']['Row']): SavedSummary {
+export function toSavedSummary(
+  row: Database['public']['Tables']['summaries']['Row'],
+): SavedSummary {
   return {
     id: row.id,
     title: row.title,

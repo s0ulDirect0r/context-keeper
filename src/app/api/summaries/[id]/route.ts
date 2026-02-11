@@ -1,15 +1,18 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { buildSearchText } from '@/lib/search-text';
 import crypto from 'crypto';
 
 const patchSummarySchema = z.object({
   title: z.string().min(1).max(200).optional(),
   summaries: z.array(z.string()).optional(),
-  context: z.object({
-    extractionGoal: z.string().min(1).max(1000),
-    additionalContext: z.string().max(2000).optional(),
-  }).optional(),
+  context: z
+    .object({
+      extractionGoal: z.string().min(1).max(1000),
+      additionalContext: z.string().max(2000).optional(),
+    })
+    .optional(),
   is_shared: z.boolean().optional(),
   transcripts: z.array(z.string()).optional(),
 });
@@ -34,16 +37,18 @@ export async function PATCH(request: Request, { params }: Props) {
     const validatedBody = parsed.data;
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Verify ownership
+    // Verify ownership and get current data for search_text recomputation
     const { data: existing, error: fetchError } = await supabase
       .from('summaries')
-      .select('id, user_id, share_token')
+      .select('id, user_id, share_token, title, summaries')
       .eq('id', id)
       .single();
 
@@ -63,6 +68,19 @@ export async function PATCH(request: Request, { params }: Props) {
     if (validatedBody.context !== undefined) updateData.context = validatedBody.context;
     if (validatedBody.is_shared !== undefined) updateData.is_shared = validatedBody.is_shared;
     if (validatedBody.transcripts !== undefined) updateData.transcripts = validatedBody.transcripts;
+
+    // Recompute search_text when title or summaries change
+    if (validatedBody.title !== undefined || validatedBody.summaries !== undefined) {
+      const newTitle = validatedBody.title ?? existing.title;
+      const newSummaries = validatedBody.summaries ?? (existing.summaries as string[]);
+      const summariesMap: Record<string, string> = {};
+      if (Array.isArray(newSummaries)) {
+        newSummaries.forEach((s: string, i: number) => {
+          summariesMap[String(i)] = String(s);
+        });
+      }
+      updateData.search_text = buildSearchText(newTitle, summariesMap);
+    }
 
     // Generate share token when enabling sharing for the first time
     if (validatedBody.is_shared === true && !existing.share_token) {
