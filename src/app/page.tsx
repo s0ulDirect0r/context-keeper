@@ -27,8 +27,12 @@ import {
   getStoredSession,
   storeSession,
   clearSession,
+  hasCompletedOnboarding,
+  markOnboardingComplete,
   type StoredOtterSession,
 } from '@/lib/storage';
+import { SAMPLE_TRANSCRIPT } from '@/lib/sample-transcript';
+import WelcomeStep from '@/components/WelcomeStep';
 import type { User } from '@supabase/supabase-js';
 import { generationReducer, initialState } from '@/lib/generation-reducer';
 
@@ -98,6 +102,9 @@ export default function Home() {
 
   // Consolidated generation state
   const [state, dispatch] = useReducer(generationReducer, initialState);
+
+  // First-run onboarding gate
+  const [showWelcome, setShowWelcome] = useState(() => !hasCompletedOnboarding());
 
   // Otter session — external to reducer (loaded from DB/localStorage)
   const [otterSession, setOtterSession] = useState<StoredOtterSession | null>(null);
@@ -565,6 +572,24 @@ export default function Home() {
         />
         <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} initialMode={authMode} />
       </>
+    );
+  }
+
+  if (showWelcome && state.step === 'choose-method') {
+    return (
+      <main className="container mx-auto px-4 py-12">
+        <WelcomeStep
+          onTryExample={() => {
+            markOnboardingComplete();
+            setShowWelcome(false);
+            handleManualTranscript(SAMPLE_TRANSCRIPT);
+          }}
+          onUseOwn={() => {
+            markOnboardingComplete();
+            setShowWelcome(false);
+          }}
+        />
+      </main>
     );
   }
 
