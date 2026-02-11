@@ -10,7 +10,8 @@ import { PearlsSidebar } from './PearlsSidebar';
 import { AuthDialog } from './AuthDialog';
 import { useAuth } from './AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
-import { Pencil, Loader2, Share2, Check, Link } from 'lucide-react';
+import { Pencil, Loader2, Share2, Check, Link, Copy, FileDown, Printer } from 'lucide-react';
+import { downloadMarkdown } from '@/lib/export';
 import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
 import type { SavedSummary, SavedPearl } from '@/lib/supabase/types';
@@ -199,6 +200,13 @@ export function SummaryView(props: SummaryViewProps) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ─────────────────────────────────────────────────────
+
+  const getExportTitle = (index: number) => {
+    if (recordingTitles && recordingTitles.length > 0) {
+      return recordingTitles[index] || recordingTitles[0] || 'summary';
+    }
+    return saved ? (title || 'summary') : 'summary';
+  };
 
   const copyToClipboard = async (text: string, index: number) => {
     try {
@@ -478,13 +486,35 @@ export function SummaryView(props: SummaryViewProps) {
               <CardTitle className="text-lg">
                 {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
               </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(summaryText, index)}
-              >
-                {copiedIndex === index ? 'Copied!' : 'Copy'}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(summaryText, index)}
+                  title="Copy to clipboard"
+                >
+                  {copiedIndex === index ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">{copiedIndex === index ? 'Copied!' : 'Copy'}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadMarkdown(summaryText, getExportTitle(index))}
+                  title="Download as Markdown"
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.print()}
+                  title="Print / Save as PDF"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Print</span>
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
