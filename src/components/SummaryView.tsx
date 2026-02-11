@@ -10,8 +10,8 @@ import { PearlsSidebar } from './PearlsSidebar';
 import { AuthDialog } from './AuthDialog';
 import { useAuth } from './AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
-import { Pencil, Loader2, Share2, Check, Link, Copy, FileDown, Printer } from 'lucide-react';
-import { downloadMarkdown } from '@/lib/export';
+import { Pencil, Loader2, Share2, Check, Link, Copy, FileDown, FileText } from 'lucide-react';
+import { downloadMarkdown, downloadPdf } from '@/lib/export';
 import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
 import type { SavedSummary, SavedPearl } from '@/lib/supabase/types';
@@ -503,16 +503,16 @@ export function SummaryView(props: SummaryViewProps) {
                   title="Download as Markdown"
                 >
                   <FileDown className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Download</span>
+                  <span className="hidden sm:inline">Markdown</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.print()}
-                  title="Print / Save as PDF"
+                  onClick={() => downloadPdf(summaryText, getExportTitle(index))}
+                  title="Download as PDF"
                 >
-                  <Printer className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Print</span>
+                  <FileText className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">PDF</span>
                 </Button>
               </div>
             </div>
