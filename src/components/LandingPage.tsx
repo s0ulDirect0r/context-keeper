@@ -8,22 +8,30 @@ interface LandingPageProps {
   onSignIn: () => void;
 }
 
-function HeroSection({ onTryFree, onSignIn }: Pick<LandingPageProps, 'onTryFree' | 'onSignIn'>) {
+function HeroSection({ onTryFree, onSignUp, onSignIn }: Pick<LandingPageProps, 'onTryFree' | 'onSignUp' | 'onSignIn'>) {
   return (
-    <section className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4 text-center">
-      <div className="max-w-3xl space-y-6">
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight">
+    <section className="pt-16 pb-8 px-4 text-center">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <p className="text-4xl sm:text-5xl font-bold tracking-tight">
+          Context Keeper
+        </p>
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-snug">
           Same meeting. Different summaries.{' '}
-          <span className="text-primary">Each one tailored to who needs it.</span>
+          Each one tailored to who needs it.
         </h1>
-        <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-base text-muted-foreground max-w-lg mx-auto">
           Import any meeting transcript. Tell us who it&apos;s for. Get a summary that speaks their language.
         </p>
-        <div className="pt-4 flex flex-col items-center gap-3">
-          <Button size="lg" onClick={onTryFree} className="text-base px-8 h-12">
-            Try it free
-            <ArrowRight className="ml-1 size-4" />
-          </Button>
+        <div className="pt-2 flex flex-col items-center gap-3">
+          <div className="flex gap-3">
+            <Button size="lg" onClick={onTryFree}>
+              Try it free
+              <ArrowRight className="ml-1 size-4" />
+            </Button>
+            <Button size="lg" variant="outline" onClick={onSignUp}>
+              Sign up
+            </Button>
+          </div>
           <button
             onClick={onSignIn}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
@@ -38,60 +46,73 @@ function HeroSection({ onTryFree, onSignIn }: Pick<LandingPageProps, 'onTryFree'
 
 function BeforeAfterSection() {
   return (
-    <section className="py-20 px-4 bg-muted/30">
-      <div className="max-w-5xl mx-auto space-y-10">
-        <div className="text-center space-y-3">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+    <section className="py-12 px-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">
             One conversation, two perspectives
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            The same transcript produces completely different summaries depending on who needs to read it.
+          <p className="text-sm text-muted-foreground">
+            The same transcript produces completely different summaries depending on who reads it.
           </p>
         </div>
 
-        {/* Transcript snippet */}
-        <Card className="max-w-3xl mx-auto border-dashed">
-          <CardContent className="py-2">
-            <p className="text-sm font-mono text-muted-foreground leading-relaxed">
-              <span className="font-semibold text-foreground">Sarah:</span> We need to push the API migration to next sprint. The auth service refactor is blocking it, and we&apos;re still waiting on the security review.
-            </p>
-          </CardContent>
-        </Card>
+        {/* Transcript snippet — multi-speaker dialogue */}
+        <div className="max-w-3xl mx-auto rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-5 py-4 space-y-2.5">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/70 mb-3">From the transcript</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <span className="font-semibold text-foreground">Sarah:</span>{' '}
+            We need to push the API migration to next sprint. The auth service refactor is blocking it, and we&apos;re still waiting on the security review from compliance.
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <span className="font-semibold text-foreground">James:</span>{' '}
+            I can have the auth refactor done by Thursday, but the compliance review is out of our hands. I&apos;ve pinged them twice.
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <span className="font-semibold text-foreground">Sarah:</span>{' '}
+            OK, let&apos;s flag it as a blocker in the sprint retro. If we don&apos;t hear back by Friday, I&apos;ll escalate to VP Eng.
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <span className="font-semibold text-foreground">Marcus:</span>{' '}
+            Should we start scoping the fallback plan in case the migration slips further? We promised the client a demo in three weeks.
+          </p>
+        </div>
 
-        {/* Side-by-side summary cards */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card className="border-blue-200 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-950/20">
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="rounded-full bg-blue-100 dark:bg-blue-900/40 p-1.5">
-                  <Users className="size-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
-                  For your manager
-                </span>
+        {/* Arrow / flow indicator */}
+        <div className="flex justify-center">
+          <ArrowRight className="size-5 text-muted-foreground/50 rotate-90" />
+        </div>
+
+        {/* Side-by-side summary cards with distinct colors */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card className="border-blue-200 dark:border-blue-800/40 bg-blue-50/40 dark:bg-blue-950/20">
+            <CardContent className="space-y-2">
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                For your manager
+              </span>
+              <div className="text-sm leading-relaxed space-y-2">
+                <p>
+                  The API migration is delayed to next sprint. Root cause is a dependency on the auth service refactor (ETA Thursday) and a pending compliance security review that&apos;s been unresponsive.
+                </p>
+                <p>
+                  Sarah will escalate to VP Eng if compliance doesn&apos;t respond by Friday. The team is evaluating a fallback plan given a client demo in three weeks. No action needed from you yet.
+                </p>
               </div>
-              <p className="text-sm leading-relaxed">
-                The API migration is delayed to next sprint due to dependencies on the auth service refactor and a pending security review. No action needed from you — the team is tracking it.
-              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-emerald-200 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-950/20">
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/40 p-1.5">
-                  <Users className="size-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">
-                  For the team
-                </span>
-              </div>
-              <div className="text-sm leading-relaxed space-y-1">
-                <p className="font-semibold">Action items:</p>
-                <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                  <li>Auth service refactor must complete before API migration can proceed</li>
-                  <li>Security review still pending — owner needed</li>
-                  <li>API migration moved to next sprint</li>
+          <Card className="border-amber-200 dark:border-amber-800/40 bg-amber-50/40 dark:bg-amber-950/20">
+            <CardContent className="space-y-2">
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                For the team
+              </span>
+              <div className="text-sm leading-relaxed space-y-2">
+                <p className="font-medium">Action items:</p>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                  <li><span className="font-medium text-foreground">James:</span> Complete auth service refactor by Thursday</li>
+                  <li><span className="font-medium text-foreground">Sarah:</span> Escalate compliance review to VP Eng if no response by Friday</li>
+                  <li><span className="font-medium text-foreground">Marcus:</span> Scope fallback plan for client demo (3-week deadline)</li>
+                  <li>Flag compliance blocker in sprint retro</li>
                 </ul>
               </div>
             </CardContent>
@@ -122,28 +143,21 @@ const steps = [
 
 function HowItWorksSection() {
   return (
-    <section className="py-20 px-4">
-      <div className="max-w-5xl mx-auto space-y-12">
-        <div className="text-center space-y-3">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">How it works</h2>
-          <p className="text-muted-foreground text-lg">Three steps. One tailored summary.</p>
+    <section className="py-12 px-4 bg-muted/30">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">How it works</h2>
+          <p className="text-sm text-muted-foreground">Three steps. One tailored summary.</p>
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-8">
-          {steps.map((step, i) => (
-            <div key={step.title} className="text-center space-y-4">
-              <div className="mx-auto flex items-center justify-center">
-                <div className="relative">
-                  <div className="rounded-full bg-primary/10 p-4">
-                    <step.icon className="size-6 text-primary" />
-                  </div>
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center size-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
-                    {i + 1}
-                  </span>
-                </div>
+        <div className="grid sm:grid-cols-3 gap-6">
+          {steps.map((step) => (
+            <div key={step.title} className="text-center space-y-2">
+              <div className="mx-auto rounded-full bg-primary/10 p-3 w-fit">
+                <step.icon className="size-5 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold">{step.title}</h3>
-              <p className="text-sm text-muted-foreground">{step.description}</p>
+              <h3 className="text-sm font-semibold">{step.title}</h3>
+              <p className="text-xs text-muted-foreground">{step.description}</p>
             </div>
           ))}
         </div>
@@ -154,11 +168,11 @@ function HowItWorksSection() {
 
 function CTAFooterSection({ onTryFree, onSignUp }: Pick<LandingPageProps, 'onTryFree' | 'onSignUp'>) {
   return (
-    <section className="py-20 px-4 bg-muted/30">
-      <div className="max-w-2xl mx-auto text-center space-y-6">
-        <h2 className="text-3xl font-bold tracking-tight">Ready to try it?</h2>
+    <section className="py-12 px-4">
+      <div className="max-w-lg mx-auto text-center space-y-4">
+        <h2 className="text-xl font-bold tracking-tight">Ready to try it?</h2>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button size="lg" onClick={onTryFree} className="text-base px-8 h-12">
+          <Button size="lg" onClick={onTryFree}>
             Try it free
           </Button>
           <Button size="lg" variant="outline" onClick={onSignUp}>
@@ -173,7 +187,7 @@ function CTAFooterSection({ onTryFree, onSignUp }: Pick<LandingPageProps, 'onTry
 export function LandingPage({ onTryFree, onSignUp, onSignIn }: LandingPageProps) {
   return (
     <main>
-      <HeroSection onTryFree={onTryFree} onSignIn={onSignIn} />
+      <HeroSection onTryFree={onTryFree} onSignUp={onSignUp} onSignIn={onSignIn} />
       <BeforeAfterSection />
       <HowItWorksSection />
       <CTAFooterSection onTryFree={onTryFree} onSignUp={onSignUp} />
