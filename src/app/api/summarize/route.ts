@@ -1,6 +1,28 @@
+import { z } from 'zod';
 import { generateSummary, extractTags, streamSummarySingle, type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
+import { createRateLimiter } from '@/lib/rate-limit';
 import type { Database } from '@/lib/supabase/types';
+
+const MAX_TRANSCRIPT_BYTES = 100_000; // 100KB per transcript
+
+const summarizeSchema = z.object({
+  transcripts: z
+    .array(z.string().max(MAX_TRANSCRIPT_BYTES, 'Transcript exceeds 100KB limit'))
+    .min(1, 'At least one transcript required')
+    .max(10, 'Maximum 10 transcripts'),
+  context: z.object({
+    extractionGoal: z.string().min(1).max(1000, 'Extraction goal exceeds 1000 chars'),
+    additionalContext: z.string().max(2000, 'Additional context exceeds 2000 chars').optional(),
+  }),
+  mode: z.enum(['combined', 'separate']).optional(),
+  save: z.boolean().optional(),
+  recordingTitles: z.array(z.string()).optional(),
+  recordingDates: z.array(z.string()).optional(),
+});
+
+// 10 requests per hour per IP
+const limiter = createRateLimiter({ limit: 10, windowMs: 60 * 60 * 1000 });
 
 function deriveTitle(recordingTitles?: string[]): string {
   if (!recordingTitles || recordingTitles.length === 0) return 'Untitled Summary';
@@ -10,17 +32,32 @@ function deriveTitle(recordingTitles?: string[]): string {
 }
 
 export async function POST(request: Request) {
-  // Parse and validate before streaming — must access cookies() before writing response
-  const body = await request.json();
-  const { transcripts, context, mode, save, recordingTitles, recordingDates } = body;
-
-  if (!transcripts || !Array.isArray(transcripts) || transcripts.length === 0) {
-    return Response.json({ error: 'At least one transcript required' }, { status: 400 });
+  // Rate limit check
+  const { allowed, retryAfter } = limiter.check(request);
+  if (!allowed) {
+    return Response.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
   }
 
-  if (!context?.extractionGoal) {
-    return Response.json({ error: 'Context (extractionGoal) required' }, { status: 400 });
+  // Validate input
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+
+  const parsed = summarizeSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json(
+      { error: 'Validation failed', details: parsed.error.issues.map((i) => i.message) },
+      { status: 400 },
+    );
+  }
+
+  const { transcripts, context, mode, save, recordingTitles, recordingDates } = parsed.data;
 
   const summaryContext: SummaryContext = {
     extractionGoal: context.extractionGoal,

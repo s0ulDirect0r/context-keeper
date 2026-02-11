@@ -1,6 +1,18 @@
+import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
+
+const patchSummarySchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  summaries: z.array(z.string()).optional(),
+  context: z.object({
+    extractionGoal: z.string().min(1).max(1000),
+    additionalContext: z.string().max(2000).optional(),
+  }).optional(),
+  is_shared: z.boolean().optional(),
+  transcripts: z.array(z.string()).optional(),
+});
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -10,6 +22,16 @@ export async function PATCH(request: Request, { params }: Props) {
   try {
     const { id } = await params;
     const body = await request.json();
+
+    const parsed = patchSummarySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.issues.map((i) => i.message) },
+        { status: 400 },
+      );
+    }
+
+    const validatedBody = parsed.data;
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -33,18 +55,17 @@ export async function PATCH(request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    // Build update object from allowed fields
-    const allowedFields = ['title', 'summaries', 'context', 'is_shared', 'transcripts'];
+    // Build update object from validated fields
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
-    }
+    if (validatedBody.title !== undefined) updateData.title = validatedBody.title;
+    if (validatedBody.summaries !== undefined) updateData.summaries = validatedBody.summaries;
+    if (validatedBody.context !== undefined) updateData.context = validatedBody.context;
+    if (validatedBody.is_shared !== undefined) updateData.is_shared = validatedBody.is_shared;
+    if (validatedBody.transcripts !== undefined) updateData.transcripts = validatedBody.transcripts;
 
     // Generate share token when enabling sharing for the first time
-    if (body.is_shared === true && !existing.share_token) {
+    if (validatedBody.is_shared === true && !existing.share_token) {
       updateData.share_token = crypto.randomBytes(16).toString('base64url');
     }
 

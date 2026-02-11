@@ -1,7 +1,25 @@
+import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { type SummaryContext, type Pearl } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
+
+const pearlSchema = z.object({
+  insight: z.string().min(1),
+  concepts: z.array(z.string()),
+  quote: z.string().nullable().optional(),
+});
+
+const saveSummarySchema = z.object({
+  summaries: z.array(z.string()).min(1, 'At least one summary required'),
+  context: z.object({
+    extractionGoal: z.string().min(1).max(1000),
+    additionalContext: z.string().max(2000).optional(),
+  }),
+  recordingTitles: z.array(z.string()).optional(),
+  transcripts: z.array(z.string()).optional(),
+  pearls: z.array(pearlSchema).optional(),
+});
 
 function deriveTitle(recordingTitles?: string[]): string {
   if (!recordingTitles || recordingTitles.length === 0) return 'Untitled Summary';
@@ -12,15 +30,17 @@ function deriveTitle(recordingTitles?: string[]): string {
 
 export async function POST(request: Request) {
   try {
-    const { summaries, context, recordingTitles, transcripts, pearls } = await request.json();
+    const body = await request.json();
 
-    if (!summaries || !Array.isArray(summaries) || summaries.length === 0) {
-      return NextResponse.json({ error: 'Summaries required' }, { status: 400 });
+    const parsed = saveSummarySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.issues.map((i) => i.message) },
+        { status: 400 },
+      );
     }
 
-    if (!context?.extractionGoal) {
-      return NextResponse.json({ error: 'Context (extractionGoal) required' }, { status: 400 });
-    }
+    const { summaries, context, recordingTitles, transcripts, pearls } = parsed.data;
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -56,7 +76,7 @@ export async function POST(request: Request) {
     }
 
     // Save pearls if provided (guest sign-up-to-save flow)
-    if (pearls && Array.isArray(pearls) && pearls.length > 0) {
+    if (pearls && pearls.length > 0) {
       const pearlRows = (pearls as Pearl[]).map((pearl) => ({
         user_id: user.id,
         summary_id: data.id,

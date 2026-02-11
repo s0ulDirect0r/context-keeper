@@ -1,6 +1,7 @@
 'use client';
 
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -16,7 +17,7 @@ export function StreamingGenerationView({ markdown, isStreaming }: Props) {
         <CardContent className="pt-6">
           {markdown ? (
             <div className="prose prose-sm dark:prose-invert max-w-none">
-              <Markdown>{markdown}</Markdown>
+              <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
               {isStreaming && (
                 <span className="inline-block w-2 h-5 bg-primary animate-pulse ml-0.5 align-text-bottom" />
               )}
