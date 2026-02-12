@@ -14,89 +14,118 @@ test.afterAll(async () => {
 
 test.describe('Decision generation API', () => {
   test('POST /api/decisions/generate with valid input returns decisions via AI mock', async ({
-    request,
+    page,
   }) => {
-    const response = await request.post('/api/decisions/generate', {
-      data: {
-        summaryId: 'summary-1',
-        summaryMarkdown: '## Test Summary\nSome content here.',
-        pearls: [
-          {
-            id: 'pearl-1',
-            insight: 'Timeline pressure is mounting.',
-            concepts: ['urgency'],
-            quote: { text: 'We need to ship by March.' },
-          },
-          {
-            id: 'pearl-2',
-            insight: 'Dependencies are blocking progress.',
-            concepts: ['dependencies'],
-            quote: { text: 'Auth refactor is the bottleneck.' },
-          },
-        ],
-        context: { extractionGoal: 'Key decisions for Q2' },
-      },
+    await signInOnPage(page, testUser);
+
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/api/decisions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summaryId: 'summary-1',
+          summaryMarkdown: '## Test Summary\nSome content here.',
+          pearls: [
+            {
+              id: 'pearl-1',
+              insight: 'Timeline pressure is mounting.',
+              concepts: ['urgency'],
+              quote: { text: 'We need to ship by March.' },
+            },
+            {
+              id: 'pearl-2',
+              insight: 'Dependencies are blocking progress.',
+              concepts: ['dependencies'],
+              quote: { text: 'Auth refactor is the bottleneck.' },
+            },
+          ],
+          context: { extractionGoal: 'Key decisions for Q2' },
+        }),
+      });
+      return { status: res.status, body: await res.json() };
     });
 
-    expect(response.status()).toBe(200);
-    const body = await response.json();
+    expect(result.status).toBe(200);
+    expect(result.body.decisions).toBeDefined();
+    expect(result.body.decisions.length).toBe(2);
 
-    // Verify structure from AI mock
-    expect(body.decisions).toBeDefined();
-    expect(body.decisions.length).toBe(2);
-
-    const d = body.decisions[0];
+    const d = result.body.decisions[0];
     expect(d.statement).toBeTruthy();
     expect(d.reasoning).toBeTruthy();
     expect(['low', 'medium', 'high']).toContain(d.confidence);
     expect(d.status).toBe('emerging');
     expect(d.supportingPearls).toBeDefined();
-    // Mock references input pearl IDs
     expect(d.supportingPearls[0].pearlId).toBe('pearl-1');
     expect(d.supportingPearls[1].pearlId).toBe('pearl-2');
   });
 
-  test('POST /api/decisions/generate with empty pearls returns 400', async ({ request }) => {
+  test('POST /api/decisions/generate without auth returns 401', async ({ request }) => {
     const response = await request.post('/api/decisions/generate', {
       data: {
         summaryId: 'summary-1',
         summaryMarkdown: '## Test',
-        pearls: [],
+        pearls: [{ id: 'p1', insight: 'test', concepts: ['test'], quote: { text: 'test' } }],
         context: { extractionGoal: 'test' },
       },
     });
 
-    expect(response.status()).toBe(400);
-    const body = await response.json();
-    expect(body.error).toBe('Validation failed');
+    expect(response.status()).toBe(401);
   });
 
-  test('POST /api/decisions/generate with missing fields returns 400', async ({ request }) => {
-    const response = await request.post('/api/decisions/generate', {
-      data: { summaryId: 'summary-1' },
+  test('POST /api/decisions/generate with empty pearls returns 400', async ({ page }) => {
+    await signInOnPage(page, testUser);
+
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/api/decisions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summaryId: 'summary-1',
+          summaryMarkdown: '## Test',
+          pearls: [],
+          context: { extractionGoal: 'test' },
+        }),
+      });
+      return { status: res.status, body: await res.json() };
     });
 
-    expect(response.status()).toBe(400);
+    expect(result.status).toBe(400);
+    expect(result.body.error).toBe('Validation failed');
   });
 
-  test('POST /api/decisions/generate with oversized summary returns 400', async ({ request }) => {
-    const response = await request.post('/api/decisions/generate', {
-      data: {
-        summaryId: 'summary-1',
-        summaryMarkdown: 'x'.repeat(50_001),
-        pearls: [
-          {
-            id: 'pearl-1',
-            insight: 'test',
-            concepts: ['test'],
-            quote: { text: 'test' },
-          },
-        ],
-        context: { extractionGoal: 'test' },
-      },
+  test('POST /api/decisions/generate with missing fields returns 400', async ({ page }) => {
+    await signInOnPage(page, testUser);
+
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/api/decisions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summaryId: 'summary-1' }),
+      });
+      return { status: res.status };
     });
 
-    expect(response.status()).toBe(400);
+    expect(result.status).toBe(400);
+  });
+
+  test('POST /api/decisions/generate with oversized summary returns 400', async ({ page }) => {
+    await signInOnPage(page, testUser);
+
+    const result = await page.evaluate(async (bigSummary: string) => {
+      const res = await fetch('/api/decisions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summaryId: 'summary-1',
+          summaryMarkdown: bigSummary,
+          pearls: [{ id: 'pearl-1', insight: 'test', concepts: ['test'], quote: { text: 'test' } }],
+          context: { extractionGoal: 'test' },
+        }),
+      });
+      return { status: res.status };
+    }, 'x'.repeat(50_001));
+
+    expect(result.status).toBe(400);
   });
 });
 

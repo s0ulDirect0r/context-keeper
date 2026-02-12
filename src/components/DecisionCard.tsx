@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, X, Pencil } from 'lucide-react';
 import type { Decision, DecisionConfidence, DecisionStatus } from '@/lib/types/cedar';
@@ -11,8 +12,8 @@ interface DecisionCardProps {
   pearls: Pearl[];
   /** Called when user accepts (transitions status to 'active') */
   onAccept?: (decisionId: string) => void;
-  /** Called when user wants to edit the decision */
-  onEdit?: (decisionId: string) => void;
+  /** Called when user saves edits (statement, confidence) */
+  onEdit?: (decisionId: string, updates: { statement?: string; confidence?: string }) => void;
   /** Called when user dismisses the decision */
   onDismiss?: (decisionId: string) => void;
 }
@@ -38,6 +39,10 @@ const STATUS_STYLES: Record<DecisionStatus, string> = {
  * Shows the hypothesis, reasoning, supporting pearls, and action buttons.
  */
 export function DecisionCard({ decision, pearls, onAccept, onEdit, onDismiss }: DecisionCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editStatement, setEditStatement] = useState(decision.statement);
+  const [editConfidence, setEditConfidence] = useState<DecisionConfidence>(decision.confidence);
+
   // Resolve pearl data from the decision's supportingPearls references
   const resolvedPearls = decision.supportingPearls
     .map((sp) => {
@@ -48,15 +53,43 @@ export function DecisionCard({ decision, pearls, onAccept, onEdit, onDismiss }: 
 
   const isTerminal = decision.status === 'dismissed';
 
+  const handleSaveEdit = () => {
+    const updates: { statement?: string; confidence?: string } = {};
+    if (editStatement !== decision.statement) updates.statement = editStatement;
+    if (editConfidence !== decision.confidence) updates.confidence = editConfidence;
+    if (Object.keys(updates).length > 0) {
+      onEdit?.(decision.id, updates);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditStatement(decision.statement);
+    setEditConfidence(decision.confidence);
+    setIsEditing(false);
+  };
+
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3 shadow-sm">
       {/* Header badges */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span
-          className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${CONFIDENCE_STYLES[decision.confidence]}`}
-        >
-          {decision.confidence} confidence
-        </span>
+        {isEditing ? (
+          <select
+            value={editConfidence}
+            onChange={(e) => setEditConfidence(e.target.value as DecisionConfidence)}
+            className="text-[10px] font-medium uppercase tracking-wide rounded-full px-2 py-0.5 border bg-background"
+          >
+            <option value="low">Low confidence</option>
+            <option value="medium">Medium confidence</option>
+            <option value="high">High confidence</option>
+          </select>
+        ) : (
+          <span
+            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${CONFIDENCE_STYLES[decision.confidence]}`}
+          >
+            {decision.confidence} confidence
+          </span>
+        )}
         <span
           className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${STATUS_STYLES[decision.status]}`}
         >
@@ -65,10 +98,22 @@ export function DecisionCard({ decision, pearls, onAccept, onEdit, onDismiss }: 
       </div>
 
       {/* Hypothesis statement */}
-      <p className="text-sm font-medium leading-snug">{decision.statement}</p>
+      {isEditing ? (
+        <textarea
+          value={editStatement}
+          onChange={(e) => setEditStatement(e.target.value)}
+          className="w-full text-sm font-medium leading-snug p-2 border rounded resize-none bg-background"
+          rows={3}
+          autoFocus
+        />
+      ) : (
+        <p className="text-sm font-medium leading-snug">{decision.statement}</p>
+      )}
 
       {/* Reasoning */}
-      <p className="text-xs leading-relaxed text-muted-foreground">{decision.reasoning}</p>
+      {decision.reasoning && (
+        <p className="text-xs leading-relaxed text-muted-foreground">{decision.reasoning}</p>
+      )}
 
       {/* Supporting pearls */}
       {resolvedPearls.length > 0 && (
@@ -106,8 +151,31 @@ export function DecisionCard({ decision, pearls, onAccept, onEdit, onDismiss }: 
         </div>
       )}
 
-      {/* Action buttons — hidden for terminal states */}
-      {!isTerminal && (
+      {/* Edit mode: Save/Cancel buttons */}
+      {isEditing && (
+        <div className="flex gap-1.5 pt-1">
+          <Button
+            variant="default"
+            size="sm"
+            className="h-7 text-xs px-2.5"
+            onClick={handleSaveEdit}
+          >
+            <Check className="h-3 w-3 mr-1" />
+            Save
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs px-2.5"
+            onClick={handleCancelEdit}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {/* Action buttons — hidden for terminal states and during editing */}
+      {!isTerminal && !isEditing && (
         <div className="flex gap-1.5 pt-1">
           {decision.status === 'emerging' && onAccept && (
             <Button
@@ -125,7 +193,7 @@ export function DecisionCard({ decision, pearls, onAccept, onEdit, onDismiss }: 
               variant="outline"
               size="sm"
               className="h-7 text-xs px-2.5"
-              onClick={() => onEdit(decision.id)}
+              onClick={() => setIsEditing(true)}
             >
               <Pencil className="h-3 w-3 mr-1" />
               Edit

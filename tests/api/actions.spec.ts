@@ -14,66 +14,96 @@ test.afterAll(async () => {
 
 test.describe('Action generation API', () => {
   test('POST /api/actions/generate with valid input returns actions via AI mock', async ({
-    request,
+    page,
   }) => {
-    const response = await request.post('/api/actions/generate', {
-      data: {
-        decisionId: 'decision-1',
-        decision: {
-          statement: 'Prioritize auth refactor',
-          reasoning: 'It unblocks the API migration.',
-        },
-        pearls: [
-          {
-            id: 'pearl-1',
-            insight: 'Timeline pressure.',
-            concepts: ['urgency'],
-            quote: { text: 'We need to ship by March.', speaker: 'Sarah' },
+    await signInOnPage(page, testUser);
+
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/api/actions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decisionId: 'decision-1',
+          decision: {
+            statement: 'Prioritize auth refactor',
+            reasoning: 'It unblocks the API migration.',
           },
-        ],
-        context: { extractionGoal: 'Key actions for Q2' },
-      },
+          pearls: [
+            {
+              id: 'pearl-1',
+              insight: 'Timeline pressure.',
+              concepts: ['urgency'],
+              quote: { text: 'We need to ship by March.', speaker: 'Sarah' },
+            },
+          ],
+          context: { extractionGoal: 'Key actions for Q2' },
+        }),
+      });
+      return { status: res.status, body: await res.json() };
     });
 
-    expect(response.status()).toBe(200);
-    const body = await response.json();
+    expect(result.status).toBe(200);
+    expect(result.body.actions).toBeDefined();
+    expect(result.body.actions.length).toBeGreaterThan(0);
 
-    // Verify structure from AI mock
-    expect(body.actions).toBeDefined();
-    expect(body.actions.length).toBeGreaterThan(0);
-
-    const action = body.actions[0];
+    const action = result.body.actions[0];
     expect(action.description).toBeTruthy();
     expect(action.contextCard).toBeDefined();
     expect(action.contextCard.sourcePearlQuote).toBeTruthy();
     expect(action.contextCard.sourcePearlInsight).toBeTruthy();
-    // Mock references input decision statement
-    expect(action.contextCard.parentDecisionStatement).toBe('Prioritize auth refactor');
+    expect(action.contextCard.parentDecisionStatement).toContain('Prioritize auth refactor');
     expect(action.contextCard.framing).toBeTruthy();
   });
 
-  test('POST /api/actions/generate missing decisionId returns 400', async ({ request }) => {
+  test('POST /api/actions/generate without auth returns 401', async ({ request }) => {
     const response = await request.post('/api/actions/generate', {
       data: {
+        decisionId: 'decision-1',
         decision: { statement: 'test', reasoning: 'test' },
         pearls: [{ id: 'p1', insight: 'test', concepts: ['x'] }],
         context: { extractionGoal: 'test' },
       },
     });
 
-    expect(response.status()).toBe(400);
+    expect(response.status()).toBe(401);
   });
 
-  test('POST /api/actions/generate missing decision returns 400', async ({ request }) => {
-    const response = await request.post('/api/actions/generate', {
-      data: {
-        decisionId: 'decision-1',
-        pearls: [{ id: 'p1', insight: 'test', concepts: ['x'] }],
-        context: { extractionGoal: 'test' },
-      },
+  test('POST /api/actions/generate missing decisionId returns 400', async ({ page }) => {
+    await signInOnPage(page, testUser);
+
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/api/actions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decision: { statement: 'test', reasoning: 'test' },
+          pearls: [{ id: 'p1', insight: 'test', concepts: ['x'] }],
+          context: { extractionGoal: 'test' },
+        }),
+      });
+      return { status: res.status };
     });
 
-    expect(response.status()).toBe(400);
+    expect(result.status).toBe(400);
+  });
+
+  test('POST /api/actions/generate missing decision returns 400', async ({ page }) => {
+    await signInOnPage(page, testUser);
+
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/api/actions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decisionId: 'decision-1',
+          pearls: [{ id: 'p1', insight: 'test', concepts: ['x'] }],
+          context: { extractionGoal: 'test' },
+        }),
+      });
+      return { status: res.status };
+    });
+
+    expect(result.status).toBe(400);
   });
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
@@ -13,9 +13,24 @@ const ConstellationFlow = dynamic(
 import { DetailSidebar } from '@/components/constellation/DetailSidebar';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import type { ConstellationData, ConstellationNode } from '@/lib/types/cedar';
+import type {
+  ConstellationData,
+  ConstellationNode,
+  EnrichedConstellationResponse,
+  Decision,
+  Action,
+  ActionStatus,
+} from '@/lib/types/cedar';
+import type { Pearl } from '@/lib/claude';
+import { toast } from 'sonner';
 import { MOCK_TEAM_CONSTELLATION } from '@/lib/mock-team-data';
-import { loadAllGuestDecisions } from '@/lib/cedar-storage';
+import {
+  loadAllGuestDecisions,
+  loadGuestActions,
+  saveGuestDecisions,
+  saveGuestActions,
+} from '@/lib/cedar-storage';
+import { loadDismissedIds, saveDismissedIds } from '@/lib/dismissed-storage';
 
 type ViewMode = 'personal' | 'team';
 
@@ -28,11 +43,24 @@ export function ConstellationClient() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('personal');
   const [data, setData] = useState<ConstellationData | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [actions, setActions] = useState<Record<string, Action[]>>({});
+  const [pearls, setPearls] = useState<Record<string, Pearl>>({});
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set(loadDismissedIds()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<ConstellationNode | null>(null);
   const [surfacing, setSurfacing] = useState(false);
   const surfacingAttempted = useRef(false);
+
+  /** Parse enriched API response into graph data + entity maps */
+  const applyEnrichedResponse = useCallback((json: EnrichedConstellationResponse) => {
+    const { decisions: d, actions: a, pearls: p, ...graphData } = json;
+    setData(graphData);
+    setDecisions(d ?? {});
+    setActions(a ?? {});
+    setPearls(p ?? {});
+  }, []);
 
   const fetchPersonalData = useCallback(async () => {
     setLoading(true);
@@ -42,12 +70,16 @@ export function ConstellationClient() {
         const res = await fetch('/api/constellation');
         if (!res.ok) throw new Error('Failed to fetch constellation data');
         const json = await res.json();
-        setData(json);
+        applyEnrichedResponse(json);
       } else {
         // Guest: build constellation from localStorage
-        const decisions = loadAllGuestDecisions();
+        const guestDecisions = loadAllGuestDecisions();
+        const guestDecisionMap: Record<string, Decision> = {};
+        for (const d of guestDecisions) {
+          guestDecisionMap[d.id] = d;
+        }
         setData({
-          nodes: decisions.map((d) => ({
+          nodes: guestDecisions.map((d) => ({
             id: d.id,
             type: 'decision' as const,
             label: d.statement,
@@ -58,13 +90,22 @@ export function ConstellationClient() {
           })),
           edges: [],
         });
+        setDecisions(guestDecisionMap);
+        // Load guest actions for each decision
+        const guestActionMap: Record<string, Action[]> = {};
+        for (const d of guestDecisions) {
+          const acts = loadGuestActions(d.id);
+          if (acts.length > 0) guestActionMap[d.id] = acts;
+        }
+        setActions(guestActionMap);
+        setPearls({});
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, applyEnrichedResponse]);
 
   useEffect(() => {
     if (viewMode === 'team') {
@@ -91,7 +132,7 @@ export function ConstellationClient() {
         return res.json();
       })
       .then((json) => {
-        setData(json);
+        applyEnrichedResponse(json);
         setSurfacing(false);
         router.replace('/constellation');
       })
@@ -111,8 +152,312 @@ export function ConstellationClient() {
     setSelectedNode(null);
   }, []);
 
+  // ── Decision mutations ─────────────────────────────────────────────
+
+  /** Helper: persist guest decisions to localStorage after local state update */
+  const persistGuestDecisions = useCallback((updated: Record<string, Decision>) => {
+    // Group by summaryId and save each group
+    const bySummary = new Map<string, Decision[]>();
+    for (const d of Object.values(updated)) {
+      const existing = bySummary.get(d.summaryId) ?? [];
+      existing.push(d);
+      bySummary.set(d.summaryId, existing);
+    }
+    for (const [summaryId, decs] of bySummary) {
+      saveGuestDecisions(summaryId, decs);
+    }
+  }, []);
+
+  const handleAcceptDecision = useCallback(
+    async (decisionId: string) => {
+      const prev = decisions[decisionId];
+      if (!prev) return;
+
+      const updated = { ...prev, status: 'active' as const };
+      setDecisions((d) => ({ ...d, [decisionId]: updated }));
+
+      if (!user) {
+        // Guest: persist to localStorage
+        const allDecisions = { ...decisions, [decisionId]: updated };
+        persistGuestDecisions(allDecisions);
+        toast.success('Decision accepted');
+        return;
+      }
+
+      try {
+        await fetch(`/api/decisions/${decisionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'active' }),
+        });
+        toast.success('Decision accepted');
+        fetchPersonalData();
+      } catch {
+        setDecisions((d) => ({ ...d, [decisionId]: prev }));
+        toast.error('Failed to accept decision');
+      }
+    },
+    [decisions, user, fetchPersonalData, persistGuestDecisions],
+  );
+
+  const handleDismissDecision = useCallback(
+    (decisionId: string) => {
+      const prev = decisions[decisionId];
+      if (!prev) return;
+
+      // Optimistic: add to dismissed set, close sidebar if viewing this decision
+      const newDismissed = new Set(dismissedIds);
+      newDismissed.add(decisionId);
+      setDismissedIds(newDismissed);
+      saveDismissedIds([...newDismissed]);
+      if (selectedNode?.id === decisionId) setSelectedNode(null);
+
+      toast('Decision dismissed', {
+        duration: 5000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            const restored = new Set(newDismissed);
+            restored.delete(decisionId);
+            setDismissedIds(restored);
+            saveDismissedIds([...restored]);
+          },
+        },
+      });
+    },
+    [decisions, dismissedIds, selectedNode],
+  );
+
+  const handleEditDecision = useCallback(
+    async (decisionId: string, updates: { statement?: string; confidence?: string }) => {
+      const prev = decisions[decisionId];
+      if (!prev) return;
+
+      const updated = {
+        ...prev,
+        ...(updates.statement !== undefined && { statement: updates.statement }),
+        ...(updates.confidence !== undefined && {
+          confidence: updates.confidence as Decision['confidence'],
+        }),
+      };
+      setDecisions((d) => ({ ...d, [decisionId]: updated }));
+
+      if (!user) {
+        // Guest: persist to localStorage
+        const allDecisions = { ...decisions, [decisionId]: updated };
+        persistGuestDecisions(allDecisions);
+        toast.success('Decision updated');
+        return;
+      }
+
+      try {
+        await fetch(`/api/decisions/${decisionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        toast.success('Decision updated');
+        fetchPersonalData();
+      } catch {
+        setDecisions((d) => ({ ...d, [decisionId]: prev }));
+        toast.error('Failed to update decision');
+      }
+    },
+    [decisions, user, fetchPersonalData, persistGuestDecisions],
+  );
+
+  // ── Action mutations ───────────────────────────────────────────────
+
+  const [generatingActionsFor, setGeneratingActionsFor] = useState<string | null>(null);
+
+  const handleGenerateActions = useCallback(
+    async (decisionId: string) => {
+      const decision = decisions[decisionId];
+      if (!decision || !user) return;
+
+      setGeneratingActionsFor(decisionId);
+
+      // Resolve supporting pearls for the generate request
+      const supportingPearls = decision.supportingPearls
+        .map((sp) => pearls[sp.pearlId])
+        .filter(Boolean);
+
+      try {
+        // 1. Generate actions via AI
+        const genRes = await fetch('/api/actions/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            decisionId,
+            decision: { statement: decision.statement, reasoning: decision.reasoning },
+            pearls: supportingPearls,
+            context: { extractionGoal: 'Strategic actions from this decision' },
+          }),
+        });
+        if (!genRes.ok) throw new Error('Generation failed');
+        const { actions: generatedActions } = (await genRes.json()) as {
+          actions: { description: string; contextCard: Action['contextCard'] }[];
+        };
+
+        // 2. Persist each action
+        const persistedActions: Action[] = [];
+        for (const genAction of generatedActions) {
+          const persistRes = await fetch('/api/actions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              decisionId,
+              description: genAction.description,
+              contextCard: genAction.contextCard,
+            }),
+          });
+          if (persistRes.ok) {
+            const { id } = (await persistRes.json()) as { id: string };
+            const now = new Date().toISOString();
+            persistedActions.push({
+              id,
+              userId: user.id,
+              decisionId,
+              description: genAction.description,
+              contextCard: genAction.contextCard,
+              status: 'pending',
+              dueDate: null,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+
+        // 3. Update local actions state
+        setActions((a) => ({
+          ...a,
+          [decisionId]: [...(a[decisionId] ?? []), ...persistedActions],
+        }));
+
+        toast.success(
+          `Generated ${persistedActions.length} action${persistedActions.length !== 1 ? 's' : ''}`,
+        );
+        fetchPersonalData(); // Background refetch for graph nodes
+      } catch {
+        toast.error('Failed to generate actions');
+      } finally {
+        setGeneratingActionsFor(null);
+      }
+    },
+    [decisions, pearls, user, fetchPersonalData],
+  );
+
+  const handleActionStatusChange = useCallback(
+    async (actionId: string, newStatus: ActionStatus) => {
+      // Find which decision this action belongs to
+      let ownerDecisionId: string | null = null;
+      let prevAction: Action | null = null;
+      for (const [decId, actionList] of Object.entries(actions)) {
+        const found = actionList.find((a) => a.id === actionId);
+        if (found) {
+          ownerDecisionId = decId;
+          prevAction = found;
+          break;
+        }
+      }
+      if (!ownerDecisionId || !prevAction) return;
+
+      // Optimistic update
+      setActions((a) => ({
+        ...a,
+        [ownerDecisionId!]: a[ownerDecisionId!].map((act) =>
+          act.id === actionId ? { ...act, status: newStatus } : act,
+        ),
+      }));
+
+      try {
+        const res = await fetch(`/api/actions/${actionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) throw new Error('Status update failed');
+      } catch {
+        // Rollback
+        setActions((a) => ({
+          ...a,
+          [ownerDecisionId!]: a[ownerDecisionId!].map((act) =>
+            act.id === actionId ? prevAction! : act,
+          ),
+        }));
+        toast.error('Failed to update action status');
+      }
+    },
+    [actions],
+  );
+
+  const handleAddAction = useCallback(
+    async (decisionId: string) => {
+      const description = prompt('Describe the action:');
+      if (!description?.trim()) return;
+
+      try {
+        const res = await fetch('/api/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decisionId, description: description.trim() }),
+        });
+        if (!res.ok) throw new Error('Failed to create action');
+        const { id } = (await res.json()) as { id: string };
+        const now = new Date().toISOString();
+
+        setActions((a) => ({
+          ...a,
+          [decisionId]: [
+            ...(a[decisionId] ?? []),
+            {
+              id,
+              userId: user?.id ?? '',
+              decisionId,
+              description: description.trim(),
+              contextCard: null,
+              status: 'pending' as const,
+              dueDate: null,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        }));
+        toast.success('Action added');
+      } catch {
+        toast.error('Failed to add action');
+      }
+    },
+    [user],
+  );
+
+  // Sync graph nodes with current decision/action state + filter dismissed
+  const visibleData = useMemo(() => {
+    if (!data) return null;
+    return {
+      nodes: data.nodes
+        .filter((n) => !dismissedIds.has(n.id))
+        .map((n) => {
+          // Sync decision node status/confidence with current state
+          if (n.type === 'decision' && decisions[n.id]) {
+            const d = decisions[n.id];
+            return {
+              ...n,
+              label: d.statement,
+              confidence: d.confidence,
+              decisionStatus: d.status,
+            };
+          }
+          return n;
+        }),
+      edges: data.edges.filter((e) => !dismissedIds.has(e.source) && !dismissedIds.has(e.target)),
+    };
+  }, [data, decisions, dismissedIds]);
+
   const isEmpty =
-    !loading && !surfacing && (!data || (data.nodes.length === 0 && viewMode === 'personal'));
+    !loading &&
+    !surfacing &&
+    (!visibleData || (visibleData.nodes.length === 0 && viewMode === 'personal'));
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -210,9 +555,9 @@ export function ConstellationClient() {
                 Retry
               </Button>
             </div>
-          ) : data ? (
+          ) : visibleData ? (
             <ConstellationFlow
-              data={data}
+              data={visibleData}
               selectedNodeId={selectedNode?.id ?? null}
               onNodeClick={handleNodeClick}
             />
@@ -220,8 +565,25 @@ export function ConstellationClient() {
         </div>
 
         {/* Detail sidebar */}
-        {selectedNode && data && (
-          <DetailSidebar node={selectedNode} data={data} onClose={handleCloseSidebar} />
+        {selectedNode && visibleData && (
+          <DetailSidebar
+            node={selectedNode}
+            data={visibleData}
+            decision={selectedNode.type === 'decision' ? decisions[selectedNode.id] : undefined}
+            actions={
+              selectedNode.type === 'decision' ? (actions[selectedNode.id] ?? []) : undefined
+            }
+            pearls={pearls}
+            onClose={handleCloseSidebar}
+            onAcceptDecision={handleAcceptDecision}
+            onDismissDecision={handleDismissDecision}
+            onEditDecision={handleEditDecision}
+            isGuest={!user}
+            onGenerateActions={handleGenerateActions}
+            generatingActions={generatingActionsFor === selectedNode?.id}
+            onActionStatusChange={handleActionStatusChange}
+            onAddAction={handleAddAction}
+          />
         )}
       </div>
     </div>

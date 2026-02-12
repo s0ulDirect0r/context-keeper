@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Loader2 } from 'lucide-react';
-import type { ConstellationData, ConstellationNode } from '@/lib/types/cedar';
+import { X, Loader2, Sparkles } from 'lucide-react';
+import type {
+  ConstellationData,
+  ConstellationNode,
+  Decision,
+  Action,
+  ActionStatus,
+} from '@/lib/types/cedar';
+import type { Pearl } from '@/lib/claude';
+import { DecisionCard } from '@/components/DecisionCard';
+import { ActionList } from '@/components/ActionList';
 
 interface PearlDetail {
   id: string;
@@ -16,10 +25,42 @@ interface PearlDetail {
 interface DetailSidebarProps {
   node: ConstellationNode;
   data: ConstellationData;
+  /** Full Decision object when a decision node is selected */
+  decision?: Decision;
+  /** Actions belonging to the selected decision */
+  actions?: Action[];
+  /** All pearls keyed by ID (for resolving pearl references) */
+  pearls?: Record<string, Pearl>;
+  isGuest?: boolean;
   onClose: () => void;
+  onAcceptDecision?: (decisionId: string) => void;
+  onDismissDecision?: (decisionId: string) => void;
+  onEditDecision?: (
+    decisionId: string,
+    updates: { statement?: string; confidence?: string },
+  ) => void;
+  onGenerateActions?: (decisionId: string) => void;
+  generatingActions?: boolean;
+  onActionStatusChange?: (actionId: string, newStatus: ActionStatus) => void;
+  onAddAction?: (decisionId: string) => void;
 }
 
-export function DetailSidebar({ node, data, onClose }: DetailSidebarProps) {
+export function DetailSidebar({
+  node,
+  data,
+  decision,
+  actions: decisionActions,
+  pearls: pearlMap,
+  isGuest,
+  onClose,
+  onAcceptDecision,
+  onDismissDecision,
+  onEditDecision,
+  onGenerateActions,
+  generatingActions,
+  onActionStatusChange,
+  onAddAction,
+}: DetailSidebarProps) {
   const [pearlDetails, setPearlDetails] = useState<PearlDetail[]>([]);
   const [fetchedConcept, setFetchedConcept] = useState<string | null>(null);
   const isPearlCluster = node.type === 'pearl-cluster' && !!node.concept;
@@ -73,7 +114,10 @@ export function DetailSidebar({ node, data, onClose }: DetailSidebarProps) {
                 ? 'Decision'
                 : 'Action'}
           </span>
-          <h3 className="text-sm font-semibold leading-tight">{node.label}</h3>
+          {/* Hide label for decisions when DecisionCard will render it */}
+          {!(node.type === 'decision' && decision) && (
+            <h3 className="text-sm font-semibold leading-tight">{node.label}</h3>
+          )}
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0 -mt-1 -mr-2">
           <X className="h-4 w-4" />
@@ -146,10 +190,59 @@ export function DetailSidebar({ node, data, onClose }: DetailSidebarProps) {
         </div>
       )}
 
-      {/* Decision detail */}
-      {node.type === 'decision' && (
+      {/* Decision detail — use DecisionCard when full data is available */}
+      {node.type === 'decision' && decision && pearlMap && (
         <div className="space-y-3">
-          {/* Confidence badge */}
+          <DecisionCard
+            decision={decision}
+            pearls={decision.supportingPearls.map((sp) => pearlMap[sp.pearlId]).filter(Boolean)}
+            onAccept={onAcceptDecision}
+            onEdit={onEditDecision}
+            onDismiss={onDismissDecision}
+          />
+
+          {/* Actions section */}
+          <div className="space-y-2">
+            <ActionList
+              actions={decisionActions ?? []}
+              onStatusChange={onActionStatusChange}
+              onAdd={onAddAction ? () => onAddAction(decision.id) : undefined}
+            />
+
+            {/* Generate actions button — shown when no actions exist yet */}
+            {(!decisionActions || decisionActions.length === 0) &&
+              (isGuest ? (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Sign up to generate AI-powered actions
+                </p>
+              ) : onGenerateActions ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs"
+                  disabled={generatingActions}
+                  onClick={() => onGenerateActions(decision.id)}
+                >
+                  {generatingActions ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3 mr-1.5" />
+                      Generate Actions
+                    </>
+                  )}
+                </Button>
+              ) : null)}
+          </div>
+        </div>
+      )}
+
+      {/* Decision detail — fallback when enriched data isn't available */}
+      {node.type === 'decision' && !decision && (
+        <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -164,71 +257,6 @@ export function DetailSidebar({ node, data, onClose }: DetailSidebarProps) {
             </span>
             <span className="text-xs text-muted-foreground">{node.decisionStatus}</span>
           </div>
-
-          {/* Supporting pearl clusters */}
-          {connectedNodes.filter((n) => n.type === 'pearl-cluster').length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Evidence
-              </h4>
-              {connectedNodes
-                .filter((n) => n.type === 'pearl-cluster')
-                .map((p) => {
-                  const edge = connectedEdges.find(
-                    (e) =>
-                      (e.source === p.id && e.target === node.id) ||
-                      (e.source === node.id && e.target === p.id),
-                  );
-                  return (
-                    <div
-                      key={p.id}
-                      className={`text-xs p-2 rounded border ${
-                        edge?.type === 'contradicts'
-                          ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/40'
-                          : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/40'
-                      }`}
-                    >
-                      <span className="font-medium">{p.label}</span>
-                      <span className="text-muted-foreground">
-                        {' '}
-                        ({p.pearlCount} pearl{p.pearlCount !== 1 ? 's' : ''})
-                      </span>
-                      {edge?.type === 'contradicts' && (
-                        <span className="text-red-600 dark:text-red-400 ml-1">(contradicts)</span>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-
-          {/* Connected actions */}
-          {connectedNodes.filter((n) => n.type === 'action').length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Actions
-              </h4>
-              {connectedNodes
-                .filter((n) => n.type === 'action')
-                .map((a) => (
-                  <div
-                    key={a.id}
-                    className="text-xs p-2 rounded border bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 flex items-center gap-2"
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${
-                        a.actionStatus === 'done'
-                          ? 'bg-green-500'
-                          : a.actionStatus === 'in_progress'
-                            ? 'bg-amber-500'
-                            : 'bg-gray-400'
-                      }`}
-                    />
-                    {a.label}
-                  </div>
-                ))}
-            </div>
-          )}
         </div>
       )}
 
