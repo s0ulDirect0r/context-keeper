@@ -17,6 +17,7 @@ import type {
   ConstellationData,
   ConstellationNode,
   EnrichedConstellationResponse,
+  SeedSummary,
   Decision,
   Action,
   ActionStatus,
@@ -46,6 +47,7 @@ export function ConstellationClient() {
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [actions, setActions] = useState<Record<string, Action[]>>({});
   const [pearls, setPearls] = useState<Record<string, Pearl>>({});
+  const [summaries, setSummaries] = useState<Record<string, SeedSummary>>({});
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set(loadDismissedIds()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +57,12 @@ export function ConstellationClient() {
 
   /** Parse enriched API response into graph data + entity maps */
   const applyEnrichedResponse = useCallback((json: EnrichedConstellationResponse) => {
-    const { decisions: d, actions: a, pearls: p, ...graphData } = json;
+    const { decisions: d, actions: a, pearls: p, summaries: s, ...graphData } = json;
     setData(graphData);
     setDecisions(d ?? {});
     setActions(a ?? {});
     setPearls(p ?? {});
+    setSummaries(s ?? {});
   }, []);
 
   const fetchPersonalData = useCallback(async () => {
@@ -574,6 +577,7 @@ export function ConstellationClient() {
               selectedNode.type === 'decision' ? (actions[selectedNode.id] ?? []) : undefined
             }
             pearls={pearls}
+            summaries={summaries}
             onClose={handleCloseSidebar}
             onAcceptDecision={handleAcceptDecision}
             onDismissDecision={handleDismissDecision}

@@ -6,6 +6,40 @@ import type { ConstellationData } from './types/cedar';
  */
 export const MOCK_TEAM_CONSTELLATION: ConstellationData = {
   nodes: [
+    // Seeds (origin evidence)
+    {
+      id: 'seed-team-standup-feb10',
+      type: 'seed',
+      label: 'Team Standup — Feb 10',
+      summaryTitle: 'Team Standup — Feb 10',
+      summaryDate: '2026-02-10T10:00:00Z',
+      seedPearlCount: 5,
+      size: 10,
+      recency: 0.9,
+      contributor: 'Sandra',
+    },
+    {
+      id: 'seed-hiring-review-feb8',
+      type: 'seed',
+      label: 'Hiring Pipeline Review',
+      summaryTitle: 'Hiring Pipeline Review',
+      summaryDate: '2026-02-08T14:00:00Z',
+      seedPearlCount: 6,
+      size: 10,
+      recency: 0.85,
+      contributor: 'Marcus',
+    },
+    {
+      id: 'seed-sprint-planning-feb7',
+      type: 'seed',
+      label: 'Sprint Planning — Q2 Prep',
+      summaryTitle: 'Sprint Planning — Q2 Prep',
+      summaryDate: '2026-02-07T09:00:00Z',
+      seedPearlCount: 5,
+      size: 10,
+      recency: 0.8,
+      contributor: 'Priya',
+    },
     // Sandra's pearl clusters
     {
       id: 'cluster-trust-sandra',
@@ -120,6 +154,43 @@ export const MOCK_TEAM_CONSTELLATION: ConstellationData = {
     },
   ],
   edges: [
+    // Seeds → pearl clusters (sprouts)
+    {
+      source: 'seed-team-standup-feb10',
+      target: 'cluster-trust-sandra',
+      type: 'sprouts',
+      strength: 0.4,
+    },
+    {
+      source: 'seed-team-standup-feb10',
+      target: 'cluster-budget-sandra',
+      type: 'sprouts',
+      strength: 0.4,
+    },
+    {
+      source: 'seed-hiring-review-feb8',
+      target: 'cluster-trust-marcus',
+      type: 'sprouts',
+      strength: 0.4,
+    },
+    {
+      source: 'seed-hiring-review-feb8',
+      target: 'cluster-hiring-marcus',
+      type: 'sprouts',
+      strength: 0.4,
+    },
+    {
+      source: 'seed-sprint-planning-feb7',
+      target: 'cluster-timeline-priya',
+      type: 'sprouts',
+      strength: 0.4,
+    },
+    {
+      source: 'seed-sprint-planning-feb7',
+      target: 'cluster-scope-priya',
+      type: 'sprouts',
+      strength: 0.4,
+    },
     // Trust clusters → trust decision
     {
       source: 'cluster-trust-sandra',

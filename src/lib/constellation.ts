@@ -3,6 +3,7 @@ import type {
   ConstellationNode,
   ConstellationEdge,
   EnrichedConstellationResponse,
+  SeedSummary,
   Decision,
   Action,
   DecisionConfidence,
@@ -14,8 +15,15 @@ import type {
 import type { Pearl } from './claude';
 
 /** Database row shapes for constellation building */
+interface SummaryRow {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
 interface PearlRow {
   id: string;
+  summary_id: string;
   concepts: string[];
   insight?: string;
   created_at: string;
@@ -64,10 +72,11 @@ export interface FullPearlRow extends PearlRow {
 
 /**
  * Build constellation graph data from raw database rows.
- * Creates individual pearl nodes (with quote + concept tag), connects
- * decisions and actions via edges.
+ * Creates seed nodes (from summaries), individual pearl nodes,
+ * decision nodes, and action nodes with edges connecting them.
  */
 export function buildConstellationData(
+  summaries: SummaryRow[],
   pearls: PearlRow[],
   decisions: DecisionRow[],
   decisionPearls: DecisionPearlRow[],
@@ -76,6 +85,28 @@ export function buildConstellationData(
   const now = Date.now();
   const nodes: ConstellationNode[] = [];
   const edges: ConstellationEdge[] = [];
+
+  // Count pearls per summary for seed nodes
+  const pearlCountBySum = new Map<string, number>();
+  for (const pearl of pearls) {
+    pearlCountBySum.set(pearl.summary_id, (pearlCountBySum.get(pearl.summary_id) ?? 0) + 1);
+  }
+
+  // Create seed nodes from summaries
+  for (const summary of summaries) {
+    const ts = new Date(summary.created_at).getTime();
+    const pearlCount = pearlCountBySum.get(summary.id) ?? 0;
+    nodes.push({
+      id: `seed-${summary.id}`,
+      type: 'seed',
+      label: summary.title,
+      summaryTitle: summary.title,
+      summaryDate: summary.created_at,
+      seedPearlCount: pearlCount,
+      size: 10,
+      recency: computeRecency(ts, now),
+    });
+  }
 
   // Create individual pearl nodes
   for (const pearl of pearls) {
@@ -94,6 +125,19 @@ export function buildConstellationData(
       size: 14,
       recency: computeRecency(ts, now),
     });
+  }
+
+  // Build sprouts edges: seed → pearl
+  const summaryIds = new Set(summaries.map((s) => s.id));
+  for (const pearl of pearls) {
+    if (summaryIds.has(pearl.summary_id)) {
+      edges.push({
+        source: `seed-${pearl.summary_id}`,
+        target: pearl.id,
+        type: 'sprouts',
+        strength: 0.4,
+      });
+    }
   }
 
   // Create decision nodes
@@ -152,6 +196,7 @@ export function buildConstellationData(
  */
 export function buildEnrichedResponse(
   graph: ConstellationData,
+  summaryRows: SummaryRow[],
   fullDecisions: FullDecisionRow[],
   decisionPearls: DecisionPearlRow[],
   fullActions: FullActionRow[],
@@ -215,7 +260,25 @@ export function buildEnrichedResponse(
     };
   }
 
-  return { ...graph, decisions, actions, pearls };
+  // Map summary rows → SeedSummary objects (count pearls per summary)
+  const pearlCountBySummary = new Map<string, number>();
+  for (const row of fullPearls) {
+    const sumId = (row as PearlRow).summary_id;
+    if (sumId) {
+      pearlCountBySummary.set(sumId, (pearlCountBySummary.get(sumId) ?? 0) + 1);
+    }
+  }
+  const summaries: Record<string, SeedSummary> = {};
+  for (const row of summaryRows) {
+    summaries[row.id] = {
+      id: row.id,
+      title: row.title,
+      createdAt: row.created_at,
+      pearlCount: pearlCountBySummary.get(row.id) ?? 0,
+    };
+  }
+
+  return { ...graph, decisions, actions, pearls, summaries };
 }
 
 /** Compute recency as 0-1 value. Items from the last 7 days are > 0.5. */

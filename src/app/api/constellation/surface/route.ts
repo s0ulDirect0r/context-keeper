@@ -135,38 +135,59 @@ async function buildAndReturnConstellation(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ) {
-  const [pearlsResult, decisionsResult, linksResult, actionsResult] = await Promise.all([
-    supabase
-      .from('pearls')
-      .select('id, concepts, insight, quote, created_at')
-      .eq('user_id', userId),
-    supabase
-      .from('decisions')
-      .select(
-        'id, user_id, summary_id, statement, reasoning, confidence, status, created_at, updated_at',
-      )
-      .eq('user_id', userId),
-    supabase.from('decision_pearls').select('decision_id, pearl_id, relationship'),
-    supabase
-      .from('actions')
-      .select(
-        'id, user_id, description, decision_id, context_card, status, due_date, created_at, updated_at',
-      )
-      .eq('user_id', userId),
-  ]);
+  const [summariesResult, pearlsResult, decisionsResult, linksResult, actionsResult] =
+    await Promise.all([
+      supabase.from('summaries').select('id, title, created_at').eq('user_id', userId),
+      supabase
+        .from('pearls')
+        .select('id, summary_id, concepts, insight, quote, created_at')
+        .eq('user_id', userId),
+      supabase
+        .from('decisions')
+        .select(
+          'id, user_id, summary_id, statement, reasoning, confidence, status, created_at, updated_at',
+        )
+        .eq('user_id', userId),
+      supabase.from('decision_pearls').select('decision_id, pearl_id, relationship'),
+      supabase
+        .from('actions')
+        .select(
+          'id, user_id, description, decision_id, context_card, status, due_date, created_at, updated_at',
+        )
+        .eq('user_id', userId),
+    ]);
 
   // If tables don't exist yet, return empty
   if (pearlsResult.error || decisionsResult.error || actionsResult.error) {
-    return Response.json({ nodes: [], edges: [], decisions: {}, actions: {}, pearls: {} });
+    return Response.json({
+      nodes: [],
+      edges: [],
+      decisions: {},
+      actions: {},
+      pearls: {},
+      summaries: {},
+    });
   }
 
+  const summaryRows = (summariesResult.data ?? []) as {
+    id: string;
+    title: string;
+    created_at: string;
+  }[];
   const pearlRows = (pearlsResult.data ?? []) as FullPearlRow[];
   const decisionRows = (decisionsResult.data ?? []) as FullDecisionRow[];
   const dpRows = linksResult.data ?? [];
   const actionRows = (actionsResult.data ?? []) as FullActionRow[];
 
-  const graph = buildConstellationData(pearlRows, decisionRows, dpRows, actionRows);
-  const enriched = buildEnrichedResponse(graph, decisionRows, dpRows, actionRows, pearlRows);
+  const graph = buildConstellationData(summaryRows, pearlRows, decisionRows, dpRows, actionRows);
+  const enriched = buildEnrichedResponse(
+    graph,
+    summaryRows,
+    decisionRows,
+    dpRows,
+    actionRows,
+    pearlRows,
+  );
 
   return Response.json(enriched);
 }

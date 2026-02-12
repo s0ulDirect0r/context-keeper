@@ -4,6 +4,7 @@ import type { ConstellationData, ConstellationNode, ConstellationEdge } from './
 
 // Card dimensions per node type (width x height in pixels)
 const NODE_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  seed: { width: 200, height: 60 },
   pearl: { width: 288, height: 180 },
   'pearl-cluster': { width: 224, height: 100 },
   decision: { width: 240, height: 140 },
@@ -135,6 +136,7 @@ function layoutComponent(
 
 /** Convert a ConstellationEdge to a React Flow Edge */
 function toReactFlowEdge(edge: ConstellationEdge): Edge {
+  const isSprouts = edge.type === 'sprouts';
   const isContradicts = edge.type === 'contradicts';
   return {
     id: `${edge.source}-${edge.target}`,
@@ -144,9 +146,9 @@ function toReactFlowEdge(edge: ConstellationEdge): Edge {
     animated: false,
     style: {
       stroke: isContradicts ? '#ef4444' : '#d1d5db',
-      strokeWidth: Math.max(1, edge.strength * 2),
+      strokeWidth: isSprouts ? 1.5 : Math.max(1, edge.strength * 2),
       strokeDasharray: isContradicts ? '4 4' : undefined,
-      opacity: 0.6,
+      opacity: isSprouts ? 0.5 : 0.6,
     },
   };
 }

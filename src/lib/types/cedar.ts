@@ -75,12 +75,16 @@ export interface GenerateActionsOutput {
 
 // ── Constellation ──────────────────────────────────────────────────
 
-export type ConstellationNodeType = 'pearl' | 'pearl-cluster' | 'decision' | 'action';
+export type ConstellationNodeType = 'seed' | 'pearl' | 'pearl-cluster' | 'decision' | 'action';
 
 export interface ConstellationNode {
   id: string;
   type: ConstellationNodeType;
   label: string;
+  // Seed fields
+  summaryTitle?: string;
+  summaryDate?: string;
+  seedPearlCount?: number;
   // Pearl fields (individual pearl nodes)
   quote?: string;
   speaker?: string;
@@ -104,13 +108,22 @@ export interface ConstellationNode {
 export interface ConstellationEdge {
   source: string;
   target: string;
-  type: 'supports' | 'contradicts' | 'derives';
+  type: 'supports' | 'contradicts' | 'derives' | 'sprouts';
   strength: number; // 0-1
 }
 
 export interface ConstellationData {
   nodes: ConstellationNode[];
   edges: ConstellationEdge[];
+}
+
+// ── Seed summary (lightweight, for constellation) ─────────────────
+
+export interface SeedSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  pearlCount: number;
 }
 
 // ── Enriched constellation response ───────────────────────────────
@@ -120,6 +133,7 @@ export interface EnrichedConstellationResponse extends ConstellationData {
   decisions: Record<string, Decision>;
   actions: Record<string, Action[]>; // keyed by decision ID
   pearls: Record<string, Pearl>; // keyed by pearl ID
+  summaries: Record<string, SeedSummary>; // keyed by summary ID
 }
 
 // ── State transition validation ────────────────────────────────────

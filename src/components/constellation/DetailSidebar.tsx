@@ -6,6 +6,7 @@ import { X, Loader2, Sparkles } from 'lucide-react';
 import type {
   ConstellationData,
   ConstellationNode,
+  SeedSummary,
   Decision,
   Action,
   ActionStatus,
@@ -31,6 +32,8 @@ interface DetailSidebarProps {
   actions?: Action[];
   /** All pearls keyed by ID (for resolving pearl references) */
   pearls?: Record<string, Pearl>;
+  /** Summary metadata keyed by summary ID (for seed detail) */
+  summaries?: Record<string, SeedSummary>;
   isGuest?: boolean;
   onClose: () => void;
   onAcceptDecision?: (decisionId: string) => void;
@@ -51,6 +54,7 @@ export function DetailSidebar({
   decision,
   actions: decisionActions,
   pearls: pearlMap,
+  summaries: summaryMap,
   isGuest,
   onClose,
   onAcceptDecision,
@@ -108,13 +112,15 @@ export function DetailSidebar({
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            {node.type === 'pearl'
-              ? 'Pearl'
-              : node.type === 'pearl-cluster'
-                ? 'Pearl Cluster'
-                : node.type === 'decision'
-                  ? 'Decision'
-                  : 'Action'}
+            {node.type === 'seed'
+              ? 'Seed'
+              : node.type === 'pearl'
+                ? 'Pearl'
+                : node.type === 'pearl-cluster'
+                  ? 'Pearl Cluster'
+                  : node.type === 'decision'
+                    ? 'Decision'
+                    : 'Action'}
           </span>
           {/* Hide label for pearls (quote rendered below) and decisions (DecisionCard renders it) */}
           {node.type !== 'pearl' && !(node.type === 'decision' && decision) && (
@@ -125,6 +131,78 @@ export function DetailSidebar({
           <X className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Seed detail */}
+      {node.type === 'seed' &&
+        (() => {
+          // Extract summary ID from seed node ID (format: "seed-{summaryId}")
+          const summaryId = node.id.replace(/^seed-/, '');
+          const summary = summaryMap?.[summaryId];
+          const pearlCount = summary?.pearlCount ?? node.seedPearlCount ?? 0;
+          const formattedDate =
+            (summary?.createdAt ?? node.summaryDate)
+              ? new Date(summary?.createdAt ?? node.summaryDate!).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
+              : '';
+
+          return (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold leading-tight">
+                {summary?.title ?? node.summaryTitle ?? node.label}
+              </h3>
+
+              {formattedDate && <p className="text-xs text-muted-foreground">{formattedDate}</p>}
+
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-stone-600 dark:text-stone-400">
+                  {pearlCount}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  pearl{pearlCount !== 1 ? 's' : ''} sprouted
+                </span>
+              </div>
+
+              {/* Connected pearls */}
+              {connectedNodes.filter((n) => n.type === 'pearl').length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Pearls
+                  </h4>
+                  {connectedNodes
+                    .filter((n) => n.type === 'pearl')
+                    .slice(0, 5)
+                    .map((p) => (
+                      <div
+                        key={p.id}
+                        className="text-xs p-2 rounded border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40"
+                      >
+                        {p.quote ? (
+                          <span className="italic">&ldquo;{p.quote}&rdquo;</span>
+                        ) : (
+                          p.label
+                        )}
+                      </div>
+                    ))}
+                  {connectedNodes.filter((n) => n.type === 'pearl').length > 5 && (
+                    <p className="text-xs text-muted-foreground">
+                      +{connectedNodes.filter((n) => n.type === 'pearl').length - 5} more
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <a
+                href={`/summary/${summaryId}`}
+                className="inline-block text-xs text-stone-600 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 underline underline-offset-2"
+              >
+                View full summary &rarr;
+              </a>
+            </div>
+          );
+        })()}
 
       {/* Individual pearl detail */}
       {node.type === 'pearl' && (
