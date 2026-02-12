@@ -114,6 +114,96 @@ export interface Database {
         };
         Relationships: [];
       };
+      decisions: {
+        Row: {
+          id: string;
+          user_id: string;
+          summary_id: string;
+          statement: string;
+          reasoning: string | null;
+          confidence: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          summary_id: string;
+          statement: string;
+          reasoning?: string | null;
+          confidence?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          summary_id?: string;
+          statement?: string;
+          reasoning?: string | null;
+          confidence?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      decision_pearls: {
+        Row: {
+          decision_id: string;
+          pearl_id: string;
+          relationship: string;
+        };
+        Insert: {
+          decision_id: string;
+          pearl_id: string;
+          relationship: string;
+        };
+        Update: {
+          decision_id?: string;
+          pearl_id?: string;
+          relationship?: string;
+        };
+        Relationships: [];
+      };
+      actions: {
+        Row: {
+          id: string;
+          user_id: string;
+          decision_id: string;
+          description: string;
+          context_card: Json | null;
+          status: string;
+          due_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          decision_id: string;
+          description: string;
+          context_card?: Json | null;
+          status?: string;
+          due_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          decision_id?: string;
+          description?: string;
+          context_card?: Json | null;
+          status?: string;
+          due_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
