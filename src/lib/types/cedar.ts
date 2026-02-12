@@ -84,6 +84,7 @@ export interface ConstellationNode {
   // Pearl cluster fields
   concept?: string;
   pearlCount?: number;
+  insights?: string[]; // Top insight previews for cluster cards
   // Decision fields
   confidence?: DecisionConfidence;
   decisionStatus?: DecisionStatus;

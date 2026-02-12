@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import { Graph } from '@/components/constellation/Graph';
+import dynamic from 'next/dynamic';
+
+const ConstellationFlow = dynamic(
+  () => import('@/components/constellation/ConstellationFlow').then((mod) => mod.ConstellationFlow),
+  { ssr: false },
+);
 import { DetailSidebar } from '@/components/constellation/DetailSidebar';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -203,7 +208,7 @@ export function ConstellationClient() {
               </Button>
             </div>
           ) : data ? (
-            <Graph
+            <ConstellationFlow
               data={data}
               selectedNodeId={selectedNode?.id ?? null}
               onNodeClick={handleNodeClick}
