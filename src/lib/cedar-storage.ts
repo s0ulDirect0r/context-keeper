@@ -63,6 +63,30 @@ export function loadGuestActions(decisionId: string): Action[] {
 }
 
 /**
+ * Load all guest decisions across all summaries.
+ * Scans localStorage for all decision keys and merges results.
+ */
+export function loadAllGuestDecisions(): Decision[] {
+  if (typeof window === 'undefined') return [];
+  const decisions: Decision[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(DECISIONS_PREFIX)) {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored) as Decision[];
+          decisions.push(...parsed);
+        }
+      }
+    }
+  } catch {
+    // corrupted data — return what we have
+  }
+  return decisions;
+}
+
+/**
  * Clear all Cedar guest data from localStorage.
  * Useful when user signs up (data migrates to DB) or wants a fresh start.
  */

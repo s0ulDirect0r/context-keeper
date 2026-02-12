@@ -7,7 +7,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useAppMode } from '@/components/AppModeProvider';
 import { AuthDialog } from '@/components/AuthDialog';
 import { Button } from '@/components/ui/button';
-import { Plus, LayoutDashboard, LogOut } from 'lucide-react';
+import { Plus, LayoutDashboard, Sparkles, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function NavBar() {
@@ -45,6 +45,16 @@ export function NavBar() {
                 >
                   <LayoutDashboard className="h-4 w-4 mr-1" />
                   Dashboard
+                </Button>
+              </Link>
+              <Link href="/constellation">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(pathname === '/constellation' && 'bg-muted')}
+                >
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Constellation
                 </Button>
               </Link>
             </nav>
@@ -99,6 +109,16 @@ export function NavBar() {
             >
               <LayoutDashboard className="h-4 w-4 mr-1" />
               Dashboard
+            </Button>
+          </Link>
+          <Link href="/constellation" className="flex-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('w-full justify-start', pathname === '/constellation' && 'bg-muted')}
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              Constellation
             </Button>
           </Link>
         </div>
