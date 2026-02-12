@@ -58,7 +58,6 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
 
   if (pearls.length === 0) return null;
 
-  const allDecided = pearls.every((p) => p.id in decisions);
   // Overlay edits onto kept pearls so saves include user modifications
   const keptPearls = pearls.filter((p) => decisions[p.id] === 'keep').map((p) => edits[p.id] ?? p);
 
@@ -205,7 +204,7 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
       </div>
 
       {/* Save button — only for logged-in users with a summary ID */}
-      {isLoggedIn && summaryId && !saved && allDecided && keptPearls.length > 0 && (
+      {isLoggedIn && summaryId && !saved && keptPearls.length > 0 && (
         <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
           {saving ? (
             <>
@@ -222,7 +221,7 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
         <p className="text-xs text-green-600 dark:text-green-400 text-center">Pearls saved</p>
       )}
 
-      {!isLoggedIn && allDecided && keptPearls.length > 0 && (
+      {!isLoggedIn && keptPearls.length > 0 && (
         <p className="text-xs text-muted-foreground text-center">Sign up to save your pearls</p>
       )}
     </PearlPanel>
