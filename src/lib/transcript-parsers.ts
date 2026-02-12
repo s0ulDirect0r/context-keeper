@@ -27,9 +27,7 @@ function parseVtt(content: string): string {
   }
 
   // Rejoin and strip NOTE blocks (NOTE ... followed by blank line)
-  const withoutNotes = lines
-    .join('\n')
-    .replace(/^NOTE\b[^\n]*(?:\n(?!\n)[^\n]*)*/gm, '');
+  const withoutNotes = lines.join('\n').replace(/^NOTE\b[^\n]*(?:\n(?!\n)[^\n]*)*/gm, '');
 
   return parseSrt(withoutNotes);
 }

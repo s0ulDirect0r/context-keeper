@@ -50,7 +50,8 @@ const SUMMARY_TOOL: Anthropic.Tool = {
       },
       summary: {
         type: 'string',
-        description: 'The full meeting summary in markdown format. Use headings, quotes, lists, and other markdown as appropriate.',
+        description:
+          'The full meeting summary in markdown format. Use headings, quotes, lists, and other markdown as appropriate.',
       },
     },
     required: ['title', 'summary'],
@@ -89,13 +90,12 @@ export async function generateSummary(
   transcripts: string[],
   context: SummaryContext,
   mode: 'combined' | 'separate',
-  metadata?: SummaryMetadata
+  metadata?: SummaryMetadata,
 ): Promise<GeneratedSummary[]> {
   if (mode === 'combined' || transcripts.length === 1) {
     const combinedTranscript = transcripts.join('\n\n---\n\n');
-    const title = metadata?.titles?.length === 1
-      ? metadata.titles[0]
-      : metadata?.titles?.join(' & ');
+    const title =
+      metadata?.titles?.length === 1 ? metadata.titles[0] : metadata?.titles?.join(' & ');
     const date = metadata?.dates?.[0];
     const summary = await summarizeSingle(combinedTranscript, context, title, date);
     return [summary];
@@ -103,13 +103,8 @@ export async function generateSummary(
 
   const summaries = await Promise.all(
     transcripts.map((transcript, i) =>
-      summarizeSingle(
-        transcript,
-        context,
-        metadata?.titles?.[i],
-        metadata?.dates?.[i]
-      )
-    )
+      summarizeSingle(transcript, context, metadata?.titles?.[i], metadata?.dates?.[i]),
+    ),
   );
 
   return summaries;
@@ -181,7 +176,8 @@ function buildUserMessage(
 
 // ── Streaming summary (no tool_use, raw markdown output) ────────────
 
-const STREAMING_SUMMARY_SYSTEM_PROMPT = SUMMARY_SYSTEM_PROMPT +
+const STREAMING_SUMMARY_SYSTEM_PROMPT =
+  SUMMARY_SYSTEM_PROMPT +
   '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full summary below it. Do not wrap the output in a code block.';
 
 export function streamSummarySingle(
@@ -224,7 +220,10 @@ const TAG_EXTRACTION_TOOL: Anthropic.Tool = {
           type: 'object',
           properties: {
             name: { type: 'string', description: 'The concept tag (exactly one word, lowercase)' },
-            reason: { type: 'string', description: 'Brief explanation of why this tag is present (1 sentence)' },
+            reason: {
+              type: 'string',
+              description: 'Brief explanation of why this tag is present (1 sentence)',
+            },
           },
           required: ['name', 'reason'],
         },
@@ -244,7 +243,7 @@ export interface ConceptTag {
 
 export async function extractTags(
   transcript: string,
-  context: SummaryContext
+  context: SummaryContext,
 ): Promise<ConceptTag[]> {
   try {
     const userMessage = `What conceptual themes, dynamics, and patterns are present in this conversation?
@@ -270,7 +269,7 @@ ${transcript}`;
     if (toolBlock && toolBlock.type === 'tool_use') {
       const input = toolBlock.input as { tags?: ConceptTag[] };
       // Enforce single-word tags — drop any with whitespace
-      return (input.tags || []).filter(tag => /^\S+$/.test(tag.name));
+      return (input.tags || []).filter((tag) => /^\S+$/.test(tag.name));
     }
 
     return [];
@@ -334,7 +333,10 @@ const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Unique identifier for the pearl' },
-            insight: { type: 'string', description: 'One punchy sentence, 6-12 words, addressed to "you." No quoted speech.' },
+            insight: {
+              type: 'string',
+              description: 'One punchy sentence, 6-12 words, addressed to "you." No quoted speech.',
+            },
             concepts: {
               type: 'array',
               items: { type: 'string' },
@@ -345,9 +347,16 @@ const PEARL_EXTRACTION_TOOL: Anthropic.Tool = {
             quote: {
               type: 'object',
               properties: {
-                text: { type: 'string', description: 'Verbatim quote from transcript — the anchor for this pearl' },
+                text: {
+                  type: 'string',
+                  description: 'Verbatim quote from transcript — the anchor for this pearl',
+                },
                 speaker: { type: 'string', description: 'Speaker name if identifiable' },
-                is_user: { type: 'boolean', description: 'True if this quote is from the user (the person reading the summary). Only set if user identity is provided.' },
+                is_user: {
+                  type: 'boolean',
+                  description:
+                    'True if this quote is from the user (the person reading the summary). Only set if user identity is provided.',
+                },
               },
               required: ['text'],
               description: 'Grounding quote from the conversation (required)',

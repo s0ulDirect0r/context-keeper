@@ -1,7 +1,13 @@
 import { z } from 'zod';
-import { generateSummary, extractTags, streamSummarySingle, type SummaryContext } from '@/lib/claude';
+import {
+  generateSummary,
+  extractTags,
+  streamSummarySingle,
+  type SummaryContext,
+} from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import { createRateLimiter } from '@/lib/rate-limit';
+import { buildSearchText } from '@/lib/search-text';
 import type { Database } from '@/lib/supabase/types';
 
 const MAX_TRANSCRIPT_BYTES = 100_000; // 100KB per transcript
@@ -73,7 +79,9 @@ export async function POST(request: Request) {
 
   if (save) {
     supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     userId = user?.id ?? null;
   }
 
@@ -91,21 +99,25 @@ export async function POST(request: Request) {
         // is still streaming (JS is single-threaded so enqueue calls are safe).
         send('tags_extracting', {});
         let resolvedTags: Awaited<ReturnType<typeof extractTags>> = [];
-        const tagPromise = extractTags(combinedTranscript, summaryContext)
-          .then(tags => {
-            resolvedTags = tags;
-            send('tags_done', { tags });
-            return tags;
-          });
+        const tagPromise = extractTags(combinedTranscript, summaryContext).then((tags) => {
+          resolvedTags = tags;
+          send('tags_done', { tags });
+          return tags;
+        });
 
         if (summaryMode === 'separate' && transcripts.length > 1) {
           // Non-streaming fallback for separate mode
-          const generatedSummaries = await generateSummary(transcripts, summaryContext, 'separate', {
-            titles: recordingTitles,
-            dates: recordingDates,
-          });
+          const generatedSummaries = await generateSummary(
+            transcripts,
+            summaryContext,
+            'separate',
+            {
+              titles: recordingTitles,
+              dates: recordingDates,
+            },
+          );
 
-          const summaries = generatedSummaries.map(s => s.markdown);
+          const summaries = generatedSummaries.map((s) => s.markdown);
           send('summary_done', { summaries });
 
           // Ensure tags are done before proceeding
@@ -119,14 +131,23 @@ export async function POST(request: Request) {
               title = generatedSummaries[0].title;
             }
 
+            const summariesMap: Record<string, string> = {};
+            summaries.forEach((s, i) => {
+              summariesMap[String(i)] = s;
+            });
+
             const { data, error: saveError } = await supabase
               .from('summaries')
               .insert({
                 user_id: userId,
                 title,
-                summaries: summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
-                context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-                transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
+                summaries:
+                  summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
+                context:
+                  summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
+                transcripts:
+                  transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
+                search_text: buildSearchText(title, summariesMap),
               })
               .select('id')
               .single();
@@ -141,9 +162,8 @@ export async function POST(request: Request) {
           send('complete', { savedSummaryId, summaries, tags: resolvedTags });
         } else {
           // Streaming mode: single/combined summary
-          const title = recordingTitles?.length === 1
-            ? recordingTitles[0]
-            : recordingTitles?.join(' & ');
+          const title =
+            recordingTitles?.length === 1 ? recordingTitles[0] : recordingTitles?.join(' & ');
           const date = recordingDates?.[0];
 
           const messageStream = streamSummarySingle(
@@ -183,9 +203,14 @@ export async function POST(request: Request) {
               .insert({
                 user_id: userId,
                 title: displayTitle,
-                summaries: [accumulatedText] as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
-                context: summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-                transcripts: transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
+                summaries: [
+                  accumulatedText,
+                ] as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
+                context:
+                  summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
+                transcripts:
+                  transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
+                search_text: buildSearchText(displayTitle, { '0': accumulatedText }),
               })
               .select('id')
               .single();
@@ -212,7 +237,7 @@ export async function POST(request: Request) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     },
   });
 }

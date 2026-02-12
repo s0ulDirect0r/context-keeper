@@ -37,7 +37,12 @@ function PearlsDisplay({ pearls }: { pearls: SavedPearl[] }) {
     <PearlPanel>
       <div className="space-y-3">
         {pearls.map((pearl) => (
-          <PearlCard key={pearl.id} insight={pearl.insight} concepts={pearl.concepts} quote={pearl.quote} />
+          <PearlCard
+            key={pearl.id}
+            insight={pearl.insight}
+            concepts={pearl.concepts}
+            quote={pearl.quote}
+          />
         ))}
       </div>
     </PearlPanel>
@@ -55,9 +60,7 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
 
   const allDecided = pearls.every((p) => p.id in decisions);
   // Overlay edits onto kept pearls so saves include user modifications
-  const keptPearls = pearls
-    .filter((p) => decisions[p.id] === 'keep')
-    .map((p) => edits[p.id] ?? p);
+  const keptPearls = pearls.filter((p) => decisions[p.id] === 'keep').map((p) => edits[p.id] ?? p);
 
   const handleDecision = (pearlId: string, decision: 'keep' | 'discard') => {
     setDecisions((prev) => ({ ...prev, [pearlId]: decision }));
@@ -120,7 +123,10 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
           const decision = decisions[pearl.id];
           if (decision === 'discard') {
             return (
-              <div key={pearl.id} className="opacity-40 line-through text-xs text-muted-foreground py-1">
+              <div
+                key={pearl.id}
+                className="opacity-40 line-through text-xs text-muted-foreground py-1"
+              >
                 {pearl.insight.slice(0, 60)}...
                 <button
                   onClick={() => {
@@ -153,8 +159,15 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
           // Show the pearl card (with edits overlaid if previously edited)
           const displayPearl = edits[pearl.id] ?? pearl;
           return (
-            <div key={pearl.id} className={`relative ${decision === 'keep' ? 'ring-1 ring-amber-400/50 rounded-lg' : ''}`}>
-              <PearlCard insight={displayPearl.insight} concepts={displayPearl.concepts} quote={displayPearl.quote} />
+            <div
+              key={pearl.id}
+              className={`relative ${decision === 'keep' ? 'ring-1 ring-amber-400/50 rounded-lg' : ''}`}
+            >
+              <PearlCard
+                insight={displayPearl.insight}
+                concepts={displayPearl.concepts}
+                quote={displayPearl.quote}
+              />
               {!saved && (
                 <div className="flex gap-1 mt-1.5">
                   <Button
@@ -193,12 +206,7 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
 
       {/* Save button — only for logged-in users with a summary ID */}
       {isLoggedIn && summaryId && !saved && allDecided && keptPearls.length > 0 && (
-        <Button
-          size="sm"
-          className="w-full"
-          onClick={handleSave}
-          disabled={saving}
-        >
+        <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
           {saving ? (
             <>
               <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -211,15 +219,11 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
       )}
 
       {saved && (
-        <p className="text-xs text-green-600 dark:text-green-400 text-center">
-          Pearls saved
-        </p>
+        <p className="text-xs text-green-600 dark:text-green-400 text-center">Pearls saved</p>
       )}
 
       {!isLoggedIn && allDecided && keptPearls.length > 0 && (
-        <p className="text-xs text-muted-foreground text-center">
-          Sign up to save your pearls
-        </p>
+        <p className="text-xs text-muted-foreground text-center">Sign up to save your pearls</p>
       )}
     </PearlPanel>
   );
@@ -234,17 +238,18 @@ function PearlPanel({ children, subtitle }: { children: React.ReactNode; subtitl
           Pearls
         </h3>
       </div>
-      {subtitle && (
-        <p className="text-xs text-amber-700/70 dark:text-amber-400/60">
-          {subtitle}
-        </p>
-      )}
+      {subtitle && <p className="text-xs text-amber-700/70 dark:text-amber-400/60">{subtitle}</p>}
       {children}
     </div>
   );
 }
 
-function PearlEditForm({ draft, onUpdate, onDone, onCancel }: {
+function PearlEditForm({
+  draft,
+  onUpdate,
+  onDone,
+  onCancel,
+}: {
   draft: Pearl;
   onUpdate: (patch: Partial<Pearl>) => void;
   onDone: () => void;
@@ -279,13 +284,17 @@ function PearlEditForm({ draft, onUpdate, onDone, onCancel }: {
 
   return (
     <div className="rounded-lg border border-amber-300 dark:border-amber-700/50 bg-white dark:bg-amber-950/30 shadow-sm p-3 space-y-2">
-      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Insight</label>
+      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+        Insight
+      </label>
       <Textarea
         value={draft.insight}
         onChange={(e) => onUpdate({ insight: e.target.value })}
         className="text-sm min-h-[60px]"
       />
-      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Concepts</label>
+      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+        Concepts
+      </label>
       <div
         className="flex flex-wrap items-center gap-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm cursor-text"
         onClick={() => conceptInputRef.current?.focus()}
@@ -319,15 +328,17 @@ function PearlEditForm({ draft, onUpdate, onDone, onCancel }: {
       </div>
       {draft.quote && (
         <>
-          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Quote</label>
+          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+            Quote
+          </label>
           <Input
             value={draft.quote.text}
-            onChange={(e) =>
-              onUpdate({ quote: { ...draft.quote!, text: e.target.value } })
-            }
+            onChange={(e) => onUpdate({ quote: { ...draft.quote!, text: e.target.value } })}
             className="text-sm"
           />
-          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Speaker</label>
+          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+            Speaker
+          </label>
           <Input
             value={draft.quote.speaker ?? ''}
             onChange={(e) =>
@@ -354,7 +365,11 @@ function PearlEditForm({ draft, onUpdate, onDone, onCancel }: {
   );
 }
 
-function PearlCard({ insight, concepts, quote }: {
+function PearlCard({
+  insight,
+  concepts,
+  quote,
+}: {
   insight: string;
   concepts: string[];
   quote?: { text: string; speaker?: string; isUser?: boolean } | null;
@@ -372,9 +387,7 @@ function PearlCard({ insight, concepts, quote }: {
           {quote.speaker && (
             <p className="text-[11px] mt-1 text-muted-foreground">
               &mdash; {quote.speaker}
-              {isUserQuote && (
-                <span className="ml-1 font-medium">(you)</span>
-              )}
+              {isUserQuote && <span className="ml-1 font-medium">(you)</span>}
             </p>
           )}
         </div>

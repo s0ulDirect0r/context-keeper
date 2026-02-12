@@ -103,7 +103,7 @@ export function SummaryView(props: SummaryViewProps) {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pendingSave, setPendingSave] = useState(false);
-  const savedSummaryId = saved ? props.summary.id : (props as InlineProps).savedSummaryId ?? null;
+  const savedSummaryId = saved ? props.summary.id : ((props as InlineProps).savedSummaryId ?? null);
 
   // Title editing (saved mode only)
   const [title, setTitle] = useState(saved ? props.summary.title : '');
@@ -125,7 +125,8 @@ export function SummaryView(props: SummaryViewProps) {
 
   const readOnly = props.readOnly ?? false;
   const summaryId = saved ? props.summary.id : savedSummaryId;
-  const hasTranscripts = transcripts !== null && transcripts !== undefined && transcripts.length > 0;
+  const hasTranscripts =
+    transcripts !== null && transcripts !== undefined && transcripts.length > 0;
 
   // Guest sign-up-to-save flow
   useEffect(() => {
@@ -156,15 +157,16 @@ export function SummaryView(props: SummaryViewProps) {
           setPendingSave(false);
         });
     }
-  }, [user, pendingSave, savedSummaryId]);
+  }, [user, pendingSave, savedSummaryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Convert old structured summaries to markdown for uniform rendering,
   // then track as mutable state so inline edits are reflected immediately.
-  const initialMarkdown = useMemo<string[]>(() =>
-    isStructuredSummary(summaries)
-      ? summaries.map(s => structuredSummaryToMarkdown(s))
-      : summaries,
-    [summaries]
+  const initialMarkdown = useMemo<string[]>(
+    () =>
+      isStructuredSummary(summaries)
+        ? summaries.map((s) => structuredSummaryToMarkdown(s))
+        : summaries,
+    [summaries],
   );
   const [markdownSummaries, setMarkdownSummaries] = useState(initialMarkdown);
 
@@ -205,7 +207,7 @@ export function SummaryView(props: SummaryViewProps) {
     if (recordingTitles && recordingTitles.length > 0) {
       return recordingTitles[index] || recordingTitles[0] || 'summary';
     }
-    return saved ? (props.summary.title || 'summary') : 'summary';
+    return saved ? props.summary.title || 'summary' : 'summary';
   };
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -356,8 +358,13 @@ export function SummaryView(props: SummaryViewProps) {
   const hasDisplayPearls = displayPearls.length > 0;
   const inlineProps = !saved ? (props as InlineProps) : null;
   const isGeneratingPearls = inlineProps?.generatingPearls ?? false;
-  const hasTagsForSidebar = inlineProps?.conceptTags && inlineProps.conceptTags.length > 0 && !hasCuratingPearls && !hasDisplayPearls;
-  const showPearlsSidebar = hasCuratingPearls || hasDisplayPearls || hasTagsForSidebar || isGeneratingPearls;
+  const hasTagsForSidebar =
+    inlineProps?.conceptTags &&
+    inlineProps.conceptTags.length > 0 &&
+    !hasCuratingPearls &&
+    !hasDisplayPearls;
+  const showPearlsSidebar =
+    hasCuratingPearls || hasDisplayPearls || hasTagsForSidebar || isGeneratingPearls;
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -375,7 +382,10 @@ export function SummaryView(props: SummaryViewProps) {
               onBlur={() => saveTitle(title)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur();
-                if (e.key === 'Escape') { setTitle(props.summary.title); setEditingTitle(false); }
+                if (e.key === 'Escape') {
+                  setTitle(props.summary.title);
+                  setEditingTitle(false);
+                }
               }}
               autoFocus
             />
@@ -438,13 +448,18 @@ export function SummaryView(props: SummaryViewProps) {
                     {window.location.origin}/share/{shareToken}
                   </code>
                   <Button size="sm" variant="outline" onClick={copyShareLink}>
-                    {copiedShareLink ? <Check className="h-3.5 w-3.5" /> : <Link className="h-3.5 w-3.5" />}
+                    {copiedShareLink ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Link className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 </div>
               )}
               {!isShared && (
                 <p className="text-xs text-muted-foreground">
-                  Link is currently disabled. Toggle on to allow anyone with the link to view this summary.
+                  Link is currently disabled. Toggle on to allow anyone with the link to view this
+                  summary.
                 </p>
               )}
             </div>
@@ -493,8 +508,14 @@ export function SummaryView(props: SummaryViewProps) {
                   onClick={() => copyToClipboard(summaryText, index)}
                   title="Copy to clipboard"
                 >
-                  {copiedIndex === index ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{copiedIndex === index ? 'Copied!' : 'Copy'}</span>
+                  {copiedIndex === index ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {copiedIndex === index ? 'Copied!' : 'Copy'}
+                  </span>
                 </Button>
                 <Button
                   variant="outline"
@@ -521,7 +542,7 @@ export function SummaryView(props: SummaryViewProps) {
             <EditableMarkdown
               markdown={summaryText}
               onChange={(newText) => {
-                setMarkdownSummaries(prev => {
+                setMarkdownSummaries((prev) => {
                   const updated = [...prev];
                   updated[index] = newText;
                   persistGuestEdits(updated);
@@ -666,9 +687,7 @@ export function SummaryView(props: SummaryViewProps) {
         </div>
       )}
 
-      {!saved && (
-        <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
-      )}
+      {!saved && <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />}
     </div>
   );
 
@@ -692,8 +711,18 @@ export function SummaryView(props: SummaryViewProps) {
         ) : hasDisplayPearls ? (
           <PearlsSidebar mode="display" pearls={displayPearls} />
         ) : isGeneratingPearls ? (
-          <PearlsGeneratingView selectedTags={inlineProps?.tagSelection ? Array.from(inlineProps.tagSelection) : undefined} />
-        ) : hasTagsForSidebar && inlineProps?.onTagSubmit && inlineProps.onTagSkip && inlineProps.tagSelection && inlineProps.onTagSelectionChange && inlineProps.tagCustomTags && inlineProps.onTagCustomTagsChange ? (
+          <PearlsGeneratingView
+            selectedTags={
+              inlineProps?.tagSelection ? Array.from(inlineProps.tagSelection) : undefined
+            }
+          />
+        ) : hasTagsForSidebar &&
+          inlineProps?.onTagSubmit &&
+          inlineProps.onTagSkip &&
+          inlineProps.tagSelection &&
+          inlineProps.onTagSelectionChange &&
+          inlineProps.tagCustomTags &&
+          inlineProps.onTagCustomTagsChange ? (
           <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
               Focus your pearls

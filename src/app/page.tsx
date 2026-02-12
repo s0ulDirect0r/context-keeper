@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useReducer } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useAppMode } from '@/components/AppModeProvider';
 import { AuthDialog, type AuthMode } from '@/components/AuthDialog';
-import { Button } from '@/components/ui/button';
 import { LandingPage } from '@/components/LandingPage';
 import { InputMethodPicker } from '@/components/InputMethodPicker';
 import { OtterLogin } from '@/components/OtterLogin';
@@ -65,12 +64,16 @@ function autoMatchUserSpeaker(
   }
 
   // Case-insensitive match: check if any speaker name contains or matches a candidate
-  const lower = candidates.map(c => c.toLowerCase()).filter(c => c.length >= 2);
+  const lower = candidates.map((c) => c.toLowerCase()).filter((c) => c.length >= 2);
 
   for (const speaker of speakerNames) {
     const speakerLower = speaker.toLowerCase();
     for (const candidate of lower) {
-      if (speakerLower === candidate || speakerLower.includes(candidate) || candidate.includes(speakerLower)) {
+      if (
+        speakerLower === candidate ||
+        speakerLower.includes(candidate) ||
+        candidate.includes(speakerLower)
+      ) {
         return speaker;
       }
     }
@@ -114,10 +117,7 @@ export default function Home() {
 
       if (user) {
         const supabase = createClient();
-        const { data, error } = await supabase
-          .from('otter_connections')
-          .select('*')
-          .single();
+        const { data, error } = await supabase.from('otter_connections').select('*').single();
 
         if (error) {
           if (error.code !== 'PGRST116') {
@@ -282,7 +282,10 @@ export default function Home() {
       });
       dispatch({ type: 'SET_STEP', step: 'otter-recordings' });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to fetch recordings' });
+      dispatch({
+        type: 'SET_ERROR',
+        error: err instanceof Error ? err.message : 'Failed to fetch recordings',
+      });
       clearSession();
       setOtterSession(null);
       dispatch({ type: 'SET_STEP', step: 'otter-login' });
@@ -321,9 +324,7 @@ export default function Home() {
         throw new Error('No transcripts could be retrieved');
       }
 
-      const selected = recordingIds.map(
-        (id: string) => state.recordings.find((r) => r.id === id)
-      );
+      const selected = recordingIds.map((id: string) => state.recordings.find((r) => r.id === id));
       const titles = selected.map((r) => r?.title || 'Untitled');
       const dates = selected.map((r) => r?.createdAt?.toISOString() || '');
 
@@ -331,9 +332,10 @@ export default function Home() {
       const returnedSpeakers: string[] = data.speakerNames ?? [];
       const matched = autoMatchUserSpeaker(returnedSpeakers, otterSession.email, user);
 
-      const nextStep = (returnedSpeakers.length > 1 && !matched)
-        ? 'speaker-select' as const
-        : 'context-wizard' as const;
+      const nextStep =
+        returnedSpeakers.length > 1 && !matched
+          ? ('speaker-select' as const)
+          : ('context-wizard' as const);
 
       dispatch({
         type: 'TRANSCRIPTS_LOADED',
@@ -345,7 +347,10 @@ export default function Home() {
         nextStep,
       });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to fetch transcripts' });
+      dispatch({
+        type: 'SET_ERROR',
+        error: err instanceof Error ? err.message : 'Failed to fetch transcripts',
+      });
     } finally {
       dispatch({ type: 'SET_LOADING_RECORDINGS', loading: false });
     }
@@ -354,9 +359,8 @@ export default function Home() {
   const handleManualTranscript = (transcript: string) => {
     // Try to extract speaker names from pasted transcript (lines like "Name: ...")
     const parsedSpeakers = parseSpeakerNames(transcript);
-    const matched = parsedSpeakers.length > 1
-      ? autoMatchUserSpeaker(parsedSpeakers, undefined, user)
-      : null;
+    const matched =
+      parsedSpeakers.length > 1 ? autoMatchUserSpeaker(parsedSpeakers, undefined, user) : null;
 
     let nextStep: 'speaker-select' | 'context-wizard' = 'context-wizard';
     if (parsedSpeakers.length > 1 && !matched) {
@@ -446,7 +450,10 @@ export default function Home() {
         }
       }
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to generate summary' });
+      dispatch({
+        type: 'SET_ERROR',
+        error: err instanceof Error ? err.message : 'Failed to generate summary',
+      });
       dispatch({ type: 'SET_STEP', step: 'context-wizard' });
     }
   };
@@ -498,9 +505,10 @@ export default function Home() {
 
       // Use finalized summaries if available, fall back to streaming markdown
       // (tags_done can fire before summary_done, so summaries may still be empty)
-      const summaryMarkdown = Array.isArray(state.summaries) && state.summaries.length > 0
-        ? (state.summaries as string[]).join('\n\n---\n\n')
-        : streamingMarkdownRef.current;
+      const summaryMarkdown =
+        Array.isArray(state.summaries) && state.summaries.length > 0
+          ? (state.summaries as string[]).join('\n\n---\n\n')
+          : streamingMarkdownRef.current;
 
       if (!combinedTranscript || !summaryMarkdown || !state.context?.extractionGoal) {
         throw new Error('Summary is still generating — please wait a moment and try again.');
@@ -560,8 +568,14 @@ export default function Home() {
       <>
         <LandingPage
           onTryFree={() => setAppMode(true)}
-          onSignUp={() => { setAuthMode('sign-up'); setAuthDialogOpen(true); }}
-          onSignIn={() => { setAuthMode('sign-in'); setAuthDialogOpen(true); }}
+          onSignUp={() => {
+            setAuthMode('sign-up');
+            setAuthDialogOpen(true);
+          }}
+          onSignIn={() => {
+            setAuthMode('sign-in');
+            setAuthDialogOpen(true);
+          }}
         />
         <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} initialMode={authMode} />
       </>
@@ -570,138 +584,152 @@ export default function Home() {
 
   return (
     <main className="container mx-auto px-4 py-12">
-        {state.error && (
-          <div className="max-w-2xl mx-auto mb-6 rounded-md bg-red-50 dark:bg-red-950 p-4 text-red-800 dark:text-red-200">
-            {state.error}
+      {state.error && (
+        <div className="max-w-2xl mx-auto mb-6 rounded-md bg-red-50 dark:bg-red-950 p-4 text-red-800 dark:text-red-200">
+          {state.error}
+        </div>
+      )}
+
+      {state.step === 'choose-method' && (
+        <InputMethodPicker
+          onSelect={handleMethodSelect}
+          connectedOtterEmail={otterSession?.email}
+          onDisconnectOtter={handleDisconnectOtter}
+          prefetchedRecordingCount={
+            state.prefetchedRecordings
+              ? state.prefetchedRecordings.length
+              : otterSession
+                ? null
+                : undefined
+          }
+        />
+      )}
+
+      {state.step === 'otter-login' && (
+        <OtterLogin
+          onLogin={handleOtterLogin}
+          onBack={() => goBack('choose-method')}
+          initialEmail={otterSession?.email}
+        />
+      )}
+
+      {state.step === 'otter-recordings' && (
+        <RecordingList
+          recordings={state.recordings}
+          onSelect={handleRecordingSelect}
+          onBack={() => goBack('choose-method')}
+          loading={state.loadingRecordings}
+        />
+      )}
+
+      {state.step === 'manual-transcript' && (
+        <ManualTranscript
+          onSubmit={handleManualTranscript}
+          onBack={() => goBack('choose-method')}
+        />
+      )}
+
+      {state.step === 'speaker-select' && (
+        <SpeakerSelect
+          speakerNames={state.speakerNames}
+          onSelect={(name) => {
+            dispatch({ type: 'SET_USER_SPEAKER', name: name ?? undefined });
+            dispatch({ type: 'SET_STEP', step: 'context-wizard' });
+          }}
+          onBack={() =>
+            goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
+          }
+        />
+      )}
+
+      {state.step === 'context-wizard' && (
+        <ContextWizard
+          onComplete={handleContextComplete}
+          onBack={() =>
+            goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
+          }
+          recordingCount={state.transcripts.length}
+        />
+      )}
+
+      {state.step === 'summary-mode' && (
+        <SummaryModeSelector
+          recordingCount={state.transcripts.length}
+          onSelect={handleSummaryModeSelect}
+          onBack={() => goBack('context-wizard')}
+        />
+      )}
+
+      {state.step === 'generating' && (
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="min-w-0 flex-1 max-w-3xl">
+            <StreamingGenerationView
+              markdown={state.streamingMarkdown}
+              isStreaming={state.isStreaming}
+            />
           </div>
-        )}
+          <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
+            {state.phase.pearlsGenerating ? (
+              <PearlsGeneratingView selectedTags={Array.from(state.tagSelection)} />
+            ) : (
+              <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                  Focus your pearls
+                </h3>
+                {state.conceptTags.length > 0 ? (
+                  <TagSelector
+                    tags={state.conceptTags}
+                    generating={false}
+                    onSubmit={handleTagSelection}
+                    onSkip={handleTagSkip}
+                    selected={state.tagSelection}
+                    onSelectedChange={(next) =>
+                      dispatch({ type: 'SET_TAG_SELECTION', selection: next })
+                    }
+                    customTags={state.tagCustomTags}
+                    onCustomTagsChange={(next) =>
+                      dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })
+                    }
+                    compact
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                    Identifying themes...
+                  </div>
+                )}
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
 
-        {state.step === 'choose-method' && (
-          <InputMethodPicker
-            onSelect={handleMethodSelect}
-            connectedOtterEmail={otterSession?.email}
-            onDisconnectOtter={handleDisconnectOtter}
-            prefetchedRecordingCount={state.prefetchedRecordings ? state.prefetchedRecordings.length : otterSession ? null : undefined}
-          />
-        )}
-
-        {state.step === 'otter-login' && (
-          <OtterLogin
-            onLogin={handleOtterLogin}
-            onBack={() => goBack('choose-method')}
-            initialEmail={otterSession?.email}
-          />
-        )}
-
-        {state.step === 'otter-recordings' && (
-          <RecordingList
-            recordings={state.recordings}
-            onSelect={handleRecordingSelect}
-            onBack={() => goBack('choose-method')}
-            loading={state.loadingRecordings}
-          />
-        )}
-
-        {state.step === 'manual-transcript' && (
-          <ManualTranscript
-            onSubmit={handleManualTranscript}
-            onBack={() => goBack('choose-method')}
-          />
-        )}
-
-        {state.step === 'speaker-select' && (
-          <SpeakerSelect
-            speakerNames={state.speakerNames}
-            onSelect={(name) => {
-              dispatch({ type: 'SET_USER_SPEAKER', name: name ?? undefined });
-              dispatch({ type: 'SET_STEP', step: 'context-wizard' });
-            }}
-            onBack={() =>
-              goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
-            }
-          />
-        )}
-
-        {state.step === 'context-wizard' && (
-          <ContextWizard
-            onComplete={handleContextComplete}
-            onBack={() =>
-              goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
-            }
-            recordingCount={state.transcripts.length}
-          />
-        )}
-
-        {state.step === 'summary-mode' && (
-          <SummaryModeSelector
-            recordingCount={state.transcripts.length}
-            onSelect={handleSummaryModeSelect}
-            onBack={() => goBack('context-wizard')}
-          />
-        )}
-
-        {state.step === 'generating' && (
-          <div className="flex flex-col lg:flex-row gap-8">
-            <div className="min-w-0 flex-1 max-w-3xl">
-              <StreamingGenerationView
-                markdown={state.streamingMarkdown}
-                isStreaming={state.isStreaming}
-              />
-            </div>
-            <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
-              {state.phase.pearlsGenerating ? (
-                <PearlsGeneratingView selectedTags={Array.from(state.tagSelection)} />
-              ) : (
-                <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-                    Focus your pearls
-                  </h3>
-                  {state.conceptTags.length > 0 ? (
-                    <TagSelector
-                      tags={state.conceptTags}
-                      generating={false}
-                      onSubmit={handleTagSelection}
-                      onSkip={handleTagSkip}
-                      selected={state.tagSelection}
-                      onSelectedChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
-                      customTags={state.tagCustomTags}
-                      onCustomTagsChange={(next) => dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })}
-                      compact
-                    />
-                  ) : (
-                    <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-                      Identifying themes...
-                    </div>
-                  )}
-                </div>
-              )}
-            </aside>
-          </div>
-        )}
-
-        {state.step === 'summary' && (
-          <SummaryView
-            data={{
-              summaries: state.summaries,
-              context: state.context,
-              transcripts: state.transcripts,
-              recordingTitles: state.recordingTitles,
-            }}
-            pearls={state.pearls}
-            savedSummaryId={state.savedSummaryId}
-            onSaved={(id) => dispatch({ type: 'SET_SAVED_SUMMARY_ID', id })}
-            onStartOver={handleStartOver}
-            conceptTags={state.pearls.length === 0 && state.phase.tagsReady ? state.conceptTags : undefined}
-            onTagSubmit={state.pearls.length === 0 ? handleTagSelection : undefined}
-            onTagSkip={state.pearls.length === 0 ? handleTagSkip : undefined}
-            generatingPearls={state.phase.pearlsGenerating}
-            tagSelection={state.tagSelection}
-            onTagSelectionChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
-            tagCustomTags={state.tagCustomTags}
-            onTagCustomTagsChange={(next) => dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })}
-          />
-        )}
-      </main>
+      {state.step === 'summary' && (
+        <SummaryView
+          data={{
+            summaries: state.summaries,
+            context: state.context,
+            transcripts: state.transcripts,
+            recordingTitles: state.recordingTitles,
+          }}
+          pearls={state.pearls}
+          savedSummaryId={state.savedSummaryId}
+          onSaved={(id) => dispatch({ type: 'SET_SAVED_SUMMARY_ID', id })}
+          onStartOver={handleStartOver}
+          conceptTags={
+            state.pearls.length === 0 && state.phase.tagsReady ? state.conceptTags : undefined
+          }
+          onTagSubmit={state.pearls.length === 0 ? handleTagSelection : undefined}
+          onTagSkip={state.pearls.length === 0 ? handleTagSkip : undefined}
+          generatingPearls={state.phase.pearlsGenerating}
+          tagSelection={state.tagSelection}
+          onTagSelectionChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
+          tagCustomTags={state.tagCustomTags}
+          onTagCustomTagsChange={(next) =>
+            dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })
+          }
+        />
+      )}
+    </main>
   );
 }

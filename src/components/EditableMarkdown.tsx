@@ -38,7 +38,9 @@ function parseChunks(markdown: string): string[] {
         lines[i + 1].trim() !== '' &&
         !/^#{1,6}\s/.test(lines[i + 1].trimStart()) &&
         (lines[i + 1].length - lines[i + 1].trimStart().length > baseIndent ||
-          (!(/^[-*+]\s/.test(lines[i + 1].trimStart()) || /^\d+\.\s/.test(lines[i + 1].trimStart())) &&
+          (!(
+            /^[-*+]\s/.test(lines[i + 1].trimStart()) || /^\d+\.\s/.test(lines[i + 1].trimStart())
+          ) &&
             (lines[i + 1].startsWith('  ') || lines[i + 1].startsWith('\t'))))
       ) {
         i++;
@@ -114,7 +116,7 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
   // Sync external changes
   useEffect(() => {
     if (!editing) {
-      setEditValue(chunk);
+      setEditValue(chunk); // eslint-disable-line react-hooks/set-state-in-effect -- intentional prop-to-state sync
     }
   }, [chunk, editing]);
 
@@ -211,11 +213,14 @@ interface EditableMarkdownProps {
 export function EditableMarkdown({ markdown, onChange, readOnly }: EditableMarkdownProps) {
   const chunks = useMemo(() => parseChunks(markdown), [markdown]);
 
-  const handleChunkSave = useCallback((index: number, newText: string) => {
-    const updated = [...chunks];
-    updated[index] = newText;
-    onChange(assembleChunks(updated));
-  }, [chunks, onChange]);
+  const handleChunkSave = useCallback(
+    (index: number, newText: string) => {
+      const updated = [...chunks];
+      updated[index] = newText;
+      onChange(assembleChunks(updated));
+    },
+    [chunks, onChange],
+  );
 
   return (
     <div className="space-y-4">

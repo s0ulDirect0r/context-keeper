@@ -5,7 +5,7 @@ import { toSavedPearl, type Database } from '@/lib/supabase/types';
 
 export async function POST(request: Request) {
   try {
-    const { pearls, summaryId, selectedTags } = await request.json() as {
+    const { pearls, summaryId, selectedTags } = (await request.json()) as {
       pearls: Pearl[];
       summaryId: string;
       selectedTags?: string[];
@@ -20,7 +20,9 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -47,10 +49,7 @@ export async function POST(request: Request) {
       quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
     }));
 
-    const { data, error: insertError } = await supabase
-      .from('pearls')
-      .insert(rows)
-      .select('*');
+    const { data, error: insertError } = await supabase.from('pearls').insert(rows).select('*');
 
     if (insertError) {
       console.error('Failed to save pearls:', insertError);
