@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PearlsSidebar } from './PearlsSidebar';
+import { ConstellationPrompt } from './ConstellationPrompt';
 import { AuthDialog } from './AuthDialog';
 import { useAuth } from './AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
@@ -709,7 +710,12 @@ export function SummaryView(props: SummaryViewProps) {
             isLoggedIn={!!user}
           />
         ) : hasDisplayPearls ? (
-          <PearlsSidebar mode="display" pearls={displayPearls} />
+          <div className="space-y-4">
+            <PearlsSidebar mode="display" pearls={displayPearls} />
+            {summaryId && (
+              <ConstellationPrompt summaryId={summaryId} pearlCount={displayPearls.length} />
+            )}
+          </div>
         ) : isGeneratingPearls ? (
           <PearlsGeneratingView
             selectedTags={
