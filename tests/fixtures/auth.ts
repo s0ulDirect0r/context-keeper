@@ -18,7 +18,7 @@ export interface TestUser {
  * Auto-confirmed — no email verification needed.
  */
 export async function createTestUser(
-  email = `test-${Date.now()}@example.com`,
+  email = `test-${crypto.randomUUID()}@example.com`,
   password = 'test-password-123',
 ): Promise<TestUser> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {

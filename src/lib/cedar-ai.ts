@@ -98,6 +98,32 @@ export async function surfaceDecisions(
   pearls: Pearl[],
   context: SummaryContext,
 ): Promise<GenerateDecisionsOutput> {
+  // Test mock: return deterministic decisions referencing input pearl IDs
+  if (process.env.CEDAR_AI_MOCK === 'true') {
+    return {
+      decisions: [
+        {
+          statement: 'Prioritize the auth refactor over new feature work',
+          reasoning: 'Evidence suggests the auth blocker is on the critical path.',
+          confidence: 'high',
+          status: 'emerging',
+          supportingPearls: pearls.slice(0, 2).map((p) => ({
+            pearlId: p.id,
+            relationship: 'supports' as const,
+          })),
+        },
+        {
+          statement: 'Formalize cross-team dependency tracking',
+          reasoning: 'Multiple signals point to invisible blockers slowing the team.',
+          confidence: 'medium',
+          status: 'emerging',
+          supportingPearls:
+            pearls.length > 0 ? [{ pearlId: pearls[0].id, relationship: 'supports' as const }] : [],
+        },
+      ],
+    };
+  }
+
   const pearlSummary = pearls
     .map(
       (p) =>
@@ -269,6 +295,27 @@ export async function generateActions(
   pearls: Pearl[],
   context: SummaryContext,
 ): Promise<GenerateActionsOutput> {
+  // Test mock: return deterministic action referencing input decision
+  if (process.env.CEDAR_AI_MOCK === 'true') {
+    const pearl = pearls[0];
+    return {
+      actions: [
+        {
+          description: 'Follow up with the team about next steps',
+          contextCard: {
+            sourcePearlQuote: pearl?.quote?.text ?? 'No quote available',
+            sourcePearlSpeaker: pearl?.quote?.speaker,
+            sourcePearlInsight: pearl?.insight ?? 'No insight',
+            parentDecisionStatement: decision.statement,
+            framing: 'Approach this as a collaborative check-in, not a status demand.',
+            timing: 'Before end of week',
+            talkingPoints: ['Acknowledge progress', 'Clarify blockers'],
+          },
+        },
+      ],
+    };
+  }
+
   const pearlSummary = pearls
     .map(
       (p) =>

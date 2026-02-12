@@ -44,6 +44,11 @@ export function createRateLimiter(config: RateLimitConfig) {
 
   return {
     check(request: Request): RateLimitResult {
+      // Allow tests to bypass rate limiting
+      if (process.env.RATE_LIMIT_DISABLED === 'true') {
+        return { allowed: true };
+      }
+
       const ip =
         request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
         request.headers.get('x-real-ip') ||

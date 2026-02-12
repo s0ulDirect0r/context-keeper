@@ -22,5 +22,6 @@ export default defineConfig({
     command: process.env.CI ? 'pnpm start' : 'pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    env: { CEDAR_AI_MOCK: 'true', RATE_LIMIT_DISABLED: 'true' },
   },
 });
