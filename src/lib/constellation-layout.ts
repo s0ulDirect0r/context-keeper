@@ -4,9 +4,10 @@ import type { ConstellationData, ConstellationNode, ConstellationEdge } from './
 
 // Card dimensions per node type (width x height in pixels)
 const NODE_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  pearl: { width: 288, height: 180 },
   'pearl-cluster': { width: 224, height: 100 },
-  decision: { width: 240, height: 110 },
-  action: { width: 200, height: 80 },
+  decision: { width: 240, height: 140 },
+  action: { width: 200, height: 100 },
 };
 
 const DEFAULT_DIMENSIONS = { width: 200, height: 80 };
@@ -31,7 +32,7 @@ export function computeConstellationLayout(
   data: ConstellationData,
   options: LayoutOptions = {},
 ): { nodes: Node[]; edges: Edge[] } {
-  const { nodesep = 60, ranksep = 80, componentGap = 100 } = options;
+  const { nodesep = 80, ranksep = 100, componentGap = 120 } = options;
 
   if (data.nodes.length === 0) {
     return { nodes: [], edges: [] };

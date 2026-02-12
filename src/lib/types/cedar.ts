@@ -75,13 +75,17 @@ export interface GenerateActionsOutput {
 
 // ── Constellation ──────────────────────────────────────────────────
 
-export type ConstellationNodeType = 'pearl-cluster' | 'decision' | 'action';
+export type ConstellationNodeType = 'pearl' | 'pearl-cluster' | 'decision' | 'action';
 
 export interface ConstellationNode {
   id: string;
   type: ConstellationNodeType;
   label: string;
-  // Pearl cluster fields
+  // Pearl fields (individual pearl nodes)
+  quote?: string;
+  speaker?: string;
+  concepts?: string[];
+  // Pearl cluster fields (kept but unused — may revisit)
   concept?: string;
   pearlCount?: number;
   insights?: string[]; // Top insight previews for cluster cards

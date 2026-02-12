@@ -108,14 +108,16 @@ export function DetailSidebar({
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            {node.type === 'pearl-cluster'
-              ? 'Pearl Cluster'
-              : node.type === 'decision'
-                ? 'Decision'
-                : 'Action'}
+            {node.type === 'pearl'
+              ? 'Pearl'
+              : node.type === 'pearl-cluster'
+                ? 'Pearl Cluster'
+                : node.type === 'decision'
+                  ? 'Decision'
+                  : 'Action'}
           </span>
-          {/* Hide label for decisions when DecisionCard will render it */}
-          {!(node.type === 'decision' && decision) && (
+          {/* Hide label for pearls (quote rendered below) and decisions (DecisionCard renders it) */}
+          {node.type !== 'pearl' && !(node.type === 'decision' && decision) && (
             <h3 className="text-sm font-semibold leading-tight">{node.label}</h3>
           )}
         </div>
@@ -123,6 +125,66 @@ export function DetailSidebar({
           <X className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Individual pearl detail */}
+      {node.type === 'pearl' && (
+        <div className="space-y-3">
+          {/* Quote — prominent */}
+          {node.quote && (
+            <blockquote className="border-l-2 border-amber-300 dark:border-amber-700 pl-3 text-sm text-foreground italic leading-relaxed">
+              &ldquo;{node.quote}&rdquo;
+              {node.speaker && (
+                <span className="not-italic text-xs text-muted-foreground font-medium block mt-1">
+                  — {node.speaker}
+                </span>
+              )}
+            </blockquote>
+          )}
+
+          {/* Insight (if available from enriched data) */}
+          {pearlMap?.[node.id]?.insight && (
+            <div className="space-y-1">
+              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Insight
+              </h4>
+              <p className="text-sm text-foreground">{pearlMap[node.id].insight}</p>
+            </div>
+          )}
+
+          {/* Concept tags */}
+          {node.concepts && node.concepts.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {node.concepts.map((concept) => (
+                <span
+                  key={concept}
+                  className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300"
+                >
+                  {concept}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Connected decisions */}
+          {connectedNodes.filter((n) => n.type === 'decision').length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Related decisions
+              </h4>
+              {connectedNodes
+                .filter((n) => n.type === 'decision')
+                .map((d) => (
+                  <div
+                    key={d.id}
+                    className="text-xs p-2 rounded border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40"
+                  >
+                    {d.label}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Pearl cluster detail */}
       {node.type === 'pearl-cluster' && (

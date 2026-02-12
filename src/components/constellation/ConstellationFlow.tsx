@@ -15,6 +15,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { PearlNode } from './nodes/PearlNode';
 import { PearlClusterNode } from './nodes/PearlClusterNode';
 import { DecisionNode } from './nodes/DecisionNode';
 import { ActionNode } from './nodes/ActionNode';
@@ -22,6 +23,7 @@ import { computeConstellationLayout } from '@/lib/constellation-layout';
 import type { ConstellationData, ConstellationNode } from '@/lib/types/cedar';
 
 const nodeTypes = {
+  pearl: PearlNode,
   'pearl-cluster': PearlClusterNode,
   decision: DecisionNode,
   action: ActionNode,

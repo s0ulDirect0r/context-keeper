@@ -64,8 +64,8 @@ export interface FullPearlRow extends PearlRow {
 
 /**
  * Build constellation graph data from raw database rows.
- * Groups pearls by concept into cluster nodes, connects decisions
- * and actions via edges.
+ * Creates individual pearl nodes (with quote + concept tag), connects
+ * decisions and actions via edges.
  */
 export function buildConstellationData(
   pearls: PearlRow[],
@@ -77,57 +77,22 @@ export function buildConstellationData(
   const nodes: ConstellationNode[] = [];
   const edges: ConstellationEdge[] = [];
 
-  // Group pearls by concept → clusters (collect insights sorted by recency)
-  const conceptMap = new Map<
-    string,
-    { pearlIds: Set<string>; latestTs: number; insights: { text: string; ts: number }[] }
-  >();
+  // Create individual pearl nodes
   for (const pearl of pearls) {
     const ts = new Date(pearl.created_at).getTime();
-    for (const concept of pearl.concepts) {
-      const existing = conceptMap.get(concept);
-      if (existing) {
-        existing.pearlIds.add(pearl.id);
-        existing.latestTs = Math.max(existing.latestTs, ts);
-        if (pearl.insight) existing.insights.push({ text: pearl.insight, ts });
-      } else {
-        conceptMap.set(concept, {
-          pearlIds: new Set([pearl.id]),
-          latestTs: ts,
-          insights: pearl.insight ? [{ text: pearl.insight, ts }] : [],
-        });
-      }
-    }
-  }
-
-  // Build pearl-to-cluster mapping (pearl → which cluster IDs it belongs to)
-  const pearlToCluster = new Map<string, string[]>();
-  for (const [concept, { pearlIds }] of conceptMap) {
-    const clusterId = `cluster-${concept}`;
-    for (const pearlId of pearlIds) {
-      const existing = pearlToCluster.get(pearlId) ?? [];
-      existing.push(clusterId);
-      pearlToCluster.set(pearlId, existing);
-    }
-  }
-
-  // Create pearl cluster nodes
-  for (const [concept, { pearlIds, latestTs, insights }] of conceptMap) {
-    const count = pearlIds.size;
-    // Top 2 insights by recency for card preview
-    const topInsights = insights
-      .sort((a, b) => b.ts - a.ts)
-      .slice(0, 2)
-      .map((i) => i.text);
+    // Use quote as primary label, fall back to insight
+    const fullPearl = pearl as FullPearlRow;
+    const quoteText = fullPearl.quote?.text;
+    const label = quoteText ?? pearl.insight ?? pearl.concepts[0] ?? 'Pearl';
     nodes.push({
-      id: `cluster-${concept}`,
-      type: 'pearl-cluster',
-      label: concept,
-      concept,
-      pearlCount: count,
-      insights: topInsights.length > 0 ? topInsights : undefined,
-      size: 12 + count * 4, // Scale with frequency
-      recency: computeRecency(latestTs, now),
+      id: pearl.id,
+      type: 'pearl',
+      label,
+      quote: quoteText,
+      speaker: fullPearl.quote?.speaker,
+      concepts: pearl.concepts,
+      size: 14,
+      recency: computeRecency(ts, now),
     });
   }
 
@@ -158,22 +123,14 @@ export function buildConstellationData(
     });
   }
 
-  // Build edges: pearl clusters → decisions (via decision_pearls)
-  const addedEdges = new Set<string>();
+  // Build edges: pearls → decisions (via decision_pearls)
   for (const dp of decisionPearls) {
-    const clusterIds = pearlToCluster.get(dp.pearl_id) ?? [];
-    for (const clusterId of clusterIds) {
-      const edgeKey = `${clusterId}→${dp.decision_id}`;
-      if (!addedEdges.has(edgeKey)) {
-        addedEdges.add(edgeKey);
-        edges.push({
-          source: clusterId,
-          target: dp.decision_id,
-          type: dp.relationship as 'supports' | 'contradicts',
-          strength: dp.relationship === 'supports' ? 0.8 : 0.5,
-        });
-      }
-    }
+    edges.push({
+      source: dp.pearl_id,
+      target: dp.decision_id,
+      type: dp.relationship as 'supports' | 'contradicts',
+      strength: dp.relationship === 'supports' ? 0.8 : 0.5,
+    });
   }
 
   // Build edges: decisions → actions
