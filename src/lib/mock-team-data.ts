@@ -1,0 +1,169 @@
+import type { ConstellationData } from './types/cedar';
+
+/**
+ * Hardcoded team constellation data for the demo.
+ * Shows what a multi-contributor constellation looks like.
+ */
+export const MOCK_TEAM_CONSTELLATION: ConstellationData = {
+  nodes: [
+    // Sandra's pearl clusters
+    {
+      id: 'cluster-trust-sandra',
+      type: 'pearl-cluster',
+      label: 'trust',
+      concept: 'trust',
+      pearlCount: 3,
+      size: 28,
+      recency: 0.9,
+      contributor: 'Sandra',
+    },
+    {
+      id: 'cluster-budget-sandra',
+      type: 'pearl-cluster',
+      label: 'budget',
+      concept: 'budget',
+      pearlCount: 2,
+      size: 20,
+      recency: 0.85,
+      contributor: 'Sandra',
+    },
+    // Marcus's pearl clusters
+    {
+      id: 'cluster-trust-marcus',
+      type: 'pearl-cluster',
+      label: 'trust',
+      concept: 'trust',
+      pearlCount: 2,
+      size: 20,
+      recency: 0.8,
+      contributor: 'Marcus',
+    },
+    {
+      id: 'cluster-hiring-marcus',
+      type: 'pearl-cluster',
+      label: 'hiring',
+      concept: 'hiring',
+      pearlCount: 4,
+      size: 32,
+      recency: 0.95,
+      contributor: 'Marcus',
+    },
+    // Priya's pearl clusters
+    {
+      id: 'cluster-timeline-priya',
+      type: 'pearl-cluster',
+      label: 'timeline',
+      concept: 'timeline',
+      pearlCount: 3,
+      size: 24,
+      recency: 0.92,
+      contributor: 'Priya',
+    },
+    {
+      id: 'cluster-scope-priya',
+      type: 'pearl-cluster',
+      label: 'scope',
+      concept: 'scope',
+      pearlCount: 2,
+      size: 18,
+      recency: 0.88,
+      contributor: 'Priya',
+    },
+    // Shared decisions
+    {
+      id: 'team-decision-1',
+      type: 'decision',
+      label: 'Rebuild team trust before Q2 push',
+      confidence: 'medium',
+      decisionStatus: 'active',
+      size: 22,
+      recency: 0.9,
+      contributor: 'Team',
+    },
+    {
+      id: 'team-decision-2',
+      type: 'decision',
+      label: 'Front-load hiring for Q2 capacity',
+      confidence: 'high',
+      decisionStatus: 'emerging',
+      size: 20,
+      recency: 0.93,
+      contributor: 'Team',
+    },
+    // Team actions
+    {
+      id: 'team-action-1',
+      type: 'action',
+      label: 'Schedule trust retrospective',
+      actionStatus: 'in_progress',
+      size: 14,
+      recency: 0.88,
+      contributor: 'Sandra',
+    },
+    {
+      id: 'team-action-2',
+      type: 'action',
+      label: 'Draft hiring timeline for Q2',
+      actionStatus: 'pending',
+      size: 14,
+      recency: 0.92,
+      contributor: 'Marcus',
+    },
+    {
+      id: 'team-action-3',
+      type: 'action',
+      label: 'Review scope against timeline',
+      actionStatus: 'pending',
+      size: 14,
+      recency: 0.9,
+      contributor: 'Priya',
+    },
+  ],
+  edges: [
+    // Trust clusters → trust decision
+    {
+      source: 'cluster-trust-sandra',
+      target: 'team-decision-1',
+      type: 'supports',
+      strength: 0.8,
+    },
+    {
+      source: 'cluster-trust-marcus',
+      target: 'team-decision-1',
+      type: 'supports',
+      strength: 0.7,
+    },
+    // Hiring cluster → hiring decision
+    {
+      source: 'cluster-hiring-marcus',
+      target: 'team-decision-2',
+      type: 'supports',
+      strength: 0.9,
+    },
+    {
+      source: 'cluster-timeline-priya',
+      target: 'team-decision-2',
+      type: 'supports',
+      strength: 0.6,
+    },
+    // Decisions → Actions
+    {
+      source: 'team-decision-1',
+      target: 'team-action-1',
+      type: 'derives',
+      strength: 1.0,
+    },
+    {
+      source: 'team-decision-2',
+      target: 'team-action-2',
+      type: 'derives',
+      strength: 1.0,
+    },
+    {
+      source: 'team-decision-2',
+      target: 'team-action-3',
+      type: 'derives',
+      strength: 0.8,
+    },
+  ],
+};
