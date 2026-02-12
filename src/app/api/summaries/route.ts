@@ -72,12 +72,26 @@ export async function GET(request: Request) {
     let query = supabase.from('summaries').select('*', { count: 'exact' }).eq('user_id', user.id);
 
     if (q) {
+      // Full-text search via GIN index (requires search_text column from migration)
+      // Falls back to ILIKE on title if column doesn't exist yet
       query = query.textSearch('search_text', q, { type: 'websearch', config: 'english' });
     }
 
     query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
-    const { data: summaries, count, error } = await query;
+    let { data: summaries, count, error } = await query;
+
+    // Fallback: if textSearch failed (column missing), retry with ILIKE on title
+    if (error && q) {
+      const fallback = supabase
+        .from('summaries')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .ilike('title', `%${q}%`)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+      ({ data: summaries, count, error } = await fallback);
+    }
 
     if (error) {
       console.error('Failed to fetch summaries:', error);
