@@ -25,13 +25,9 @@ export async function GET() {
       .eq('user_id', user.id),
   ]);
 
+  // Cedar tables may not exist yet (migration not applied) — return empty constellation
   if (pearlsResult.error || decisionsResult.error || actionsResult.error) {
-    console.error('Constellation fetch error:', {
-      pearls: pearlsResult.error,
-      decisions: decisionsResult.error,
-      actions: actionsResult.error,
-    });
-    return Response.json({ error: 'Failed to fetch constellation data' }, { status: 500 });
+    return Response.json({ nodes: [], edges: [] });
   }
 
   const data = buildConstellationData(

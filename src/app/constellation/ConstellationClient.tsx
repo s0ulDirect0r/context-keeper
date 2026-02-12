@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
@@ -26,20 +26,20 @@ export function ConstellationClient() {
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<ConstellationNode | null>(null);
   const [surfacing, setSurfacing] = useState(false);
+  const surfacingAttempted = useRef(false);
 
-  const fetchConstellationData = useCallback(async () => {
+  const fetchPersonalData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       if (user) {
-        const res = await fetch(`/api/constellation${viewMode === 'team' ? '?view=team' : ''}`);
+        const res = await fetch('/api/constellation');
         if (!res.ok) throw new Error('Failed to fetch constellation data');
         const json = await res.json();
         setData(json);
       } else {
         // Guest: build constellation from localStorage
         const decisions = loadAllGuestDecisions();
-        // For guests, show a minimal constellation with whatever data exists
         setData({
           nodes: decisions.map((d) => ({
             id: d.id,
@@ -58,25 +58,42 @@ export function ConstellationClient() {
     } finally {
       setLoading(false);
     }
-  }, [user, viewMode]);
+  }, [user]);
 
   useEffect(() => {
     if (viewMode === 'team') {
       setData(MOCK_TEAM_CONSTELLATION);
       setLoading(false);
     } else {
-      fetchConstellationData();
+      fetchPersonalData();
     }
-  }, [viewMode, fetchConstellationData]);
+  }, [viewMode, fetchPersonalData]);
 
-  // Handle decision surfacing from query param
+  // Handle decision surfacing from query param (fires once per mount)
   useEffect(() => {
-    if (shouldSurface && highlightSummaryId && !surfacing) {
-      setSurfacing(true);
-      // The surfacing UI is triggered but actual API call happens via user interaction
-      // For now, we just indicate the surface state
-    }
-  }, [shouldSurface, highlightSummaryId, surfacing]);
+    if (!shouldSurface || !highlightSummaryId || surfacingAttempted.current) return;
+    surfacingAttempted.current = true;
+    setSurfacing(true);
+
+    fetch('/api/constellation/surface', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summaryId: highlightSummaryId }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Surface failed: ${res.status}`);
+        return res.json();
+      })
+      .then((json) => {
+        setData(json);
+        setSurfacing(false);
+      })
+      .catch(() => {
+        // Surfacing failed — fall back to regular personal data load
+        setSurfacing(false);
+        fetchPersonalData();
+      });
+  }, [shouldSurface, highlightSummaryId, fetchPersonalData]);
 
   const handleNodeClick = useCallback((node: ConstellationNode) => {
     setSelectedNode(node);
@@ -86,7 +103,8 @@ export function ConstellationClient() {
     setSelectedNode(null);
   }, []);
 
-  const isEmpty = !loading && (!data || (data.nodes.length === 0 && viewMode === 'personal'));
+  const isEmpty =
+    !loading && !surfacing && (!data || (data.nodes.length === 0 && viewMode === 'personal'));
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -180,7 +198,7 @@ export function ConstellationClient() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
               <p className="text-destructive">{error}</p>
-              <Button variant="outline" onClick={fetchConstellationData}>
+              <Button variant="outline" onClick={fetchPersonalData}>
                 Retry
               </Button>
             </div>
