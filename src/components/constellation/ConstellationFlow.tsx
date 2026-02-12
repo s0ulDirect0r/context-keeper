@@ -1,13 +1,16 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   type NodeMouseHandler,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -30,19 +33,32 @@ interface ConstellationFlowProps {
   onNodeClick: (node: ConstellationNode) => void;
 }
 
-export function ConstellationFlow({ data, selectedNodeId, onNodeClick }: ConstellationFlowProps) {
+function ConstellationFlowInner({ data, selectedNodeId, onNodeClick }: ConstellationFlowProps) {
   const layout = useMemo(() => computeConstellationLayout(data), [data]);
+  const { fitView } = useReactFlow();
 
-  const [nodes, , onNodesChange] = useNodesState(layout.nodes);
-  const [edges] = useEdgesState(layout.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
+  const [edges, setEdges] = useEdgesState(layout.edges);
+
+  // Sync nodes/edges when data changes (e.g. surfacing, team toggle)
+  useEffect(() => {
+    setNodes(layout.nodes);
+    setEdges(layout.edges);
+  }, [layout, setNodes, setEdges]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      // node.data is the ConstellationNode we stored in layout
       onNodeClick(node.data as unknown as ConstellationNode);
     },
     [onNodeClick],
   );
+
+  const handleResetLayout = useCallback(() => {
+    const fresh = computeConstellationLayout(data);
+    setNodes(fresh.nodes);
+    setEdges(fresh.edges);
+    setTimeout(() => fitView({ duration: 300 }), 50);
+  }, [data, setNodes, setEdges, fitView]);
 
   return (
     <div data-testid="constellation-graph" className="w-full h-full">
@@ -60,7 +76,23 @@ export function ConstellationFlow({ data, selectedNodeId, onNodeClick }: Constel
         <Background />
         <Controls />
         <MiniMap nodeClassName={(node) => node.type ?? ''} pannable zoomable />
+        <Panel position="top-right">
+          <button
+            onClick={handleResetLayout}
+            className="px-2 py-1 text-xs rounded border bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
+          >
+            Reset layout
+          </button>
+        </Panel>
       </ReactFlow>
     </div>
+  );
+}
+
+export function ConstellationFlow(props: ConstellationFlowProps) {
+  return (
+    <ReactFlowProvider>
+      <ConstellationFlowInner {...props} />
+    </ReactFlowProvider>
   );
 }

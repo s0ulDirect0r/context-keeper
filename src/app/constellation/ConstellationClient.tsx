@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import dynamic from 'next/dynamic';
 
@@ -21,6 +21,7 @@ type ViewMode = 'personal' | 'team';
 
 export function ConstellationClient() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const highlightSummaryId = searchParams.get('highlight');
   const shouldSurface = searchParams.get('surface') === 'true';
@@ -92,10 +93,12 @@ export function ConstellationClient() {
       .then((json) => {
         setData(json);
         setSurfacing(false);
+        router.replace('/constellation');
       })
       .catch(() => {
         // Surfacing failed — fall back to regular personal data load
         setSurfacing(false);
+        router.replace('/constellation');
         fetchPersonalData();
       });
   }, [shouldSurface, highlightSummaryId, fetchPersonalData]);
