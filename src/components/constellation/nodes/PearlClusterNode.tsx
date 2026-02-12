@@ -17,7 +17,7 @@ export function PearlClusterNode({ data, selected }: PearlClusterNodeProps) {
     >
       <Handle type="target" position={Position.Top} className="!invisible" />
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-amber-700 dark:text-amber-400 font-semibold text-sm truncate">
+        <span className="text-amber-700 dark:text-amber-400 font-semibold text-sm">
           {data.concept}
         </span>
         <span className="shrink-0 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 text-xs px-1.5 py-0.5 rounded-full">
@@ -27,7 +27,7 @@ export function PearlClusterNode({ data, selected }: PearlClusterNodeProps) {
       {data.insights && data.insights.length > 0 ? (
         <div className="space-y-0.5">
           {data.insights.slice(0, 2).map((insight, i) => (
-            <p key={i} className="text-xs text-muted-foreground truncate">
+            <p key={i} className="text-xs text-muted-foreground">
               {insight}
             </p>
           ))}

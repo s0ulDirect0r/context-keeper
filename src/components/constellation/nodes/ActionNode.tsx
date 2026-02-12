@@ -39,7 +39,7 @@ export function ActionNode({ data, selected }: ActionNodeProps) {
           {status.replace('_', ' ')}
         </span>
       </div>
-      <p className="text-sm text-foreground line-clamp-2">{data.label}</p>
+      <p className="text-sm text-foreground">{data.label}</p>
       <Handle type="source" position={Position.Bottom} className="!invisible" />
     </div>
   );

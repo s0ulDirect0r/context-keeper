@@ -42,7 +42,7 @@ export function DecisionNode({ data, selected }: DecisionNodeProps) {
         </span>
         <span className="text-xs text-muted-foreground capitalize">{status}</span>
       </div>
-      <p className="text-sm font-medium text-foreground line-clamp-2">{data.label}</p>
+      <p className="text-sm font-medium text-foreground">{data.label}</p>
       <Handle type="source" position={Position.Bottom} className="!invisible" />
     </div>
   );
