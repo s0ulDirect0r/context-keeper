@@ -135,7 +135,7 @@ async function buildAndReturnConstellation(
   userId: string,
 ) {
   const [pearlsResult, decisionsResult, linksResult, actionsResult] = await Promise.all([
-    supabase.from('pearls').select('id, concepts, created_at').eq('user_id', userId),
+    supabase.from('pearls').select('id, concepts, insight, created_at').eq('user_id', userId),
     supabase
       .from('decisions')
       .select('id, statement, confidence, status, created_at')

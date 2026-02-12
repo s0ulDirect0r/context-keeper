@@ -13,7 +13,7 @@ export async function GET() {
 
   // Fetch all user data in parallel
   const [pearlsResult, decisionsResult, decisionPearlsResult, actionsResult] = await Promise.all([
-    supabase.from('pearls').select('id, concepts, created_at').eq('user_id', user.id),
+    supabase.from('pearls').select('id, concepts, insight, created_at').eq('user_id', user.id),
     supabase
       .from('decisions')
       .select('id, statement, confidence, status, created_at')

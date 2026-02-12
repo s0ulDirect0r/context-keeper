@@ -1,8 +1,17 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import type { ConstellationData, ConstellationNode } from '@/lib/types/cedar';
+
+interface PearlDetail {
+  id: string;
+  insight: string;
+  quote: { text: string; speaker?: string } | null;
+  concepts: string[];
+  created_at: string;
+}
 
 interface DetailSidebarProps {
   node: ConstellationNode;
@@ -11,6 +20,40 @@ interface DetailSidebarProps {
 }
 
 export function DetailSidebar({ node, data, onClose }: DetailSidebarProps) {
+  const [pearlDetails, setPearlDetails] = useState<PearlDetail[]>([]);
+  const [fetchedConcept, setFetchedConcept] = useState<string | null>(null);
+  const isPearlCluster = node.type === 'pearl-cluster' && !!node.concept;
+
+  // Derive loading: viewing a cluster whose data hasn't arrived yet
+  const loadingPearls = isPearlCluster && fetchedConcept !== node.concept;
+
+  // Fetch pearl details when a pearl cluster is selected
+  useEffect(() => {
+    if (!isPearlCluster) return;
+    let cancelled = false;
+    fetch('/api/constellation/cluster', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ concept: node.concept }),
+    })
+      .then((res) => (res.ok ? res.json() : { pearls: [] }))
+      .then((json) => {
+        if (!cancelled) {
+          setPearlDetails(json.pearls ?? []);
+          setFetchedConcept(node.concept!);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPearlDetails([]);
+          setFetchedConcept(node.concept!);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPearlCluster, node.concept]);
+
   // Find connected nodes via edges
   const connectedEdges = data.edges.filter((e) => e.source === node.id || e.target === node.id);
   const connectedNodeIds = new Set(
@@ -49,6 +92,38 @@ export function DetailSidebar({ node, data, onClose }: DetailSidebarProps) {
           <p className="text-xs text-muted-foreground">
             Concept: <span className="font-medium text-foreground">{node.concept}</span>
           </p>
+
+          {/* Pearl insights + quotes */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Insights
+            </h4>
+            {loadingPearls ? (
+              <div className="flex items-center gap-2 py-2">
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Loading pearls...</span>
+              </div>
+            ) : pearlDetails.length > 0 ? (
+              pearlDetails.map((pearl) => (
+                <div
+                  key={pearl.id}
+                  className="text-xs p-2 rounded border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40 space-y-1"
+                >
+                  <p className="text-foreground">{pearl.insight}</p>
+                  {pearl.quote && (
+                    <blockquote className="border-l-2 border-amber-300 dark:border-amber-700 pl-2 text-muted-foreground italic">
+                      &ldquo;{pearl.quote.text}&rdquo;
+                      {pearl.quote.speaker && (
+                        <span className="not-italic font-medium"> — {pearl.quote.speaker}</span>
+                      )}
+                    </blockquote>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No insights available</p>
+            )}
+          </div>
 
           {/* Connected decisions */}
           {connectedNodes.filter((n) => n.type === 'decision').length > 0 && (

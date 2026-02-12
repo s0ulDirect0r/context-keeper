@@ -10,6 +10,7 @@ import type {
 interface PearlRow {
   id: string;
   concepts: string[];
+  insight?: string;
   created_at: string;
 }
 
@@ -50,8 +51,11 @@ export function buildConstellationData(
   const nodes: ConstellationNode[] = [];
   const edges: ConstellationEdge[] = [];
 
-  // Group pearls by concept → clusters
-  const conceptMap = new Map<string, { pearlIds: Set<string>; latestTs: number }>();
+  // Group pearls by concept → clusters (collect insights sorted by recency)
+  const conceptMap = new Map<
+    string,
+    { pearlIds: Set<string>; latestTs: number; insights: { text: string; ts: number }[] }
+  >();
   for (const pearl of pearls) {
     const ts = new Date(pearl.created_at).getTime();
     for (const concept of pearl.concepts) {
@@ -59,8 +63,13 @@ export function buildConstellationData(
       if (existing) {
         existing.pearlIds.add(pearl.id);
         existing.latestTs = Math.max(existing.latestTs, ts);
+        if (pearl.insight) existing.insights.push({ text: pearl.insight, ts });
       } else {
-        conceptMap.set(concept, { pearlIds: new Set([pearl.id]), latestTs: ts });
+        conceptMap.set(concept, {
+          pearlIds: new Set([pearl.id]),
+          latestTs: ts,
+          insights: pearl.insight ? [{ text: pearl.insight, ts }] : [],
+        });
       }
     }
   }
@@ -77,14 +86,20 @@ export function buildConstellationData(
   }
 
   // Create pearl cluster nodes
-  for (const [concept, { pearlIds, latestTs }] of conceptMap) {
+  for (const [concept, { pearlIds, latestTs, insights }] of conceptMap) {
     const count = pearlIds.size;
+    // Top 2 insights by recency for card preview
+    const topInsights = insights
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 2)
+      .map((i) => i.text);
     nodes.push({
       id: `cluster-${concept}`,
       type: 'pearl-cluster',
       label: concept,
       concept,
       pearlCount: count,
+      insights: topInsights.length > 0 ? topInsights : undefined,
       size: 12 + count * 4, // Scale with frequency
       recency: computeRecency(latestTs, now),
     });
