@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { surfaceDecisions } from '@/lib/cedar-ai';
-import { buildConstellationData } from '@/lib/constellation';
+import { buildConstellationData, buildEnrichedResponse } from '@/lib/constellation';
+import type { FullDecisionRow, FullActionRow, FullPearlRow } from '@/lib/constellation';
 import { createRateLimiter } from '@/lib/rate-limit';
 
 const surfaceSchema = z.object({ summaryId: z.string().uuid() });
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
   const summaryRow = summaryResult.data as { id: string; summaries: unknown };
 
   if (!pearlsResult.data?.length) {
-    return Response.json({ nodes: [], edges: [] });
+    return Response.json({ nodes: [], edges: [], decisions: {}, actions: {}, pearls: {} });
   }
 
   // Idempotency: check if decisions already exist for these pearls
@@ -135,29 +136,37 @@ async function buildAndReturnConstellation(
   userId: string,
 ) {
   const [pearlsResult, decisionsResult, linksResult, actionsResult] = await Promise.all([
-    supabase.from('pearls').select('id, concepts, insight, created_at').eq('user_id', userId),
+    supabase
+      .from('pearls')
+      .select('id, concepts, insight, quote, created_at')
+      .eq('user_id', userId),
     supabase
       .from('decisions')
-      .select('id, statement, confidence, status, created_at')
+      .select(
+        'id, user_id, summary_id, statement, reasoning, confidence, status, created_at, updated_at',
+      )
       .eq('user_id', userId),
     supabase.from('decision_pearls').select('decision_id, pearl_id, relationship'),
     supabase
       .from('actions')
-      .select('id, description, decision_id, status, created_at')
+      .select(
+        'id, user_id, description, decision_id, context_card, status, due_date, created_at, updated_at',
+      )
       .eq('user_id', userId),
   ]);
 
   // If tables don't exist yet, return empty
   if (pearlsResult.error || decisionsResult.error || actionsResult.error) {
-    return Response.json({ nodes: [], edges: [] });
+    return Response.json({ nodes: [], edges: [], decisions: {}, actions: {}, pearls: {} });
   }
 
-  const data = buildConstellationData(
-    pearlsResult.data ?? [],
-    decisionsResult.data ?? [],
-    linksResult.data ?? [],
-    actionsResult.data ?? [],
-  );
+  const pearlRows = (pearlsResult.data ?? []) as FullPearlRow[];
+  const decisionRows = (decisionsResult.data ?? []) as FullDecisionRow[];
+  const dpRows = linksResult.data ?? [];
+  const actionRows = (actionsResult.data ?? []) as FullActionRow[];
 
-  return Response.json(data);
+  const graph = buildConstellationData(pearlRows, decisionRows, dpRows, actionRows);
+  const enriched = buildEnrichedResponse(graph, decisionRows, dpRows, actionRows, pearlRows);
+
+  return Response.json(enriched);
 }

@@ -50,7 +50,7 @@ export function ConstellationClient() {
           nodes: decisions.map((d) => ({
             id: d.id,
             type: 'decision' as const,
-            label: d.statement.slice(0, 40),
+            label: d.statement,
             confidence: d.confidence,
             decisionStatus: d.status,
             size: 18,

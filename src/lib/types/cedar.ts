@@ -109,6 +109,15 @@ export interface ConstellationData {
   edges: ConstellationEdge[];
 }
 
+// ── Enriched constellation response ───────────────────────────────
+
+/** Extended response from /api/constellation with full objects for sidebar interactivity */
+export interface EnrichedConstellationResponse extends ConstellationData {
+  decisions: Record<string, Decision>;
+  actions: Record<string, Action[]>; // keyed by decision ID
+  pearls: Record<string, Pearl>; // keyed by pearl ID
+}
+
 // ── State transition validation ────────────────────────────────────
 
 const VALID_DECISION_TRANSITIONS: Record<string, DecisionStatus[]> = {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { surfaceDecisions } from '@/lib/cedar-ai';
 import { createRateLimiter } from '@/lib/rate-limit';
+import { createClient } from '@/lib/supabase/server';
 import type { SummaryContext, Pearl } from '@/lib/claude';
 
 const generateSchema = z.object({
@@ -32,6 +33,15 @@ const generateSchema = z.object({
 const limiter = createRateLimiter({ limit: 10, windowMs: 60 * 60 * 1000 });
 
 export async function POST(request: Request) {
+  // Auth check — AI generation requires authentication
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { allowed, retryAfter } = limiter.check(request);
   if (!allowed) {
     return Response.json(
