@@ -13,42 +13,44 @@ interface Props {
 
 const TEMPLATES = [
   {
-    id: 'manager',
-    label: 'For my manager',
-    description: 'Decisions, blockers, and status updates',
-    extractionGoal: 'Key decisions, blockers raised, and status updates',
-    step2Hint:
-      'Tip: Mention what your manager tracks \u2014 e.g., "She\'s focused on the Q2 deadline" or "He wasn\'t in last week\'s standup." This shapes the summary to what they actually need.',
-  },
-  {
-    id: 'team',
-    label: 'For the team',
-    description: 'Action items, owners, and next steps',
-    extractionGoal: 'Action items with owners, decisions made, and next steps',
-    step2Hint:
-      'Tip: Mention who needs to know what \u2014 e.g., "Backend team needs the API changes" or "Design wasn\'t represented." This ensures the right details reach the right people.',
-  },
-  {
-    id: 'stakeholder',
-    label: 'For a stakeholder',
-    description: 'High-level outcomes, no jargon',
-    extractionGoal: 'High-level outcomes, key decisions, and strategic implications',
-    step2Hint:
-      'Tip: Add their context \u2014 e.g., "She\'s evaluating whether to fund phase 2" or "He cares about customer impact, not technical details."',
-  },
-  {
-    id: 'self',
-    label: 'For myself',
-    description: 'Deep notes with verbatim quotes',
+    id: 'catch-up',
+    label: 'Catch me up',
+    description: 'What happened and what do I need to know',
     extractionGoal:
-      'Comprehensive notes with important quotes, nuances, and details I might forget',
+      'Key context, decisions, and anything the recipient would need to understand the current state',
     step2Hint:
-      'Tip: Flag what matters to you \u2014 e.g., "I need to prep a proposal from this" or "Track what Alice said about the timeline." Your future self will thank you.',
+      'Who\u2019s this for and what do they already know? e.g., "My manager missed standup" or "My housemate needs the renovation update."',
+  },
+  {
+    id: 'align',
+    label: 'Get everyone aligned',
+    description: 'Same page, shared next steps',
+    extractionGoal: 'What was agreed, who owns what, and the shared understanding of next steps',
+    step2Hint:
+      'Who needs alignment and on what? e.g., "The whole team needs to know what changed" or "My friends need the plan for the trip."',
+  },
+  {
+    id: 'read-room',
+    label: 'Help me read the room',
+    description: 'Give me the warm data, the vibe, and the relational dynamics',
+    extractionGoal:
+      'The implicit dynamics present that might not be obvious to participants of the meeting',
+    step2Hint:
+      'What is the current mood, energy, and vibe of the meeting? e.g., "The team is excited about the new project" or "My partner is frustrated with the contractor."',
+  },
+  {
+    id: 'remember',
+    label: 'Help me remember',
+    description: 'I want to reconnect with what happened',
+    extractionGoal:
+      'Comprehensive notes with important quotes, nuances, and details I might forget. Turning points. Insights. Any decisions that were made.',
+    step2Hint:
+      'What key moments or decisions were made during the meeting? e.g., "We agreed to meet again next week" or "I promised to send an email with the details."',
   },
 ] as const;
 
 const GENERIC_HINT =
-  'Tip: Tell me who this is for and what they care about. The more context you give me, the better the summary.';
+  'Who\u2019s this for and what do they need to understand? The more I know about the gap between what you know and what they know, the better.';
 
 const STEPS = ['extraction', 'additional'] as const;
 type Step = (typeof STEPS)[number];
@@ -119,8 +121,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">
-          {step === 'extraction' &&
-            `What should I focus on in ${recordingCount > 1 ? 'these recordings' : 'this'}`}
+          {step === 'extraction' && `What would you like help with here`}
           {step === 'extraction' && '?'}
           {step === 'additional' && 'Anything else I should know?'}
         </h2>
@@ -161,7 +162,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
             <Textarea
               value={extractionGoal}
               onChange={(e) => handleExtractionChange(e.target.value)}
-              placeholder='Or describe it yourself \u2014 e.g., "Key decisions and action items", "Technical architecture discussions"'
+              placeholder='Or describe it yourself e.g., "Catch my cofounder up on the investor call", "Help me remember the details for my proposal"'
               className="min-h-32"
             />
           </>
@@ -171,7 +172,6 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
           <Textarea
             value={additional}
             onChange={(e) => setAdditional(e.target.value)}
-            placeholder='e.g., "This is for my manager who wasn\u2019t in the meeting", "Focus on the budget discussion"'
             className="min-h-32"
           />
         )}

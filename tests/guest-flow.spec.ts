@@ -15,39 +15,37 @@ test.describe('Guest happy path', () => {
     // 2. Click "Try it free" to enter app mode
     await page.getByRole('button', { name: 'Try it free' }).first().click();
 
-    // 3. See InputMethodPicker
-    await expect(page.getByText('Paste or upload transcript')).toBeVisible();
+    // 3. See InputMethodPicker with three options
+    await expect(page.getByText('Paste text')).toBeVisible();
 
-    // 4. Click "Paste or upload transcript"
-    await page.getByText('Paste or upload transcript').click();
+    // 4. Click "Paste text" to enter paste flow
+    await page.getByText('Paste text').click();
 
-    // 5. See ManualTranscript with textarea
-    await expect(page.getByPlaceholder('Paste your transcript here...')).toBeVisible();
+    // 5. See PasteTranscript with textarea
+    await expect(page.getByText('Paste your transcript')).toBeVisible();
 
     // 6. Fill textarea
-    await page.getByPlaceholder('Paste your transcript here...').fill(MOCK_TRANSCRIPT);
+    await page
+      .getByPlaceholder('Paste your meeting transcript or notes here...')
+      .fill(MOCK_TRANSCRIPT);
 
-    // 7. Click "Continue"
-    await page.getByRole('button', { name: 'Continue' }).click();
+    // 7. Click "Looks good"
+    await page.getByRole('button', { name: 'Looks good' }).click();
 
-    // 7b. Handle speaker-select step (transcript has multiple speakers)
-    await expect(page.getByText('Which speaker are you?')).toBeVisible();
-    await page.getByRole('button', { name: 'None of these / Skip' }).click();
+    // 8. See ContextWizard step 1 with intent-based templates
+    await expect(page.getByText('Catch someone up')).toBeVisible();
 
-    // 8. See ContextWizard step 1 with template buttons
-    await expect(page.getByText('What do you want to extract from this recording?')).toBeVisible();
+    // 9. Click "Catch someone up" template
+    await page.getByText('Catch someone up').click();
 
-    // 9. Click "For my manager" template
-    await page.getByText('For my manager').click();
-
-    // 10. Click "Continue"
-    await page.getByRole('button', { name: 'Continue' }).click();
+    // 10. Click "Next"
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
 
     // 11. See ContextWizard step 2
-    await expect(page.getByText('Any other relevant context?')).toBeVisible();
+    await expect(page.getByText('Anything else I should know?')).toBeVisible();
 
     // 12. Skip additional context
-    await page.getByRole('button', { name: 'Skip' }).click();
+    await page.getByRole('button', { name: "That's all" }).click();
 
     // 13. Wait for SummaryView to appear (SSE mock delivers instantly)
     await expect(page.getByText('Your Summary')).toBeVisible({ timeout: 15_000 });

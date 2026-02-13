@@ -11,17 +11,15 @@ async function navigateToSummary(page: import('@playwright/test').Page) {
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Try it free' }).first().click();
-  await page.getByText('Paste or upload transcript').click();
-  await page.getByPlaceholder('Paste your transcript here...').fill(MOCK_TRANSCRIPT);
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByText('Paste text').click();
+  await page
+    .getByPlaceholder('Paste your meeting transcript or notes here...')
+    .fill(MOCK_TRANSCRIPT);
+  await page.getByRole('button', { name: 'Looks good' }).click();
 
-  // Handle speaker-select step (transcript has multiple speakers)
-  await expect(page.getByText('Which speaker are you?')).toBeVisible();
-  await page.getByRole('button', { name: 'None of these / Skip' }).click();
-
-  await page.getByText('For my manager').click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Skip' }).click();
+  await page.getByText('Catch someone up').click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: "That's all" }).click();
 
   await expect(page.getByText('Your Summary')).toBeVisible({ timeout: 15_000 });
 }
@@ -39,7 +37,7 @@ test.describe('Summary view', () => {
     await navigateToSummary(page);
 
     await page.getByRole('button', { name: 'Create another summary' }).click();
-    await expect(page.getByText('Paste or upload transcript')).toBeVisible();
+    await expect(page.getByText('Paste text')).toBeVisible();
   });
 
   test('guest sees "Sign up to save this summary" button', async ({ page }) => {
@@ -53,7 +51,9 @@ test.describe('Summary view', () => {
 
     await expect(page.getByText('What to extract:')).toBeVisible();
     await expect(
-      page.getByText('Key decisions, blockers raised, and status updates'),
+      page.getByText(
+        'Key context, decisions, and anything the recipient would need to understand the current state',
+      ),
     ).toBeVisible();
   });
 });
