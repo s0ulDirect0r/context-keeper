@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Context Keeper',
-  description: 'Generate AI meeting summaries tailored to your audience',
+  title: 'Cedar',
+  description: 'Turn your meeting recordings into orientation',
 };
 
 export default function RootLayout({
