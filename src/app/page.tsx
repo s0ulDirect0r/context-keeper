@@ -9,6 +9,7 @@ import { InputMethodPicker } from '@/components/InputMethodPicker';
 import { OtterLogin } from '@/components/OtterLogin';
 import { RecordingList } from '@/components/RecordingList';
 import { ManualTranscript } from '@/components/ManualTranscript';
+import { PasteTranscript } from '@/components/PasteTranscript';
 import { ContextWizard } from '@/components/ContextWizard';
 import { SummaryModeSelector } from '@/components/SummaryModeSelector';
 import { SummaryView } from '@/components/SummaryView';
@@ -178,10 +179,14 @@ export default function Home() {
     prefetchPromise.current = doFetch();
   }, [otterSession]);
 
-  const handleMethodSelect = async (method: 'otter' | 'manual') => {
+  const handleMethodSelect = async (method: 'otter' | 'manual' | 'paste') => {
     dispatch({ type: 'SET_INPUT_METHOD', method });
     if (method === 'manual') {
       dispatch({ type: 'SET_STEP', step: 'manual-transcript' });
+      return;
+    }
+    if (method === 'paste') {
+      dispatch({ type: 'SET_STEP', step: 'paste-transcript' });
       return;
     }
 
@@ -640,6 +645,10 @@ export default function Home() {
         />
       )}
 
+      {state.step === 'paste-transcript' && (
+        <PasteTranscript onSubmit={handleManualTranscript} onBack={() => goBack('choose-method')} />
+      )}
+
       {state.step === 'speaker-select' && (
         <SpeakerSelect
           speakerNames={state.speakerNames}
@@ -648,7 +657,13 @@ export default function Home() {
             dispatch({ type: 'SET_STEP', step: 'context-wizard' });
           }}
           onBack={() =>
-            goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
+            goBack(
+              state.inputMethod === 'otter'
+                ? 'otter-recordings'
+                : state.inputMethod === 'paste'
+                  ? 'paste-transcript'
+                  : 'manual-transcript',
+            )
           }
         />
       )}
@@ -657,7 +672,13 @@ export default function Home() {
         <ContextWizard
           onComplete={handleContextComplete}
           onBack={() =>
-            goBack(state.inputMethod === 'otter' ? 'otter-recordings' : 'manual-transcript')
+            goBack(
+              state.inputMethod === 'otter'
+                ? 'otter-recordings'
+                : state.inputMethod === 'paste'
+                  ? 'paste-transcript'
+                  : 'manual-transcript',
+            )
           }
           recordingCount={state.transcripts.length}
         />

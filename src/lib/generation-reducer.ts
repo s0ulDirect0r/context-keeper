@@ -9,6 +9,7 @@ export type Step =
   | 'otter-login'
   | 'otter-recordings'
   | 'manual-transcript'
+  | 'paste-transcript'
   | 'speaker-select'
   | 'context-wizard'
   | 'summary-mode'
@@ -40,7 +41,7 @@ const initialPhase: GenerationPhase = {
 export interface GenerationState {
   // Navigation
   step: Step;
-  inputMethod: 'otter' | 'manual' | null;
+  inputMethod: 'otter' | 'manual' | 'paste' | null;
 
   // Otter data
   recordings: Recording[];
@@ -112,7 +113,7 @@ export const initialState: GenerationState = {
 
 export type GenerationAction =
   | { type: 'SET_STEP'; step: Step }
-  | { type: 'SET_INPUT_METHOD'; method: 'otter' | 'manual' | null }
+  | { type: 'SET_INPUT_METHOD'; method: 'otter' | 'manual' | 'paste' | null }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_RECORDINGS'; recordings: Recording[] }
   | { type: 'SET_LOADING_RECORDINGS'; loading: boolean }

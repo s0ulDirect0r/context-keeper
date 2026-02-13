@@ -116,16 +116,16 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'sign-in' }: Auth
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'sign-in' && 'Sign in'}
-            {mode === 'sign-up' && 'Create account'}
+            {mode === 'sign-in' && 'Welcome back'}
+            {mode === 'sign-up' && 'Create your account'}
             {mode === 'magic-link' && 'Magic link'}
             {mode === 'check-email' && 'Check your email'}
           </DialogTitle>
           <DialogDescription>
-            {mode === 'sign-in' && 'Sign in to save your summaries'}
-            {mode === 'sign-up' && 'Create an account to save your summaries'}
-            {mode === 'magic-link' && "We'll send you a link to sign in"}
-            {mode === 'check-email' && "We've sent you a link to complete sign in"}
+            {mode === 'sign-in' && 'Sign in so I can save your summaries.'}
+            {mode === 'sign-up' && "I'll keep your summaries and pearls safe."}
+            {mode === 'magic-link' && "I'll send you a link — no password needed."}
+            {mode === 'check-email' && 'I sent you a link — check your inbox.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -138,7 +138,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'sign-in' }: Auth
         {mode === 'check-email' ? (
           <div className="space-y-4 text-center py-4">
             <p className="text-muted-foreground">
-              Click the link in your email to complete sign in.
+              Click the link in your email and you&apos;re in.
             </p>
             <Button variant="outline" onClick={() => setMode('sign-in')}>
               Back to sign in
