@@ -395,6 +395,12 @@ export default function Home() {
   const startSummaryGeneration = async (ctx: SummaryContext, mode: 'combined' | 'separate') => {
     // Reset streaming ref (can't be in reducer)
     streamingMarkdownRef.current = '';
+    // Clear stale guest edits so they don't overwrite the new summary on mount
+    try {
+      localStorage.removeItem('context-keeper-guest-edits');
+    } catch {
+      /* noop */
+    }
     dispatch({ type: 'GENERATION_START' });
 
     try {
@@ -542,6 +548,11 @@ export default function Home() {
 
   const handleStartOver = () => {
     streamingMarkdownRef.current = '';
+    try {
+      localStorage.removeItem('context-keeper-guest-edits');
+    } catch {
+      /* noop */
+    }
     dispatch({ type: 'START_OVER' });
   };
 
