@@ -21,10 +21,8 @@ export function InputMethodPicker({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Context Keeper</h1>
-        <p className="text-muted-foreground mt-2">
-          Generate AI summaries tailored to your audience
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Cedar</h1>
+        <p className="text-muted-foreground mt-2">Choose what you want me to work with</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

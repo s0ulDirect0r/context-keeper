@@ -10,7 +10,7 @@ test.describe('Guest happy path', () => {
 
     // 1. Navigate to landing page
     await page.goto('/');
-    await expect(page.getByText('Context Keeper').first()).toBeVisible();
+    await expect(page.getByText('Cedar').first()).toBeVisible();
 
     // 2. Click "Try it free" to enter app mode
     await page.getByRole('button', { name: 'Try it free' }).first().click();

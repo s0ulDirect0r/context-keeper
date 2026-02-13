@@ -6,7 +6,7 @@ test.describe('Landing page', () => {
   });
 
   test('renders heading and hero content', async ({ page }) => {
-    await expect(page.getByText('Context Keeper').first()).toBeVisible();
+    await expect(page.getByText('Cedar').first()).toBeVisible();
     await expect(
       page.getByText('Same meeting. Different summaries. Each one tailored to who needs it.'),
     ).toBeVisible();
