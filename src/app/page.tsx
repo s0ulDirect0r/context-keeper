@@ -20,9 +20,6 @@ import type { Recording } from '@/lib/otter';
 
 type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
 import type { SummaryContext, ConceptTag } from '@/lib/claude';
-import { SpeakerSelect } from '@/components/SpeakerSelect';
-import { TagSelector } from '@/components/TagSelector';
-import { PearlsGeneratingView } from '@/components/PearlsGeneratingView';
 import {
   getStoredSession,
   storeSession,
@@ -337,11 +334,6 @@ export default function Home() {
       const returnedSpeakers: string[] = data.speakerNames ?? [];
       const matched = autoMatchUserSpeaker(returnedSpeakers, otterSession.email, user);
 
-      const nextStep =
-        returnedSpeakers.length > 1 && !matched
-          ? ('speaker-select' as const)
-          : ('context-wizard' as const);
-
       dispatch({
         type: 'TRANSCRIPTS_LOADED',
         transcripts: validTranscripts,
@@ -349,7 +341,7 @@ export default function Home() {
         recordingDates: dates,
         speakerNames: returnedSpeakers,
         userSpeakerName: matched ?? undefined,
-        nextStep,
+        nextStep: 'context-wizard',
       });
     } catch (err) {
       dispatch({
@@ -367,11 +359,6 @@ export default function Home() {
     const matched =
       parsedSpeakers.length > 1 ? autoMatchUserSpeaker(parsedSpeakers, undefined, user) : null;
 
-    let nextStep: 'speaker-select' | 'context-wizard' = 'context-wizard';
-    if (parsedSpeakers.length > 1 && !matched) {
-      nextStep = 'speaker-select';
-    }
-
     dispatch({
       type: 'TRANSCRIPTS_LOADED',
       transcripts: [transcript],
@@ -379,7 +366,7 @@ export default function Home() {
       recordingDates: [],
       speakerNames: parsedSpeakers,
       userSpeakerName: matched ?? undefined,
-      nextStep,
+      nextStep: 'context-wizard',
     });
   };
 
@@ -508,49 +495,6 @@ export default function Home() {
     }
   };
 
-  const handleTagSelection = async (selectedTags: string[]) => {
-    dispatch({ type: 'PEARLS_GENERATING' });
-
-    try {
-      const combinedTranscript = state.transcripts.join('\n\n---\n\n');
-
-      // Use finalized summaries if available, fall back to streaming markdown
-      // (tags_done can fire before summary_done, so summaries may still be empty)
-      const summaryMarkdown =
-        Array.isArray(state.summaries) && state.summaries.length > 0
-          ? (state.summaries as string[]).join('\n\n---\n\n')
-          : streamingMarkdownRef.current;
-
-      if (!combinedTranscript || !summaryMarkdown || !state.context?.extractionGoal) {
-        throw new Error('Summary is still generating — please wait a moment and try again.');
-      }
-
-      const response = await fetch('/api/pearls/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: combinedTranscript,
-          summaryMarkdown,
-          context: state.context,
-          speakerIdentity: state.userSpeakerName ? { userName: state.userSpeakerName } : undefined,
-          selectedTags,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-
-      dispatch({ type: 'PEARLS_DONE', pearls: data.pearls || [] });
-    } catch (err) {
-      console.error('Pearl generation failed:', err);
-      dispatch({ type: 'PEARLS_FAILED' });
-    }
-  };
-
-  const handleTagSkip = async () => {
-    await handleTagSelection([]);
-  };
-
   const handleStartOver = () => {
     streamingMarkdownRef.current = '';
     try {
@@ -649,25 +593,6 @@ export default function Home() {
         <PasteTranscript onSubmit={handleManualTranscript} onBack={() => goBack('choose-method')} />
       )}
 
-      {state.step === 'speaker-select' && (
-        <SpeakerSelect
-          speakerNames={state.speakerNames}
-          onSelect={(name) => {
-            dispatch({ type: 'SET_USER_SPEAKER', name: name ?? undefined });
-            dispatch({ type: 'SET_STEP', step: 'context-wizard' });
-          }}
-          onBack={() =>
-            goBack(
-              state.inputMethod === 'otter'
-                ? 'otter-recordings'
-                : state.inputMethod === 'paste'
-                  ? 'paste-transcript'
-                  : 'manual-transcript',
-            )
-          }
-        />
-      )}
-
       {state.step === 'context-wizard' && (
         <ContextWizard
           onComplete={handleContextComplete}
@@ -693,47 +618,10 @@ export default function Home() {
       )}
 
       {state.step === 'generating' && (
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="min-w-0 flex-1 max-w-3xl">
-            <StreamingGenerationView
-              markdown={state.streamingMarkdown}
-              isStreaming={state.isStreaming}
-            />
-          </div>
-          <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
-            {state.phase.pearlsGenerating ? (
-              <PearlsGeneratingView selectedTags={Array.from(state.tagSelection)} />
-            ) : (
-              <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-                  Focus your pearls
-                </h3>
-                {state.conceptTags.length > 0 ? (
-                  <TagSelector
-                    tags={state.conceptTags}
-                    generating={false}
-                    onSubmit={handleTagSelection}
-                    onSkip={handleTagSkip}
-                    selected={state.tagSelection}
-                    onSelectedChange={(next) =>
-                      dispatch({ type: 'SET_TAG_SELECTION', selection: next })
-                    }
-                    customTags={state.tagCustomTags}
-                    onCustomTagsChange={(next) =>
-                      dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })
-                    }
-                    compact
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-                    Identifying themes...
-                  </div>
-                )}
-              </div>
-            )}
-          </aside>
-        </div>
+        <StreamingGenerationView
+          markdown={state.streamingMarkdown}
+          isStreaming={state.isStreaming}
+        />
       )}
 
       {state.step === 'summary' && (
@@ -744,22 +632,9 @@ export default function Home() {
             transcripts: state.transcripts,
             recordingTitles: state.recordingTitles,
           }}
-          pearls={state.pearls}
           savedSummaryId={state.savedSummaryId}
           onSaved={(id) => dispatch({ type: 'SET_SAVED_SUMMARY_ID', id })}
           onStartOver={handleStartOver}
-          conceptTags={
-            state.pearls.length === 0 && state.phase.tagsReady ? state.conceptTags : undefined
-          }
-          onTagSubmit={state.pearls.length === 0 ? handleTagSelection : undefined}
-          onTagSkip={state.pearls.length === 0 ? handleTagSkip : undefined}
-          generatingPearls={state.phase.pearlsGenerating}
-          tagSelection={state.tagSelection}
-          onTagSelectionChange={(next) => dispatch({ type: 'SET_TAG_SELECTION', selection: next })}
-          tagCustomTags={state.tagCustomTags}
-          onTagCustomTagsChange={(next) =>
-            dispatch({ type: 'SET_TAG_CUSTOM_TAGS', customTags: next })
-          }
         />
       )}
     </main>

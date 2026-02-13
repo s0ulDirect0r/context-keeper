@@ -10,7 +10,6 @@ export type Step =
   | 'otter-recordings'
   | 'manual-transcript'
   | 'paste-transcript'
-  | 'speaker-select'
   | 'context-wizard'
   | 'summary-mode'
   | 'generating'
@@ -127,7 +126,6 @@ export type GenerationAction =
       userSpeakerName: string | undefined;
       nextStep: Step;
     }
-  | { type: 'SET_USER_SPEAKER'; name: string | undefined }
   | { type: 'SET_CONTEXT'; context: SummaryContext }
   | { type: 'SET_SUMMARY_MODE'; mode: 'combined' | 'separate' }
   | { type: 'GENERATION_START' }
@@ -185,9 +183,6 @@ export function generationReducer(
         step: action.nextStep,
         error: null,
       };
-
-    case 'SET_USER_SPEAKER':
-      return { ...state, userSpeakerName: action.name };
 
     case 'SET_CONTEXT':
       return { ...state, context: action.context };
