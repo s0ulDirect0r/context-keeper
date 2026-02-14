@@ -134,7 +134,7 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
 
   const handleSave = useCallback(() => {
     const trimmed = editValue.trim();
-    if (trimmed && trimmed !== chunk) {
+    if (trimmed !== chunk) {
       onSave(trimmed);
     } else {
       setEditValue(chunk);
@@ -216,7 +216,11 @@ export function EditableMarkdown({ markdown, onChange, readOnly }: EditableMarkd
   const handleChunkSave = useCallback(
     (index: number, newText: string) => {
       const updated = [...chunks];
-      updated[index] = newText;
+      if (newText === '') {
+        updated.splice(index, 1);
+      } else {
+        updated[index] = newText;
+      }
       onChange(assembleChunks(updated));
     },
     [chunks, onChange],
