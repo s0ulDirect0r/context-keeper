@@ -33,10 +33,10 @@ test.describe('Guest happy path', () => {
     await page.getByRole('button', { name: 'Looks good' }).click();
 
     // 8. See ContextWizard step 1 with intent-based templates
-    await expect(page.getByText('Catch someone up')).toBeVisible();
+    await expect(page.getByText('Catch me up')).toBeVisible();
 
-    // 9. Click "Catch someone up" template
-    await page.getByText('Catch someone up').click();
+    // 9. Click "Catch me up" template
+    await page.getByText('Catch me up').click();
 
     // 10. Click "Next"
     await page.getByRole('button', { name: 'Next', exact: true }).click();

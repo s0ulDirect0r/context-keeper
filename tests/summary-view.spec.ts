@@ -17,7 +17,7 @@ async function navigateToSummary(page: import('@playwright/test').Page) {
     .fill(MOCK_TRANSCRIPT);
   await page.getByRole('button', { name: 'Looks good' }).click();
 
-  await page.getByText('Catch someone up').click();
+  await page.getByText('Catch me up').click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: "That's all" }).click();
 
