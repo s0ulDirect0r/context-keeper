@@ -304,9 +304,9 @@ export function SummaryView(props: SummaryViewProps) {
   };
 
   const handleShare = async () => {
-    if (!saved) return;
+    if (!summaryId) return;
     try {
-      const response = await fetch(`/api/summaries/${props.summary.id}`, {
+      const response = await fetch(`/api/summaries/${summaryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_shared: true }),
@@ -324,10 +324,10 @@ export function SummaryView(props: SummaryViewProps) {
   };
 
   const toggleSharing = async () => {
-    if (!saved) return;
+    if (!summaryId) return;
     const newValue = !isShared;
     try {
-      await fetch(`/api/summaries/${props.summary.id}`, {
+      await fetch(`/api/summaries/${summaryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_shared: newValue }),
@@ -478,9 +478,61 @@ export function SummaryView(props: SummaryViewProps) {
             </div>
           )}
           {savedSummaryId && !saving && (
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-sm">
-              <Check className="h-4 w-4" />
-              <span>Saved to your library</span>
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-sm">
+                <Check className="h-4 w-4" />
+                <span>Saved to your library</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={shareToken ? () => setShowSharePanel(!showSharePanel) : handleShare}
+              >
+                <Share2 className="h-3.5 w-3.5 mr-1" />
+                Share
+              </Button>
+            </div>
+          )}
+          {/* Share panel (inline mode) */}
+          {showSharePanel && shareToken && (
+            <div className="mt-3 p-3 rounded-md border bg-muted/50 space-y-3 text-left max-w-md mx-auto">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Public link sharing</span>
+                <button
+                  onClick={toggleSharing}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isShared ? 'bg-primary' : 'bg-muted-foreground/30'
+                  }`}
+                  role="switch"
+                  aria-checked={isShared}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isShared ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              {isShared && (
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-background p-2 rounded border truncate">
+                    {window.location.origin}/share/{shareToken}
+                  </code>
+                  <Button size="sm" variant="outline" onClick={copyShareLink}>
+                    {copiedShareLink ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Link className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              )}
+              {!isShared && (
+                <p className="text-xs text-muted-foreground">
+                  Link is currently disabled. Toggle on to allow anyone with the link to view this
+                  summary.
+                </p>
+              )}
             </div>
           )}
           {!user && !savedSummaryId && !saving && (
