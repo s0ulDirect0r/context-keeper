@@ -154,9 +154,9 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Your Summaries</h1>
+        <h1 className="text-3xl font-bold">Your library</h1>
         <p className="text-muted-foreground mt-1">
-          {total} saved {total === 1 ? 'summary' : 'summaries'}
+          {total} {total === 1 ? 'summary' : 'summaries'} saved
         </p>
       </div>
 
@@ -178,19 +178,19 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
           {total === 0 && !debouncedQuery ? (
             <>
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No summaries yet</h2>
+              <h2 className="text-xl font-semibold mb-2">Nothing here yet</h2>
               <p className="text-muted-foreground mb-4">
-                Create your first summary to see it here.
+                Once you create a summary, it&apos;ll show up here.
               </p>
               <Link href="/">
-                <Button>Create Summary</Button>
+                <Button>Create your first</Button>
               </Link>
             </>
           ) : (
             <>
               <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No matching summaries</h2>
-              <p className="text-muted-foreground">Try a different search term.</p>
+              <h2 className="text-xl font-semibold mb-2">No matches</h2>
+              <p className="text-muted-foreground">Try different words?</p>
             </>
           )}
         </div>

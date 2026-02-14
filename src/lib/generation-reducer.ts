@@ -9,7 +9,7 @@ export type Step =
   | 'otter-login'
   | 'otter-recordings'
   | 'manual-transcript'
-  | 'speaker-select'
+  | 'paste-transcript'
   | 'context-wizard'
   | 'summary-mode'
   | 'generating'
@@ -40,7 +40,7 @@ const initialPhase: GenerationPhase = {
 export interface GenerationState {
   // Navigation
   step: Step;
-  inputMethod: 'otter' | 'manual' | null;
+  inputMethod: 'otter' | 'manual' | 'paste' | null;
 
   // Otter data
   recordings: Recording[];
@@ -112,7 +112,7 @@ export const initialState: GenerationState = {
 
 export type GenerationAction =
   | { type: 'SET_STEP'; step: Step }
-  | { type: 'SET_INPUT_METHOD'; method: 'otter' | 'manual' | null }
+  | { type: 'SET_INPUT_METHOD'; method: 'otter' | 'manual' | 'paste' | null }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_RECORDINGS'; recordings: Recording[] }
   | { type: 'SET_LOADING_RECORDINGS'; loading: boolean }
@@ -126,7 +126,6 @@ export type GenerationAction =
       userSpeakerName: string | undefined;
       nextStep: Step;
     }
-  | { type: 'SET_USER_SPEAKER'; name: string | undefined }
   | { type: 'SET_CONTEXT'; context: SummaryContext }
   | { type: 'SET_SUMMARY_MODE'; mode: 'combined' | 'separate' }
   | { type: 'GENERATION_START' }
@@ -184,9 +183,6 @@ export function generationReducer(
         step: action.nextStep,
         error: null,
       };
-
-    case 'SET_USER_SPEAKER':
-      return { ...state, userSpeakerName: action.name };
 
     case 'SET_CONTEXT':
       return { ...state, context: action.context };
