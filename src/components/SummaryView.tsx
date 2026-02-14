@@ -184,6 +184,33 @@ export function SummaryView(props: SummaryViewProps) {
     }
   }, []);
 
+  // Debounce-save edits to the database for saved summaries
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistSavedEdits = useCallback(
+    (updated: string[]) => {
+      if (!summaryId) return;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(async () => {
+        try {
+          await fetch(`/api/summaries/${summaryId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ summaries: updated }),
+          });
+        } catch (err) {
+          console.error('Failed to save edits:', err);
+        }
+      }, 800);
+    },
+    [summaryId],
+  );
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
   // Restore guest edits on mount
   useEffect(() => {
     try {
@@ -597,7 +624,11 @@ export function SummaryView(props: SummaryViewProps) {
                 setMarkdownSummaries((prev) => {
                   const updated = [...prev];
                   updated[index] = newText;
-                  persistGuestEdits(updated);
+                  if (summaryId) {
+                    persistSavedEdits(updated);
+                  } else {
+                    persistGuestEdits(updated);
+                  }
                   return updated;
                 });
               }}
