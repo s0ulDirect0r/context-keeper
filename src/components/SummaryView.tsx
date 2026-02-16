@@ -292,16 +292,22 @@ export function SummaryView(props: SummaryViewProps) {
       return;
     }
     setSavingTitle(true);
+    setSaveStatus('saving');
     try {
-      await fetch(`/api/summaries/${props.summary.id}`, {
+      const res = await fetch(`/api/summaries/${props.summary.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: trimmed }),
       });
+      if (!res.ok) throw new Error('Save failed');
       setTitle(trimmed);
+      setSaveStatus('saved');
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('Failed to save title:', err);
       setTitle(props.summary.title);
+      setSaveStatus('error');
     } finally {
       setSavingTitle(false);
       setEditingTitle(false);
@@ -480,6 +486,19 @@ export function SummaryView(props: SummaryViewProps) {
                 timeStyle: 'short',
               }).format(props.summary.createdAt)}
             </p>
+            {!readOnly && saveStatus === 'saving' && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+              </span>
+            )}
+            {!readOnly && saveStatus === 'saved' && (
+              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <Check className="h-3 w-3" /> Saved
+              </span>
+            )}
+            {!readOnly && saveStatus === 'error' && (
+              <span className="text-xs text-red-600 dark:text-red-400">Failed to save</span>
+            )}
             {!readOnly && (
               <Button
                 variant="outline"
@@ -624,17 +643,17 @@ export function SummaryView(props: SummaryViewProps) {
                 <CardTitle className="text-lg">
                   {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
                 </CardTitle>
-                {!readOnly && summaryId && index === 0 && saveStatus === 'saving' && (
+                {!saved && summaryId && index === 0 && saveStatus === 'saving' && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Loader2 className="h-3 w-3 animate-spin" /> Saving...
                   </span>
                 )}
-                {!readOnly && summaryId && index === 0 && saveStatus === 'saved' && (
+                {!saved && summaryId && index === 0 && saveStatus === 'saved' && (
                   <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                     <Check className="h-3 w-3" /> Saved
                   </span>
                 )}
-                {!readOnly && summaryId && index === 0 && saveStatus === 'error' && (
+                {!saved && summaryId && index === 0 && saveStatus === 'error' && (
                   <span className="text-xs text-red-600 dark:text-red-400">Failed to save</span>
                 )}
               </div>
