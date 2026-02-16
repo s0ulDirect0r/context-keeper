@@ -28,6 +28,7 @@ import {
 } from '@/lib/storage';
 import type { User } from '@supabase/supabase-js';
 import { generationReducer, initialState } from '@/lib/generation-reducer';
+import { consumeSSE } from '@/lib/sse';
 
 /** Try to auto-match a speaker name to the logged-in user */
 function autoMatchUserSpeaker(
@@ -414,39 +415,7 @@ export default function Home() {
         throw new Error(errorData.error || 'Failed to generate summary');
       }
 
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Parse SSE events (separated by double newlines)
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const eventStr of events) {
-          if (!eventStr.trim()) continue;
-
-          let eventName = '';
-          let eventData = '';
-
-          for (const line of eventStr.split('\n')) {
-            if (line.startsWith('event: ')) {
-              eventName = line.slice(7);
-            } else if (line.startsWith('data: ')) {
-              eventData = line.slice(6);
-            }
-          }
-
-          if (eventName && eventData) {
-            handleSSEEvent(eventName, JSON.parse(eventData));
-          }
-        }
-      }
+      await consumeSSE(response, handleSSEEvent);
     } catch (err) {
       dispatch({
         type: 'SET_ERROR',
