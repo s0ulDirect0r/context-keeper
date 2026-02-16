@@ -678,6 +678,7 @@ export function SummaryView(props: SummaryViewProps) {
           <CardContent>
             <EditableMarkdown
               markdown={summaryText}
+              readOnly={readOnly}
               onChange={(newText) => {
                 setMarkdownSummaries((prev) => {
                   const updated = [...prev];
