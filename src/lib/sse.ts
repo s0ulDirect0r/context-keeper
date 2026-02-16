@@ -14,7 +14,8 @@ export async function consumeSSE(
   response: Response,
   onEvent: (event: string, data: Record<string, unknown>) => void,
 ): Promise<void> {
-  const reader = response.body!.getReader();
+  if (!response.body) throw new Error('Response has no body');
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 

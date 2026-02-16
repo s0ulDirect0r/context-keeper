@@ -330,8 +330,14 @@ export function SummaryView(props: SummaryViewProps) {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error);
+        let message = `Request failed (${response.status})`;
+        try {
+          const err = await response.json();
+          message = err.error || message;
+        } catch {
+          /* non-JSON error response */
+        }
+        throw new Error(message);
       }
 
       // /api/summarize returns SSE, not JSON — consume the stream properly
