@@ -10,6 +10,7 @@ import { PearlsSidebar } from './PearlsSidebar';
 import { AuthDialog } from './AuthDialog';
 import { useAuth } from './AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
+import { consumeSSEToCompletion } from '@/lib/sse';
 import { Pencil, Loader2, Share2, Check, Link, Copy, FileDown, FileText } from 'lucide-react';
 import { downloadMarkdown, downloadPdf } from '@/lib/export';
 import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
@@ -111,6 +112,11 @@ export function SummaryView(props: SummaryViewProps) {
   const [savingTitle, setSavingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  // Save indicator for inline edits
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingEditsRef = useRef<string[] | null>(null);
+
   // Context editing (saved mode with transcripts)
   const [editingContext, setEditingContext] = useState(false);
   const [editExtractionGoal, setEditExtractionGoal] = useState(context?.extractionGoal ?? '');
@@ -190,26 +196,51 @@ export function SummaryView(props: SummaryViewProps) {
     (updated: string[]) => {
       if (!summaryId) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingEditsRef.current = updated;
+      setSaveStatus('saving');
       saveTimerRef.current = setTimeout(async () => {
         try {
-          await fetch(`/api/summaries/${summaryId}`, {
+          const res = await fetch(`/api/summaries/${summaryId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ summaries: updated }),
           });
+          pendingEditsRef.current = null;
+          if (!res.ok) throw new Error('Save failed');
+          setSaveStatus('saved');
+          if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+          saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
         } catch (err) {
           console.error('Failed to save edits:', err);
+          setSaveStatus('error');
         }
       }, 800);
     },
     [summaryId],
   );
-  // Clean up timer on unmount
+
+  // Flush pending edits on unmount and beforeunload
   useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const flushPendingEdits = () => {
+      if (pendingEditsRef.current && summaryId) {
+        fetch(`/api/summaries/${summaryId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summaries: pendingEditsRef.current }),
+          keepalive: true,
+        });
+        pendingEditsRef.current = null;
+      }
     };
-  }, []);
+
+    window.addEventListener('beforeunload', flushPendingEdits);
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingEdits);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+      flushPendingEdits();
+    };
+  }, [summaryId]);
 
   // Restore guest edits on mount
   useEffect(() => {
@@ -261,16 +292,22 @@ export function SummaryView(props: SummaryViewProps) {
       return;
     }
     setSavingTitle(true);
+    setSaveStatus('saving');
     try {
-      await fetch(`/api/summaries/${props.summary.id}`, {
+      const res = await fetch(`/api/summaries/${props.summary.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: trimmed }),
       });
+      if (!res.ok) throw new Error('Save failed');
       setTitle(trimmed);
+      setSaveStatus('saved');
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('Failed to save title:', err);
       setTitle(props.summary.title);
+      setSaveStatus('error');
     } finally {
       setSavingTitle(false);
       setEditingTitle(false);
@@ -298,20 +335,32 @@ export function SummaryView(props: SummaryViewProps) {
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) {
+        let message = `Request failed (${response.status})`;
+        try {
+          const err = await response.json();
+          message = err.error || message;
+        } catch {
+          /* non-JSON error response */
+        }
+        throw new Error(message);
+      }
+
+      // /api/summarize returns SSE, not JSON — consume the stream properly
+      const data = await consumeSSEToCompletion(response);
 
       if (mode === 'replace') {
+        const newSummaries = data.summaries ?? [];
         await fetch(`/api/summaries/${props.summary.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            summaries: data.summaries,
+            summaries: newSummaries,
             context: newContext,
           }),
         });
 
-        setSummaries(data.summaries);
+        setSummaries(newSummaries);
         setContext(newContext);
         setEditingContext(false);
 
@@ -620,6 +669,8 @@ export function SummaryView(props: SummaryViewProps) {
           <CardContent>
             <EditableMarkdown
               markdown={summaryText}
+              readOnly={readOnly}
+              saveStatus={saveStatus}
               onChange={(newText) => {
                 setMarkdownSummaries((prev) => {
                   const updated = [...prev];

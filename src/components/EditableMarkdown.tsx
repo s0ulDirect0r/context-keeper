@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Check } from 'lucide-react';
+import { Pencil, Check, Loader2 } from 'lucide-react';
 
 /**
  * Parse markdown into discrete editable chunks.
@@ -102,13 +102,17 @@ function assembleChunks(chunks: string[]): string {
   return parts.join('\n');
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 interface EditableChunkProps {
   chunk: string;
   onSave: (newText: string) => void;
   readOnly?: boolean;
+  /** Show save indicator in the pencil icon's position */
+  saveStatus?: SaveStatus;
 }
 
-function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
+function EditableChunk({ chunk, onSave, readOnly, saveStatus }: EditableChunkProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(chunk);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -186,12 +190,27 @@ function EditableChunk({ chunk, onSave, readOnly }: EditableChunkProps) {
     );
   }
 
+  const showIndicator = saveStatus && saveStatus !== 'idle';
+
   return (
     <div className="group relative pr-8">
       <div className="prose prose-sm dark:prose-invert max-w-none">
         <Markdown remarkPlugins={[remarkGfm]}>{chunk}</Markdown>
       </div>
-      {!readOnly && (
+      {!readOnly && showIndicator && (
+        <span className="absolute -right-1 top-0 rounded-md p-1">
+          {saveStatus === 'saving' && (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          )}
+          {saveStatus === 'saved' && (
+            <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+          )}
+          {saveStatus === 'error' && (
+            <span className="text-xs text-red-600 dark:text-red-400">!</span>
+          )}
+        </span>
+      )}
+      {!readOnly && !showIndicator && (
         <button
           onClick={() => setEditing(true)}
           className="absolute -right-1 top-0 rounded-md p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all"
@@ -208,10 +227,17 @@ interface EditableMarkdownProps {
   markdown: string;
   onChange: (newMarkdown: string) => void;
   readOnly?: boolean;
+  saveStatus?: SaveStatus;
 }
 
-export function EditableMarkdown({ markdown, onChange, readOnly }: EditableMarkdownProps) {
+export function EditableMarkdown({
+  markdown,
+  onChange,
+  readOnly,
+  saveStatus,
+}: EditableMarkdownProps) {
   const chunks = useMemo(() => parseChunks(markdown), [markdown]);
+  const [lastEditedIndex, setLastEditedIndex] = useState<number | null>(null);
 
   const handleChunkSave = useCallback(
     (index: number, newText: string) => {
@@ -221,6 +247,7 @@ export function EditableMarkdown({ markdown, onChange, readOnly }: EditableMarkd
       } else {
         updated[index] = newText;
       }
+      setLastEditedIndex(index);
       onChange(assembleChunks(updated));
     },
     [chunks, onChange],
@@ -234,6 +261,7 @@ export function EditableMarkdown({ markdown, onChange, readOnly }: EditableMarkd
           chunk={chunk}
           onSave={(newText) => handleChunkSave(index, newText)}
           readOnly={readOnly}
+          saveStatus={index === lastEditedIndex ? saveStatus : undefined}
         />
       ))}
     </div>
