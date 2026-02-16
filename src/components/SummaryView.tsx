@@ -486,19 +486,6 @@ export function SummaryView(props: SummaryViewProps) {
                 timeStyle: 'short',
               }).format(props.summary.createdAt)}
             </p>
-            {!readOnly && saveStatus === 'saving' && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" /> Saving...
-              </span>
-            )}
-            {!readOnly && saveStatus === 'saved' && (
-              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                <Check className="h-3 w-3" /> Saved
-              </span>
-            )}
-            {!readOnly && saveStatus === 'error' && (
-              <span className="text-xs text-red-600 dark:text-red-400">Failed to save</span>
-            )}
             {!readOnly && (
               <Button
                 variant="outline"
@@ -639,24 +626,9 @@ export function SummaryView(props: SummaryViewProps) {
         <Card key={index}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-lg">
-                  {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
-                </CardTitle>
-                {!saved && summaryId && index === 0 && saveStatus === 'saving' && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Saving...
-                  </span>
-                )}
-                {!saved && summaryId && index === 0 && saveStatus === 'saved' && (
-                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <Check className="h-3 w-3" /> Saved
-                  </span>
-                )}
-                {!saved && summaryId && index === 0 && saveStatus === 'error' && (
-                  <span className="text-xs text-red-600 dark:text-red-400">Failed to save</span>
-                )}
-              </div>
+              <CardTitle className="text-lg">
+                {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
+              </CardTitle>
               <div className="flex items-center gap-1.5 no-print">
                 <Button
                   variant="outline"
@@ -698,6 +670,7 @@ export function SummaryView(props: SummaryViewProps) {
             <EditableMarkdown
               markdown={summaryText}
               readOnly={readOnly}
+              saveStatus={saveStatus}
               onChange={(newText) => {
                 setMarkdownSummaries((prev) => {
                   const updated = [...prev];

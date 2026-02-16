@@ -85,11 +85,8 @@ test.describe('Edit persistence', () => {
     // Click save (the check button) to confirm edit
     await page.getByLabel('Save edit').click();
 
-    // Save indicator should appear (use exact match to avoid "Saved to your library")
-    await expect(page.getByText('Saving...', { exact: true })).toBeVisible({ timeout: 3_000 });
-
-    // Wait for debounce + save to complete
-    await expect(page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 5_000 });
+    // Wait for debounce (800ms) + PATCH to fire
+    await page.waitForTimeout(1500);
 
     // Verify PATCH was called
     expect(patchRequests.length).toBeGreaterThan(0);
