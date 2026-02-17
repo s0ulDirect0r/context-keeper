@@ -55,10 +55,10 @@ export function LandingPage({ onTryFree, onSignUp, onSignIn }: LandingPageProps)
     <main>
       <section className="pt-16 pb-8 px-4 text-center">
         <div className="max-w-2xl mx-auto space-y-4">
-          <p className="text-4xl sm:text-5xl font-bold tracking-tight">Cedar</p>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-snug">
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Cedar</h1>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight leading-snug">
             Turn your meeting recordings into clear, useful insights
-          </h1>
+          </h2>
           <div className="pt-2 flex flex-col items-center gap-3">
             <div className="flex gap-3">
               <Button size="lg" onClick={onTryFree}>
