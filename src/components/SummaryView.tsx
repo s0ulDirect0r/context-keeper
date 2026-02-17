@@ -279,7 +279,7 @@ export function SummaryView(props: SummaryViewProps) {
       setCopiedIndex(index);
       toast.success('Copied!');
       setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy to clipboard');
     }
   };
