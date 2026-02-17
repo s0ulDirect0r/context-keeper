@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { extractTags, type SummaryContext } from '@/lib/claude';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +16,11 @@ export async function POST(request: Request) {
     const tags = await extractTags(transcript, context);
     return NextResponse.json({ tags });
   } catch (error) {
-    console.error('Tag extraction error:', error);
+    logger.error(
+      'Tag extraction error',
+      { route: '/api/tags', requestId: request.headers.get('x-request-id') ?? undefined },
+      error,
+    );
     const message = error instanceof Error ? error.message : 'Failed to extract tags';
     return NextResponse.json({ error: message }, { status: 500 });
   }

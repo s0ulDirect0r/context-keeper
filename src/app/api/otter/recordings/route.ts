@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { otterGetRecordings, otterGetTranscript, type OtterSession } from '@/lib/otter';
+import { logger } from '@/lib/logger';
 
 const recordingsPostSchema = z.object({
   recordingIds: z
@@ -27,6 +28,14 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ recordings });
   } catch (error) {
+    logger.error(
+      'Failed to fetch recordings',
+      {
+        route: '/api/otter/recordings',
+        requestId: request.headers.get('x-request-id') ?? undefined,
+      },
+      error,
+    );
     const message = error instanceof Error ? error.message : 'Failed to fetch recordings';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -67,6 +76,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ transcripts: results, speakerNames: allSpeakerNames });
   } catch (error) {
+    logger.error(
+      'Failed to fetch transcripts',
+      {
+        route: '/api/otter/recordings',
+        requestId: request.headers.get('x-request-id') ?? undefined,
+      },
+      error,
+    );
     const message = error instanceof Error ? error.message : 'Failed to fetch transcripts';
     return NextResponse.json({ error: message }, { status: 500 });
   }

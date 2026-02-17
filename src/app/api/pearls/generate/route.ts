@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { extractPearls, type SummaryContext, type SpeakerIdentity } from '@/lib/claude';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
@@ -29,7 +30,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ pearls });
   } catch (error) {
-    console.error('Pearl generation error:', error);
+    logger.error(
+      'Pearl generation error',
+      {
+        route: '/api/pearls/generate',
+        requestId: request.headers.get('x-request-id') ?? undefined,
+      },
+      error,
+    );
     const message = error instanceof Error ? error.message : 'Failed to generate pearls';
     return NextResponse.json({ error: message }, { status: 500 });
   }

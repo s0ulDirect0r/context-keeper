@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { buildSearchText } from '@/lib/search-text';
+import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 
 const patchSummarySchema = z.object({
@@ -95,13 +96,24 @@ export async function PATCH(request: Request, { params }: Props) {
       .single();
 
     if (updateError) {
-      console.error('Failed to update summary:', updateError);
+      logger.error(
+        'Failed to update summary',
+        {
+          route: '/api/summaries/[id]',
+          requestId: request.headers.get('x-request-id') ?? undefined,
+        },
+        updateError,
+      );
       return NextResponse.json({ error: 'Failed to update summary' }, { status: 500 });
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Update summary error:', error);
+    logger.error(
+      'Update summary error',
+      { route: '/api/summaries/[id]', requestId: request.headers.get('x-request-id') ?? undefined },
+      error,
+    );
     const message = error instanceof Error ? error.message : 'Failed to update summary';
     return NextResponse.json({ error: message }, { status: 500 });
   }

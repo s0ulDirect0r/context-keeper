@@ -12,6 +12,8 @@ import { useAuth } from './AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
 import { consumeSSEToCompletion } from '@/lib/sse';
 import { Pencil, Loader2, Share2, Check, Link, Copy, FileDown, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import * as Sentry from '@sentry/nextjs';
 import { downloadMarkdown, downloadPdf } from '@/lib/export';
 import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
@@ -158,7 +160,8 @@ export function SummaryView(props: SummaryViewProps) {
           }
         })
         .catch((err) => {
-          console.error('Failed to save summary:', err);
+          toast.error('Failed to save summary');
+          Sentry.captureException(err);
           setSaving(false);
           setPendingSave(false);
         });
@@ -207,11 +210,13 @@ export function SummaryView(props: SummaryViewProps) {
           });
           pendingEditsRef.current = null;
           if (!res.ok) throw new Error('Save failed');
+          Sentry.addBreadcrumb({ category: 'summary', message: 'Saved summary edits' });
           setSaveStatus('saved');
           if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
           saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
         } catch (err) {
-          console.error('Failed to save edits:', err);
+          toast.error('Failed to save changes', { id: 'save-edits' });
+          Sentry.captureException(err);
           setSaveStatus('error');
         }
       }, 800);
@@ -272,9 +277,10 @@ export function SummaryView(props: SummaryViewProps) {
     try {
       await copyRichText(text);
       setCopiedIndex(index);
+      toast.success('Copied!');
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      toast.error('Failed to copy to clipboard');
     }
   };
 
@@ -305,7 +311,8 @@ export function SummaryView(props: SummaryViewProps) {
       if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
       saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
-      console.error('Failed to save title:', err);
+      toast.error('Failed to save title');
+      Sentry.captureException(err);
       setTitle(props.summary.title);
       setSaveStatus('error');
     } finally {
@@ -373,7 +380,8 @@ export function SummaryView(props: SummaryViewProps) {
         }
       }
     } catch (err) {
-      console.error('Re-generation failed:', err);
+      toast.error('Regeneration failed');
+      Sentry.captureException(err);
     } finally {
       setRegenerating(false);
     }
@@ -395,7 +403,8 @@ export function SummaryView(props: SummaryViewProps) {
       setIsShared(true);
       setShowSharePanel(true);
     } catch (err) {
-      console.error('Failed to enable sharing:', err);
+      toast.error('Failed to enable sharing');
+      Sentry.captureException(err);
     }
   };
 
@@ -409,8 +418,13 @@ export function SummaryView(props: SummaryViewProps) {
         body: JSON.stringify({ is_shared: newValue }),
       });
       setIsShared(newValue);
+      Sentry.addBreadcrumb({
+        category: 'sharing',
+        message: `Toggled sharing ${newValue ? 'on' : 'off'}`,
+      });
     } catch (err) {
-      console.error('Failed to toggle sharing:', err);
+      toast.error('Failed to update sharing');
+      Sentry.captureException(err);
     }
   };
 

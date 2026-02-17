@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, Trash2, FileText, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import * as Sentry from '@sentry/nextjs';
 
 const PAGE_SIZE = 20;
 
@@ -89,7 +91,8 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
           setTotal(data.total);
         }
       } catch (err) {
-        console.error('Search error:', err);
+        toast.error('Search failed');
+        Sentry.captureException(err);
       } finally {
         if (!cancelled) setSearching(false);
       }
@@ -117,7 +120,8 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
       setSummaries((prev) => [...prev, ...newSummaries]);
       setTotal(data.total);
     } catch (err) {
-      console.error('Load more error:', err);
+      toast.error('Failed to load more summaries');
+      Sentry.captureException(err);
     } finally {
       setLoadingMore(false);
     }
@@ -130,8 +134,8 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
     const { error } = await supabase.from('summaries').delete().eq('id', id);
 
     if (error) {
-      console.error('Failed to delete summary:', error);
-      alert('Failed to delete summary');
+      toast.error('Failed to delete summary');
+      Sentry.captureException(error);
     } else {
       setSummaries((prev) => prev.filter((s) => s.id !== id));
       setTotal((prev) => prev - 1);

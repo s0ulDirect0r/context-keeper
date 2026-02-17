@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { toSavedSummary, type Database } from '@/lib/supabase/types';
+import { logger } from '@/lib/logger';
 import { DashboardClient } from './DashboardClient';
 
 type SummaryRow = Database['public']['Tables']['summaries']['Row'];
@@ -30,7 +31,7 @@ export default async function DashboardPage() {
     .range(0, PAGE_SIZE - 1);
 
   if (error) {
-    console.error('Failed to fetch summaries:', error);
+    logger.error('Failed to fetch summaries', { route: '/dashboard' }, error);
   }
 
   const summaries = ((rows ?? []) as SummaryRow[]).map(toSavedSummary);

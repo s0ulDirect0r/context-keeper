@@ -29,6 +29,8 @@ import {
 import type { User } from '@supabase/supabase-js';
 import { generationReducer, initialState } from '@/lib/generation-reducer';
 import { consumeSSE } from '@/lib/sse';
+import { toast } from 'sonner';
+import * as Sentry from '@sentry/nextjs';
 
 /** Try to auto-match a speaker name to the logged-in user */
 function autoMatchUserSpeaker(
@@ -122,7 +124,7 @@ export default function Home() {
 
         if (error) {
           if (error.code !== 'PGRST116') {
-            console.error('Failed to load Otter connection:', error);
+            Sentry.captureException(error);
           }
           return;
         }
@@ -251,13 +253,14 @@ export default function Home() {
         csrf_token: data.csrfToken,
       });
       if (error) {
-        console.error('Failed to save Otter connection:', error);
+        Sentry.captureException(error);
       }
     } else if (remember) {
       storeSession(session);
     }
 
     setOtterSession(session);
+    Sentry.addBreadcrumb({ category: 'otter', message: 'Connected to Otter.ai' });
     await fetchRecordings(session);
   };
 
@@ -409,6 +412,7 @@ export default function Home() {
       /* noop */
     }
     dispatch({ type: 'GENERATION_START' });
+    Sentry.addBreadcrumb({ category: 'generation', message: 'Started summary generation' });
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -435,7 +439,11 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate summary');
+        const errorMsg = errorData.error || 'Failed to generate summary';
+        if (response.status === 429) {
+          toast.error('Rate limit reached. Try again later.', { duration: Infinity });
+        }
+        throw new Error(errorMsg);
       }
 
       await consumeSSE(response, handleSSEEvent);
@@ -500,14 +508,23 @@ export default function Home() {
           summaries: data.summaries as string[] | undefined,
           tags: data.tags as ConceptTag[] | undefined,
         });
+        // Notify user if DB save failed during generation
+        if (data.saveError) {
+          toast.error('Summary generated but could not be saved. Try saving manually.');
+        }
+        Sentry.addBreadcrumb({ category: 'generation', message: 'Summary generation complete' });
         break;
 
-      case 'error':
+      case 'error': {
+        const message = (data.message as string) || 'Something went wrong during generation';
+        toast.error(message);
+        Sentry.captureException(new Error(message));
         dispatch({
           type: 'GENERATION_FAILED',
-          error: (data.message as string) || 'Something went wrong during generation',
+          error: message,
         });
         break;
+      }
     }
   };
 

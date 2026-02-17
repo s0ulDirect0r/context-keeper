@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import * as Sentry from '@sentry/nextjs';
 import { Check, X, Loader2, Gem, Pencil } from 'lucide-react';
 import type { Pearl } from '@/lib/claude';
 import type { SavedPearl } from '@/lib/supabase/types';
@@ -110,7 +112,8 @@ function PearlsCuration({ pearls, summaryId, onSaved, isLoggedIn }: CurationProp
         onSaved?.(data.pearls);
       }
     } catch (err) {
-      console.error('Failed to save pearls:', err);
+      toast.error('Failed to save pearls');
+      Sentry.captureException(err);
     } finally {
       setSaving(false);
     }
