@@ -2,8 +2,13 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  // Generate a unique request ID for tracing
+  const requestId = crypto.randomUUID();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-request-id', requestId);
+
   let supabaseResponse = NextResponse.next({
-    request,
+    request: { headers: requestHeaders },
   });
 
   // Skip if Supabase env vars not configured
@@ -34,6 +39,9 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - required for Server Components
   await supabase.auth.getUser();
+
+  // Attach request ID to response headers for client-side correlation
+  supabaseResponse.headers.set('x-request-id', requestId);
 
   return supabaseResponse;
 }
