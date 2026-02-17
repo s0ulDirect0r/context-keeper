@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { otterLogin } from '@/lib/otter';
 import { createRateLimiter } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email format'),
@@ -42,7 +43,11 @@ export async function POST(request: Request) {
       csrfToken: session.csrfToken,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Login failed';
-    return NextResponse.json({ error: message }, { status: 401 });
+    logger.error(
+      'Otter login failed',
+      { route: '/api/otter/login', requestId: request.headers.get('x-request-id') ?? undefined },
+      error,
+    );
+    return NextResponse.json({ error: 'Login failed' }, { status: 401 });
   }
 }

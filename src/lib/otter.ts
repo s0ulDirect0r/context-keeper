@@ -1,6 +1,8 @@
 // Otter.ai unofficial API client
 // Based on https://github.com/gmchad/otterai-api
 
+import { logger } from '@/lib/logger';
+
 const BASE_URL = 'https://otter.ai/forward/api/v1';
 
 export interface OtterSession {
@@ -117,7 +119,7 @@ async function fetchSpeeches(
     const result = (await response.json()) as { status: string; speeches?: SpeechData[] };
     return result.speeches || [];
   } catch (e) {
-    console.error(`[otter] fetchSpeeches(${source}) error:`, e);
+    logger.warn(`fetchSpeeches(${source}) failed`, { source }, e);
     return [];
   }
 }

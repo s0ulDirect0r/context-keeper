@@ -146,7 +146,7 @@ export type GenerationAction =
   | { type: 'SET_TAG_CUSTOM_TAGS'; customTags: Set<string> }
   | { type: 'SET_SAVED_SUMMARY_ID'; id: string }
   | { type: 'SET_STEP_WITH_ERROR'; step: Step; error: string }
-  | { type: 'GENERATION_FAILED'; error: string }
+  | { type: 'GENERATION_FAILED'; error: string; stayOnGenerating?: boolean }
   | { type: 'START_OVER' };
 
 // ── Reducer ──────────────────────────────────────────────────────────
@@ -287,7 +287,12 @@ export function generationReducer(
 
     // Atomic error + step transition — avoids SET_STEP clearing the error
     case 'GENERATION_FAILED':
-      return { ...state, step: 'context-wizard', error: action.error, isStreaming: false };
+      return {
+        ...state,
+        step: action.stayOnGenerating ? 'generating' : 'context-wizard',
+        error: action.error,
+        isStreaming: false,
+      };
 
     // Full reset — preserves nothing (otterSession is external)
     case 'START_OVER':

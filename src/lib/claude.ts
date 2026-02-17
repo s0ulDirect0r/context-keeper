@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { logger } from '@/lib/logger';
 
 // Re-export shared types so server-side consumers can still import from claude.ts
 export type { SummaryContent } from './summary-types';
@@ -274,7 +275,7 @@ ${transcript}`;
 
     return [];
   } catch (error) {
-    console.error('Tag extraction failed:', error);
+    logger.error('Tag extraction failed', { transcriptLength: transcript.length }, error);
     return [];
   }
 }
@@ -431,7 +432,7 @@ ${transcript}`;
     return [];
   } catch (error) {
     // Pearl extraction is non-critical — log and return empty
-    console.error('Pearl extraction failed:', error);
+    logger.error('Pearl extraction failed', { transcriptLength: transcript.length }, error);
     return [];
   }
 }

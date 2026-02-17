@@ -29,6 +29,8 @@ import {
 import type { User } from '@supabase/supabase-js';
 import { generationReducer, initialState } from '@/lib/generation-reducer';
 import { consumeSSE } from '@/lib/sse';
+import { toast } from 'sonner';
+import * as Sentry from '@sentry/nextjs';
 
 /** Try to auto-match a speaker name to the logged-in user */
 function autoMatchUserSpeaker(
@@ -108,6 +110,20 @@ export default function Home() {
   const streamingMarkdownRef = useRef('');
   const prefetchedForSession = useRef<string | null>(null);
   const prefetchPromise = useRef<Promise<Recording[] | null> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const generationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up timeout and abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (generationTimeoutRef.current) {
+        clearTimeout(generationTimeoutRef.current);
+        generationTimeoutRef.current = null;
+      }
+      abortControllerRef.current?.abort('unmount');
+      abortControllerRef.current = null;
+    };
+  }, []);
 
   // Load Otter connection based on auth state
   useEffect(() => {
@@ -120,7 +136,7 @@ export default function Home() {
 
         if (error) {
           if (error.code !== 'PGRST116') {
-            console.error('Failed to load Otter connection:', error);
+            Sentry.captureException(error);
           }
           return;
         }
@@ -249,13 +265,14 @@ export default function Home() {
         csrf_token: data.csrfToken,
       });
       if (error) {
-        console.error('Failed to save Otter connection:', error);
+        Sentry.captureException(error);
       }
     } else if (remember) {
       storeSession(session);
     }
 
     setOtterSession(session);
+    Sentry.addBreadcrumb({ category: 'otter', message: 'Connected to Otter.ai' });
     await fetchRecordings(session);
   };
 
@@ -385,7 +402,19 @@ export default function Home() {
     startSummaryGeneration(state.context!, mode);
   };
 
+  const cancelGeneration = () => {
+    if (generationTimeoutRef.current) {
+      clearTimeout(generationTimeoutRef.current);
+      generationTimeoutRef.current = null;
+    }
+    abortControllerRef.current?.abort('user_cancel');
+    abortControllerRef.current = null;
+  };
+
   const startSummaryGeneration = async (ctx: SummaryContext, mode: 'combined' | 'separate') => {
+    // Cancel any in-progress generation
+    cancelGeneration();
+
     // Reset streaming ref (can't be in reducer)
     streamingMarkdownRef.current = '';
     // Clear stale guest edits so they don't overwrite the new summary on mount
@@ -395,6 +424,15 @@ export default function Home() {
       /* noop */
     }
     dispatch({ type: 'GENERATION_START' });
+    Sentry.addBreadcrumb({ category: 'generation', message: 'Started summary generation' });
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    // 120-second timeout safety net
+    generationTimeoutRef.current = setTimeout(() => {
+      controller.abort('timeout');
+    }, 120_000);
 
     try {
       const response = await fetch('/api/summarize', {
@@ -408,24 +446,51 @@ export default function Home() {
           recordingTitles: state.recordingTitles,
           recordingDates: state.recordingDates,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate summary');
+        const errorMsg = errorData.error || 'Failed to generate summary';
+        if (response.status === 429) {
+          toast.error('Rate limit reached. Try again later.', { duration: Infinity });
+        }
+        throw new Error(errorMsg);
       }
 
       await consumeSSE(response, handleSSEEvent);
     } catch (err) {
-      console.error('[startSummaryGeneration] Failed:', err);
+      // Don't report user cancellations as errors
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        const reason = controller.signal.reason;
+        if (reason === 'timeout') {
+          dispatch({
+            type: 'GENERATION_FAILED',
+            error: 'Generation timed out. Try a shorter transcript or try again.',
+            stayOnGenerating: true,
+          });
+        } else {
+          // User cancelled — go back to context wizard
+          dispatch({ type: 'SET_STEP', step: 'context-wizard' });
+        }
+        return;
+      }
       dispatch({
         type: 'GENERATION_FAILED',
         error: err instanceof Error ? err.message : 'Failed to generate summary',
       });
+    } finally {
+      if (generationTimeoutRef.current) {
+        clearTimeout(generationTimeoutRef.current);
+        generationTimeoutRef.current = null;
+      }
+      abortControllerRef.current = null;
     }
   };
 
   const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
+    if (abortControllerRef.current?.signal.aborted) return;
+
     switch (event) {
       case 'summary_chunk':
         streamingMarkdownRef.current += data.text as string;
@@ -457,14 +522,23 @@ export default function Home() {
           summaries: data.summaries as string[] | undefined,
           tags: data.tags as ConceptTag[] | undefined,
         });
+        // Notify user if DB save failed during generation
+        if (data.saveError) {
+          toast.error('Summary generated but could not be saved. Try saving manually.');
+        }
+        Sentry.addBreadcrumb({ category: 'generation', message: 'Summary generation complete' });
         break;
 
-      case 'error':
+      case 'error': {
+        const message = (data.message as string) || 'Something went wrong during generation';
+        toast.error(message);
+        Sentry.captureException(new Error(message));
         dispatch({
           type: 'GENERATION_FAILED',
-          error: (data.message as string) || 'Something went wrong during generation',
+          error: message,
         });
         break;
+      }
     }
   };
 
@@ -517,7 +591,7 @@ export default function Home() {
 
   return (
     <main className="container mx-auto px-4 py-12">
-      {state.error && (
+      {state.error && state.step !== 'generating' && (
         <div className="max-w-2xl mx-auto mb-6 rounded-md bg-red-50 dark:bg-red-950 p-4 text-red-800 dark:text-red-200">
           {state.error}
         </div>
@@ -594,6 +668,16 @@ export default function Home() {
         <StreamingGenerationView
           markdown={state.streamingMarkdown}
           isStreaming={state.isStreaming}
+          error={state.error}
+          onCancel={() => {
+            cancelGeneration();
+            dispatch({ type: 'SET_STEP', step: 'context-wizard' });
+          }}
+          onRetry={() => {
+            if (state.context) {
+              startSummaryGeneration(state.context, state.summaryMode);
+            }
+          }}
         />
       )}
 

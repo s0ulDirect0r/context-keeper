@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 import { buildSearchText } from '@/lib/search-text';
 import { createRateLimiter } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 // 30 requests per minute for read operations
 const listLimiter = createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
@@ -94,15 +95,22 @@ export async function GET(request: Request) {
     }
 
     if (error) {
-      console.error('Failed to fetch summaries:', error);
+      logger.error(
+        'Failed to fetch summaries',
+        { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
+        error,
+      );
       return NextResponse.json({ error: 'Failed to fetch summaries' }, { status: 500 });
     }
 
     return NextResponse.json({ summaries: summaries ?? [], total: count ?? 0, limit, offset });
   } catch (error) {
-    console.error('List summaries error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to list summaries';
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error(
+      'List summaries error',
+      { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
+      error,
+    );
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
 }
 
@@ -160,7 +168,11 @@ export async function POST(request: Request) {
       .single();
 
     if (saveError) {
-      console.error('Failed to save summary:', saveError);
+      logger.error(
+        'Failed to save summary',
+        { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
+        saveError,
+      );
       return NextResponse.json({ error: 'Failed to save summary' }, { status: 500 });
     }
 
@@ -177,14 +189,21 @@ export async function POST(request: Request) {
       const { error: pearlError } = await supabase.from('pearls').insert(pearlRows);
 
       if (pearlError) {
-        console.error('Failed to save pearls during summary save:', pearlError);
+        logger.error(
+          'Failed to save pearls during summary save',
+          { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
+          pearlError,
+        );
       }
     }
 
     return NextResponse.json({ savedSummaryId: data.id, title });
   } catch (error) {
-    console.error('Save summary error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to save summary';
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error(
+      'Save summary error',
+      { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
+      error,
+    );
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
 }

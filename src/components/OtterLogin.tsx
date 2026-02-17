@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,6 +27,7 @@ export function OtterLogin({ onLogin, onBack, initialEmail }: Props) {
     try {
       await onLogin(email, password, remember);
     } catch (err) {
+      Sentry.captureException(err);
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);

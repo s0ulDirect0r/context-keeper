@@ -8,6 +8,7 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { buildSearchText } from '@/lib/search-text';
+import { logger } from '@/lib/logger';
 import type { Database } from '@/lib/supabase/types';
 
 const MAX_TRANSCRIPT_BYTES = 500_000; // 500KB per transcript
@@ -38,6 +39,8 @@ function deriveTitle(recordingTitles?: string[]): string {
 }
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get('x-request-id') ?? 'unknown';
+
   // Rate limit check
   const { allowed, retryAfter } = limiter.check(request);
   if (!allowed) {
@@ -85,6 +88,15 @@ export async function POST(request: Request) {
     userId = user?.id ?? null;
   }
 
+  logger.info('Generation started', {
+    requestId,
+    userId: userId ?? undefined,
+    transcriptCount: transcripts.length,
+    transcriptLength: combinedTranscript.length,
+    mode: summaryMode,
+  });
+
+  const generationStart = Date.now();
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -153,13 +165,22 @@ export async function POST(request: Request) {
               .single();
 
             if (saveError) {
-              console.error('Failed to save summary:', saveError);
+              logger.error(
+                'Summary save failed',
+                { requestId, userId, route: '/api/summarize', mode: 'separate' },
+                saveError,
+              );
             } else {
               savedSummaryId = data.id;
             }
           }
 
-          send('complete', { savedSummaryId, summaries, tags: resolvedTags });
+          send('complete', {
+            savedSummaryId,
+            summaries,
+            tags: resolvedTags,
+            saveError: !savedSummaryId && !!userId,
+          });
         } else {
           // Streaming mode: single/combined summary
           const title =
@@ -216,17 +237,32 @@ export async function POST(request: Request) {
               .single();
 
             if (saveError) {
-              console.error('Failed to save summary:', saveError);
+              logger.error(
+                'Summary save failed',
+                { requestId, userId, route: '/api/summarize', mode: 'combined' },
+                saveError,
+              );
             } else {
               savedSummaryId = data.id;
             }
           }
 
-          send('complete', { savedSummaryId, summaries: [accumulatedText], tags: resolvedTags });
+          send('complete', {
+            savedSummaryId,
+            summaries: [accumulatedText],
+            tags: resolvedTags,
+            saveError: !savedSummaryId && !!userId,
+          });
         }
+
+        logger.info('Generation complete', {
+          requestId,
+          userId: userId ?? undefined,
+          duration: Date.now() - generationStart,
+        });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to generate summary';
-        send('error', { task: 'summary', message });
+        logger.error('SSE stream error', { requestId, route: '/api/summarize' }, err);
+        send('error', { task: 'summary', message: 'Failed to generate summary' });
       } finally {
         controller.close();
       }
