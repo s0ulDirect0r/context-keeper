@@ -54,7 +54,7 @@ const TEMPLATES = [
 const GENERIC_HINT =
   'Who\u2019s this for and what do they need to understand? The more I know about the gap between what you know and what they know, the better.';
 
-const STEPS = ['extraction', 'additional'] as const;
+const STEPS = ['extraction', 'format', 'additional'] as const;
 type Step = (typeof STEPS)[number];
 
 export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props) {
@@ -62,7 +62,10 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
   const [extractionGoal, setExtractionGoal] = useState('');
   const [additional, setAdditional] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [summaryStyle, setSummaryStyle] = useState<'standard' | 'structured'>('standard');
+  const [summaryStyle, setSummaryStyle] = useState<'standard' | 'structured' | 'custom'>(
+    'standard',
+  );
+  const [customFormatDescription, setCustomFormatDescription] = useState('');
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -100,6 +103,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
         extractionGoal,
         additionalContext: additional || undefined,
         summaryStyle,
+        customFormatDescription: summaryStyle === 'custom' ? customFormatDescription : undefined,
       });
     }
   };
@@ -116,6 +120,9 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
     switch (step) {
       case 'extraction':
         return extractionGoal.trim().length > 0;
+      case 'format':
+        if (summaryStyle === 'custom') return customFormatDescription.trim().length > 0;
+        return true;
       case 'additional':
         return true;
     }
@@ -125,12 +132,13 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">
-          {step === 'extraction' && `What would you like help with here`}
-          {step === 'extraction' && '?'}
+          {step === 'extraction' && 'What would you like help with here?'}
+          {step === 'format' && 'How should the summary look?'}
           {step === 'additional' && 'Anything else I should know?'}
         </h2>
         <p className="text-muted-foreground">
-          {step === 'extraction' && 'Pick a template or tell me in your own words.'}
+          {step === 'extraction' && 'Pick a template to get started.'}
+          {step === 'format' && 'Pick a style, or describe your own format.'}
           {step === 'additional' &&
             'Optional \u2014 any context about the audience, the meeting, or what you need this for.'}
         </p>
@@ -163,59 +171,82 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               ))}
             </div>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Summary style</p>
-              <RadioGroup
-                value={summaryStyle}
-                onValueChange={(v) => setSummaryStyle(v as 'standard' | 'structured')}
-                className="flex gap-3"
-              >
-                <div
-                  className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                    summaryStyle === 'standard'
-                      ? 'ring-2 ring-primary border-primary bg-accent/30'
-                      : 'border-border'
-                  }`}
-                >
-                  <RadioGroupItem value="standard" id="style-standard" className="mt-0.5" />
-                  <div className="flex-1">
-                    <Label htmlFor="style-standard" className="cursor-pointer font-medium text-sm">
-                      Standard
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Free-form, adapts to meeting shape
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                    summaryStyle === 'structured'
-                      ? 'ring-2 ring-primary border-primary bg-accent/30'
-                      : 'border-border'
-                  }`}
-                >
-                  <RadioGroupItem value="structured" id="style-structured" className="mt-0.5" />
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="style-structured"
-                      className="cursor-pointer font-medium text-sm"
-                    >
-                      Structured
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Sections for orientation, questions, quotes, and dynamics
-                    </p>
-                  </div>
-                </div>
-              </RadioGroup>
-            </div>
+            <p className="text-muted-foreground text-center">or, tell me in your own words</p>
 
             <Textarea
               value={extractionGoal}
               onChange={(e) => handleExtractionChange(e.target.value)}
-              placeholder='Or describe it yourself e.g., "Catch my cofounder up on the investor call", "Help me remember the details for my proposal"'
+              placeholder='e.g., "Catch my cofounder up on the investor call", "Help me remember the details for my proposal"'
               className="min-h-32"
             />
+          </>
+        )}
+
+        {step === 'format' && (
+          <>
+            <RadioGroup
+              value={summaryStyle}
+              onValueChange={(v) => setSummaryStyle(v as 'standard' | 'structured' | 'custom')}
+              className="flex gap-3"
+            >
+              <div
+                className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                  summaryStyle === 'standard'
+                    ? 'ring-2 ring-primary border-primary bg-accent/30'
+                    : 'border-border'
+                }`}
+              >
+                <RadioGroupItem value="standard" id="style-standard" className="mt-0.5" />
+                <div className="flex-1">
+                  <Label htmlFor="style-standard" className="cursor-pointer font-medium text-sm">
+                    Standard
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Free-form, adapts to meeting shape
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                  summaryStyle === 'structured'
+                    ? 'ring-2 ring-primary border-primary bg-accent/30'
+                    : 'border-border'
+                }`}
+              >
+                <RadioGroupItem value="structured" id="style-structured" className="mt-0.5" />
+                <div className="flex-1">
+                  <Label htmlFor="style-structured" className="cursor-pointer font-medium text-sm">
+                    Structured
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Sections for orientation, questions, quotes, and dynamics
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                  summaryStyle === 'custom'
+                    ? 'ring-2 ring-primary border-primary bg-accent/30'
+                    : 'border-border'
+                }`}
+              >
+                <RadioGroupItem value="custom" id="style-custom" className="mt-0.5" />
+                <div className="flex-1">
+                  <Label htmlFor="style-custom" className="cursor-pointer font-medium text-sm">
+                    Custom
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Describe the format you want</p>
+                </div>
+              </div>
+            </RadioGroup>
+            {summaryStyle === 'custom' && (
+              <Textarea
+                value={customFormatDescription}
+                onChange={(e) => setCustomFormatDescription(e.target.value)}
+                placeholder='e.g. "Bullet points grouped by speaker", "Email draft for my manager", "Action items only as a checklist"'
+                className="min-h-32"
+              />
+            )}
           </>
         )}
 
@@ -241,6 +272,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                     extractionGoal,
                     additionalContext: undefined,
                     summaryStyle,
+                    customFormatDescription:
+                      summaryStyle === 'custom' ? customFormatDescription : undefined,
                   })
                 }
               >

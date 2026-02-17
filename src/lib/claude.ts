@@ -86,7 +86,8 @@ export interface Pearl {
 export interface SummaryContext {
   extractionGoal: string;
   additionalContext?: string;
-  summaryStyle?: 'standard' | 'structured';
+  summaryStyle?: 'standard' | 'structured' | 'custom';
+  customFormatDescription?: string;
 }
 
 export interface SummaryMetadata {
@@ -134,7 +135,9 @@ async function summarizeSingle(
   const systemPrompt =
     context.summaryStyle === 'structured'
       ? STRUCTURED_SUMMARY_SYSTEM_PROMPT
-      : SUMMARY_SYSTEM_PROMPT;
+      : context.summaryStyle === 'custom'
+        ? CUSTOM_SUMMARY_SYSTEM_PROMPT
+        : SUMMARY_SYSTEM_PROMPT;
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -175,6 +178,10 @@ function buildUserMessage(
   let message = `Write a meeting summary for this transcript. Use whatever format best serves the content.
 
 **What to extract:** ${context.extractionGoal}`;
+
+  if (context.customFormatDescription) {
+    message += `\n\n**Desired format:** ${context.customFormatDescription}`;
+  }
 
   if (context.additionalContext) {
     message += `\n\n**Additional context:** ${context.additionalContext}`;
@@ -305,6 +312,30 @@ const STRUCTURED_STREAMING_SUMMARY_SYSTEM_PROMPT =
   STRUCTURED_SUMMARY_SYSTEM_PROMPT +
   '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full structured summary below it. Do not wrap the output in a code block.';
 
+// ── Custom format prompt ────────────────────────────────────────────
+
+const CUSTOM_SUMMARY_SYSTEM_PROMPT = `You are summarizing a meeting transcript. The user will describe the exact format they want. Follow their formatting instructions precisely.
+
+## Direct Quotes
+
+When quoting speakers, follow these rules strictly:
+
+- **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
+  > Quote text here — *Speaker Name*
+- **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
+- **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
+- **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.**
+- **If a speaker's response was long,** excerpt the most substantive portion. Use "[…]" to indicate where material was trimmed.
+- **Include timestamps when available** in the transcript (e.g., "[12:34]").
+
+## Title
+- If title metadata is provided, use it directly.
+- Otherwise, generate a concise descriptive title (not "Meeting Summary").`;
+
+const CUSTOM_STREAMING_SUMMARY_SYSTEM_PROMPT =
+  CUSTOM_SUMMARY_SYSTEM_PROMPT +
+  '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full summary below it. Do not wrap the output in a code block.';
+
 export function streamSummarySingle(
   transcript: string,
   context: SummaryContext,
@@ -316,7 +347,9 @@ export function streamSummarySingle(
   const systemPrompt =
     context.summaryStyle === 'structured'
       ? STRUCTURED_STREAMING_SUMMARY_SYSTEM_PROMPT
-      : STREAMING_SUMMARY_SYSTEM_PROMPT;
+      : context.summaryStyle === 'custom'
+        ? CUSTOM_STREAMING_SUMMARY_SYSTEM_PROMPT
+        : STREAMING_SUMMARY_SYSTEM_PROMPT;
 
   return client.messages.stream({
     model: 'claude-sonnet-4-20250514',

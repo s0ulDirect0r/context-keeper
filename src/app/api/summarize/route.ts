@@ -18,11 +18,24 @@ const summarizeSchema = z.object({
     .array(z.string().max(MAX_TRANSCRIPT_BYTES, 'Transcript exceeds 500KB limit'))
     .min(1, 'At least one transcript required')
     .max(10, 'Maximum 10 transcripts'),
-  context: z.object({
-    extractionGoal: z.string().min(1).max(1000, 'Extraction goal exceeds 1000 chars'),
-    additionalContext: z.string().max(2000, 'Additional context exceeds 2000 chars').optional(),
-    summaryStyle: z.enum(['standard', 'structured']).optional(),
-  }),
+  context: z
+    .object({
+      extractionGoal: z.string().min(1).max(1000, 'Extraction goal exceeds 1000 chars'),
+      additionalContext: z.string().max(2000, 'Additional context exceeds 2000 chars').optional(),
+      summaryStyle: z.enum(['standard', 'structured', 'custom']).optional(),
+      customFormatDescription: z
+        .string()
+        .max(2000, 'Custom format description exceeds 2000 chars')
+        .optional(),
+    })
+    .refine(
+      (ctx) =>
+        ctx.summaryStyle !== 'custom' || (ctx.customFormatDescription ?? '').trim().length > 0,
+      {
+        message: 'Custom format description is required when using custom style',
+        path: ['customFormatDescription'],
+      },
+    ),
   mode: z.enum(['combined', 'separate']).optional(),
   save: z.boolean().optional(),
   recordingTitles: z.array(z.string()).optional(),
@@ -80,6 +93,7 @@ export async function POST(request: Request) {
     extractionGoal: context.extractionGoal,
     additionalContext: context.additionalContext,
     summaryStyle: context.summaryStyle,
+    customFormatDescription: context.customFormatDescription,
   };
 
   const summaryMode = mode === 'separate' ? 'separate' : 'combined';
