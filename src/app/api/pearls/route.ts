@@ -1,24 +1,72 @@
+import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { Pearl } from '@/lib/claude';
 import { toSavedPearl, type Database } from '@/lib/supabase/types';
+import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
+const pearlItemSchema = z.object({
+  id: z.string().optional(),
+  insight: z.string().min(1, 'Insight is required').max(500, 'Insight exceeds 500 chars'),
+  concepts: z
+    .array(z.string().max(50))
+    .min(1, 'At least one concept required')
+    .max(5, 'Maximum 5 concepts'),
+  quote: z
+    .object({
+      text: z.string().min(1).max(2000),
+      speaker: z.string().optional(),
+      isUser: z.boolean().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
+const savePearlsSchema = z.object({
+  pearls: z
+    .array(pearlItemSchema)
+    .min(1, 'At least one pearl required')
+    .max(50, 'Maximum 50 pearls'),
+  summaryId: z.string().uuid('Invalid summary ID'),
+  selectedTags: z.array(z.string()).optional(),
+});
+
+// 30 requests per hour per IP
+const limiter = createRateLimiter({ limit: 30, windowMs: 60 * 60 * 1000 });
+
 export async function POST(request: Request) {
+  const requestId = request.headers.get('x-request-id') ?? 'unknown';
+
+  const { allowed, retryAfter } = limiter.check(request);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter, requestId },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
+
   try {
-    const { pearls, summaryId, selectedTags } = (await request.json()) as {
-      pearls: Pearl[];
-      summaryId: string;
-      selectedTags?: string[];
-    };
-
-    if (!pearls || !Array.isArray(pearls) || pearls.length === 0) {
-      return NextResponse.json({ error: 'At least one pearl required' }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body', requestId }, { status: 400 });
     }
 
-    if (!summaryId) {
-      return NextResponse.json({ error: 'summaryId required' }, { status: 400 });
+    const parsed = savePearlsSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: 'Validation failed',
+          details: parsed.error.issues.map((i) => i.message),
+          requestId,
+        },
+        { status: 400 },
+      );
     }
+
+    const { pearls, summaryId, selectedTags } = parsed.data;
 
     const supabase = await createClient();
     const {
@@ -26,7 +74,7 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required', requestId }, { status: 401 });
     }
 
     // Delete existing pearls for this summary (handles regeneration case)
@@ -39,14 +87,14 @@ export async function POST(request: Request) {
     if (deleteError) {
       logger.error(
         'Failed to delete existing pearls',
-        { route: '/api/pearls', requestId: request.headers.get('x-request-id') ?? undefined },
+        { route: '/api/pearls', requestId },
         deleteError,
       );
-      return NextResponse.json({ error: 'Failed to update pearls' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update pearls', requestId }, { status: 500 });
     }
 
     // Insert kept pearls
-    const rows = pearls.map((pearl) => ({
+    const rows = (pearls as Pearl[]).map((pearl) => ({
       user_id: user.id,
       summary_id: summaryId,
       insight: pearl.insight,
@@ -57,12 +105,8 @@ export async function POST(request: Request) {
     const { data, error: insertError } = await supabase.from('pearls').insert(rows).select('*');
 
     if (insertError) {
-      logger.error(
-        'Failed to save pearls',
-        { route: '/api/pearls', requestId: request.headers.get('x-request-id') ?? undefined },
-        insertError,
-      );
-      return NextResponse.json({ error: 'Failed to save pearls' }, { status: 500 });
+      logger.error('Failed to save pearls', { route: '/api/pearls', requestId }, insertError);
+      return NextResponse.json({ error: 'Failed to save pearls', requestId }, { status: 500 });
     }
 
     // Store selected tags on the summary if provided
@@ -79,12 +123,7 @@ export async function POST(request: Request) {
       pearls: ((data ?? []) as PearlRow[]).map(toSavedPearl),
     });
   } catch (error) {
-    logger.error(
-      'Save pearls error',
-      { route: '/api/pearls', requestId: request.headers.get('x-request-id') ?? undefined },
-      error,
-    );
-    const message = error instanceof Error ? error.message : 'Failed to save pearls';
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error('Save pearls error', { route: '/api/pearls', requestId }, error);
+    return NextResponse.json({ error: 'Internal server error', requestId }, { status: 500 });
   }
 }
