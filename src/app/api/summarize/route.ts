@@ -21,6 +21,8 @@ const summarizeSchema = z.object({
   context: z.object({
     extractionGoal: z.string().min(1).max(1000, 'Extraction goal exceeds 1000 chars'),
     additionalContext: z.string().max(2000, 'Additional context exceeds 2000 chars').optional(),
+    summaryStyle: z.enum(['standard', 'structured']).optional(),
+    includeCedarView: z.boolean().optional(),
   }),
   mode: z.enum(['combined', 'separate']).optional(),
   save: z.boolean().optional(),
@@ -71,6 +73,8 @@ export async function POST(request: Request) {
   const summaryContext: SummaryContext = {
     extractionGoal: context.extractionGoal,
     additionalContext: context.additionalContext,
+    summaryStyle: context.summaryStyle,
+    includeCedarView: context.includeCedarView,
   };
 
   const summaryMode = mode === 'separate' ? 'separate' : 'combined';

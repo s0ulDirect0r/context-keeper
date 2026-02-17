@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import type { SummaryContext } from '@/lib/claude';
+import type { SummaryContext, SummaryStyle } from '@/lib/claude';
 
 interface Props {
   onComplete: (context: SummaryContext) => void;
@@ -60,6 +62,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
   const [extractionGoal, setExtractionGoal] = useState('');
   const [additional, setAdditional] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [summaryStyle, setSummaryStyle] = useState<SummaryStyle>('standard');
+  const [includeCedarView, setIncludeCedarView] = useState(false);
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -96,6 +100,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
       onComplete({
         extractionGoal,
         additionalContext: additional || undefined,
+        summaryStyle,
+        includeCedarView: summaryStyle === 'structured' ? includeCedarView : undefined,
       });
     }
   };
@@ -159,6 +165,46 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               ))}
             </div>
 
+            <div className="space-y-2 pt-2">
+              <p className="text-sm font-medium text-muted-foreground">Summary style</p>
+              <RadioGroup
+                value={summaryStyle}
+                onValueChange={(v) => setSummaryStyle(v as SummaryStyle)}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="standard" id="style-standard" />
+                  <Label htmlFor="style-standard" className="cursor-pointer text-sm">
+                    Standard
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="structured" id="style-structured" />
+                  <Label htmlFor="style-structured" className="cursor-pointer text-sm">
+                    Structured
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground">
+                {summaryStyle === 'standard'
+                  ? 'Flexible format that adapts to the meeting type.'
+                  : 'Quote-driven format with central questions and status labels.'}
+              </p>
+              {summaryStyle === 'structured' && (
+                <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeCedarView}
+                    onChange={(e) => setIncludeCedarView(e.target.checked)}
+                    className="h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Include Cedar&apos;s read on the room
+                  </span>
+                </label>
+              )}
+            </div>
+
             <Textarea
               value={extractionGoal}
               onChange={(e) => handleExtractionChange(e.target.value)}
@@ -189,6 +235,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                   onComplete({
                     extractionGoal,
                     additionalContext: undefined,
+                    summaryStyle,
+                    includeCedarView: summaryStyle === 'structured' ? includeCedarView : undefined,
                   })
                 }
               >
