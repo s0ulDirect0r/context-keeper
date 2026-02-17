@@ -55,8 +55,13 @@ export function parseTranscriptFile(content: string, fileName: string): string {
       return parseSrt(content);
     case '.vtt':
       return parseVtt(content);
-    case '.txt':
+    case '.txt': {
+      // Detect VTT/SRT content inside .txt files by sniffing the content
+      if (/^\s*WEBVTT\b/i.test(content)) return parseVtt(content);
+      const firstLines = content.split('\n', 5);
+      if (firstLines.some((l) => TIMESTAMP_RE.test(l.trim()))) return parseSrt(content);
       return content;
+    }
     default:
       throw new Error(`Unsupported file type: ${fileName}`);
   }

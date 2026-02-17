@@ -18,11 +18,18 @@ export function ManualTranscript({ onSubmit, onBack }: Props) {
   const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_FILE_SIZE = 500_000; // Match server-side limit
+
   const handleFile = (file: File) => {
     setFileError(null);
 
     if (!isSupportedFile(file.name)) {
       setFileError('I can only read .txt, .srt, and .vtt files right now.');
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError('This file is too large. Maximum size is 500KB.');
       return;
     }
 
