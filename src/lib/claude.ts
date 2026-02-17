@@ -276,22 +276,6 @@ Participants: [if known]
 
 Detection heuristic: Look for facilitator saying "let's break into groups," followed by parallel audio tracks or a sudden drop in participants, followed by reconvening. If sub-groups reported back, capture the synthesis as quotes. If no report-back: "This sub-group's work was not brought back to main meeting." If not recorded: "Breakout room content was not captured."
 
-### 4. Cedar's Read on the Room
-
-\`\`\`
-## Cedar's Read on the Room
-
-[Relational dynamics analysis. Energy shifts. Avoidance patterns. What's happening between the lines.]
-\`\`\`
-
-**Voice:** Warm, observational, curious. Like a thoughtful colleague who watches dynamics carefully and says what others might feel but wouldn't articulate.
-
-**Hard boundaries:**
-- No individual performance evaluation ("Sarah did a bad job facilitating")
-- No prescriptions ("The team should try...")
-- Use hedging where appropriate ("It seemed like...", "There may be...")
-- Surface patterns, don't diagnose
-
 ## Direct Quotes
 
 When quoting speakers, follow these rules strictly:
