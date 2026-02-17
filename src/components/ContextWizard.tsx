@@ -20,16 +20,12 @@ const TEMPLATES = [
     description: 'What happened and what do I need to know',
     extractionGoal:
       'Key context, decisions, and anything the recipient would need to understand the current state',
-    step2Hint:
-      'Who\u2019s this for and what do they already know? e.g., "My manager missed standup" or "My housemate needs the renovation update."',
   },
   {
     id: 'align',
     label: 'Get everyone aligned',
     description: 'Same page, shared next steps',
     extractionGoal: 'What was agreed, who owns what, and the shared understanding of next steps',
-    step2Hint:
-      'Who needs alignment and on what? e.g., "The whole team needs to know what changed" or "My friends need the plan for the trip."',
   },
   {
     id: 'read-room',
@@ -37,8 +33,6 @@ const TEMPLATES = [
     description: 'Give me the warm data, the vibe, and the relational dynamics',
     extractionGoal:
       'The implicit dynamics present that might not be obvious to participants of the meeting',
-    step2Hint:
-      'What is the current mood, energy, and vibe of the meeting? e.g., "The team is excited about the new project" or "My partner is frustrated with the contractor."',
   },
   {
     id: 'remember',
@@ -46,13 +40,8 @@ const TEMPLATES = [
     description: 'I want to reconnect with what happened',
     extractionGoal:
       'Comprehensive notes with important quotes, nuances, and details I might forget. Turning points. Insights. Any decisions that were made.',
-    step2Hint:
-      'What key moments or decisions were made during the meeting? e.g., "We agreed to meet again next week" or "I promised to send an email with the details."',
   },
 ] as const;
-
-const GENERIC_HINT =
-  'Who\u2019s this for and what do they need to understand? The more I know about the gap between what you know and what they know, the better.';
 
 const STEPS = ['extraction', 'format', 'additional'] as const;
 type Step = (typeof STEPS)[number];
@@ -91,8 +80,6 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
       }
     }
   };
-
-  const activeTemplate = TEMPLATES.find((t) => t.id === selectedTemplate);
 
   const handleNext = () => {
     const nextIndex = stepIndex + 1;
@@ -142,11 +129,6 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
           {step === 'additional' &&
             'Optional \u2014 any context about the audience, the meeting, or what you need this for.'}
         </p>
-        {step === 'additional' && (
-          <p className="text-sm text-muted-foreground italic bg-muted/50 rounded-md p-3 mt-1 text-left">
-            {activeTemplate ? activeTemplate.step2Hint : GENERIC_HINT}
-          </p>
-        )}
       </div>
 
       <div className="space-y-4">
@@ -189,7 +171,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               onValueChange={(v) => setSummaryStyle(v as 'standard' | 'structured' | 'custom')}
               className="flex gap-3"
             >
-              <div
+              <Label
+                htmlFor="style-standard"
                 className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
                   summaryStyle === 'standard'
                     ? 'ring-2 ring-primary border-primary bg-accent/30'
@@ -198,15 +181,14 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               >
                 <RadioGroupItem value="standard" id="style-standard" className="mt-0.5" />
                 <div className="flex-1">
-                  <Label htmlFor="style-standard" className="cursor-pointer font-medium text-sm">
-                    Standard
-                  </Label>
+                  <span className="font-medium text-sm">Standard</span>
                   <p className="text-xs text-muted-foreground">
                     Free-form, adapts to meeting shape
                   </p>
                 </div>
-              </div>
-              <div
+              </Label>
+              <Label
+                htmlFor="style-structured"
                 className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
                   summaryStyle === 'structured'
                     ? 'ring-2 ring-primary border-primary bg-accent/30'
@@ -215,15 +197,14 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               >
                 <RadioGroupItem value="structured" id="style-structured" className="mt-0.5" />
                 <div className="flex-1">
-                  <Label htmlFor="style-structured" className="cursor-pointer font-medium text-sm">
-                    Structured
-                  </Label>
+                  <span className="font-medium text-sm">Structured</span>
                   <p className="text-xs text-muted-foreground">
                     Sections for orientation, questions, quotes, and dynamics
                   </p>
                 </div>
-              </div>
-              <div
+              </Label>
+              <Label
+                htmlFor="style-custom"
                 className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
                   summaryStyle === 'custom'
                     ? 'ring-2 ring-primary border-primary bg-accent/30'
@@ -232,12 +213,10 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               >
                 <RadioGroupItem value="custom" id="style-custom" className="mt-0.5" />
                 <div className="flex-1">
-                  <Label htmlFor="style-custom" className="cursor-pointer font-medium text-sm">
-                    Custom
-                  </Label>
+                  <span className="font-medium text-sm">Custom</span>
                   <p className="text-xs text-muted-foreground">Describe the format you want</p>
                 </div>
-              </div>
+              </Label>
             </RadioGroup>
             {summaryStyle === 'custom' && (
               <Textarea
