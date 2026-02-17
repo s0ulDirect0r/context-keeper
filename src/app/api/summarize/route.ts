@@ -262,8 +262,7 @@ export async function POST(request: Request) {
         });
       } catch (err) {
         logger.error('SSE stream error', { requestId, route: '/api/summarize' }, err);
-        const message = err instanceof Error ? err.message : 'Failed to generate summary';
-        send('error', { task: 'summary', message });
+        send('error', { task: 'summary', message: 'Failed to generate summary' });
       } finally {
         controller.close();
       }

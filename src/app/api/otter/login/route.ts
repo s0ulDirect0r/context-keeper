@@ -48,7 +48,6 @@ export async function POST(request: Request) {
       { route: '/api/otter/login', requestId: request.headers.get('x-request-id') ?? undefined },
       error,
     );
-    const message = error instanceof Error ? error.message : 'Login failed';
-    return NextResponse.json({ error: message }, { status: 401 });
+    return NextResponse.json({ error: 'Login failed' }, { status: 401 });
   }
 }

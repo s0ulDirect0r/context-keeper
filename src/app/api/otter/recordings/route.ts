@@ -36,8 +36,7 @@ export async function GET(request: Request) {
       },
       error,
     );
-    const message = error instanceof Error ? error.message : 'Failed to fetch recordings';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch recordings' }, { status: 500 });
   }
 }
 
@@ -84,7 +83,6 @@ export async function POST(request: Request) {
       },
       error,
     );
-    const message = error instanceof Error ? error.message : 'Failed to fetch transcripts';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch transcripts' }, { status: 500 });
   }
 }

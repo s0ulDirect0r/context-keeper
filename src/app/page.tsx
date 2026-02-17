@@ -113,6 +113,18 @@ export default function Home() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const generationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Clean up timeout and abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (generationTimeoutRef.current) {
+        clearTimeout(generationTimeoutRef.current);
+        generationTimeoutRef.current = null;
+      }
+      abortControllerRef.current?.abort('unmount');
+      abortControllerRef.current = null;
+    };
+  }, []);
+
   // Load Otter connection based on auth state
   useEffect(() => {
     const loadOtterConnection = async () => {
@@ -477,6 +489,8 @@ export default function Home() {
   };
 
   const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
+    if (abortControllerRef.current?.signal.aborted) return;
+
     switch (event) {
       case 'summary_chunk':
         streamingMarkdownRef.current += data.text as string;
@@ -577,7 +591,7 @@ export default function Home() {
 
   return (
     <main className="container mx-auto px-4 py-12">
-      {state.error && (
+      {state.error && state.step !== 'generating' && (
         <div className="max-w-2xl mx-auto mb-6 rounded-md bg-red-50 dark:bg-red-950 p-4 text-red-800 dark:text-red-200">
           {state.error}
         </div>
@@ -655,7 +669,10 @@ export default function Home() {
           markdown={state.streamingMarkdown}
           isStreaming={state.isStreaming}
           error={state.error}
-          onCancel={cancelGeneration}
+          onCancel={() => {
+            cancelGeneration();
+            dispatch({ type: 'SET_STEP', step: 'context-wizard' });
+          }}
           onRetry={() => {
             if (state.context) {
               startSummaryGeneration(state.context, state.summaryMode);

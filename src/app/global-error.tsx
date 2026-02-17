@@ -16,24 +16,74 @@ export default function GlobalError({
 
   return (
     <html lang="en">
-      <body className="antialiased bg-background text-foreground">
-        <main className="min-h-screen flex items-center justify-center px-4">
-          <div className="text-center max-w-md">
-            <h1 className="text-3xl font-bold mb-4">Something went wrong</h1>
-            <p className="text-muted-foreground mb-8">
+      <body
+        style={{
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+          WebkitFontSmoothing: 'antialiased',
+          backgroundColor: '#ffffff',
+          color: '#0a0a0a',
+          margin: 0,
+        }}
+      >
+        <main
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 1rem',
+          }}
+        >
+          <div style={{ textAlign: 'center', maxWidth: '28rem' }}>
+            <h1 style={{ fontSize: '1.875rem', fontWeight: 700, marginBottom: '1rem' }}>
+              Something went wrong
+            </h1>
+            <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
               A critical error occurred. Please try reloading the page.
             </p>
-            <div className="flex items-center justify-center gap-3">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem',
+              }}
+            >
               <button
                 onClick={reset}
-                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '0.375rem',
+                  backgroundColor: '#0a0a0a',
+                  color: '#ffffff',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
               >
                 Reload page
               </button>
               {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error renders outside the Next.js router */}
               <a
                 href="/"
-                className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#ffffff',
+                  color: '#0a0a0a',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                }}
               >
                 Go home
               </a>

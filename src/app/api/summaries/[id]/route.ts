@@ -114,7 +114,6 @@ export async function PATCH(request: Request, { params }: Props) {
       { route: '/api/summaries/[id]', requestId: request.headers.get('x-request-id') ?? undefined },
       error,
     );
-    const message = error instanceof Error ? error.message : 'Failed to update summary';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update summary' }, { status: 500 });
   }
 }

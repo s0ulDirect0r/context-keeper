@@ -110,8 +110,7 @@ export async function GET(request: Request) {
       { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
       error,
     );
-    const message = error instanceof Error ? error.message : 'Failed to list summaries';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
 }
 
@@ -205,7 +204,6 @@ export async function POST(request: Request) {
       { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
       error,
     );
-    const message = error instanceof Error ? error.message : 'Failed to save summary';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
 }
