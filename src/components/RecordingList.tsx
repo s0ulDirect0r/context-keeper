@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import type { Recording } from '@/lib/otter';
 
@@ -96,8 +97,6 @@ export function RecordingList({ recordings, onSelect, onBack, loading }: Props) 
     return groupByDate(list);
   }, [recordings, search]);
 
-  const totalFiltered = filtered.reduce((sum, g) => sum + g.recordings.length, 0);
-
   return (
     <div className="w-full max-w-[34rem] mx-auto flex flex-col gap-3">
       <div className="text-center space-y-1">
@@ -130,18 +129,18 @@ export function RecordingList({ recordings, onSelect, onBack, loading }: Props) 
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Search recordings..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+              className="pl-10 bg-card"
             />
           </div>
 
           {/* Recording list */}
           <div className="max-h-[32rem] overflow-y-auto">
-            {totalFiltered === 0 ? (
+            {filtered.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
                 No recordings match &ldquo;{search}&rdquo;
               </p>
