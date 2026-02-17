@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { SummaryContext } from '@/lib/claude';
 
 interface Props {
@@ -60,6 +62,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
   const [extractionGoal, setExtractionGoal] = useState('');
   const [additional, setAdditional] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [summaryStyle, setSummaryStyle] = useState<'standard' | 'structured'>('standard');
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -96,6 +99,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
       onComplete({
         extractionGoal,
         additionalContext: additional || undefined,
+        summaryStyle,
       });
     }
   };
@@ -159,6 +163,53 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               ))}
             </div>
 
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Summary style</p>
+              <RadioGroup
+                value={summaryStyle}
+                onValueChange={(v) => setSummaryStyle(v as 'standard' | 'structured')}
+                className="flex gap-3"
+              >
+                <div
+                  className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                    summaryStyle === 'standard'
+                      ? 'ring-2 ring-primary border-primary bg-accent/30'
+                      : 'border-border'
+                  }`}
+                >
+                  <RadioGroupItem value="standard" id="style-standard" className="mt-0.5" />
+                  <div className="flex-1">
+                    <Label htmlFor="style-standard" className="cursor-pointer font-medium text-sm">
+                      Standard
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Free-form, adapts to meeting shape
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                    summaryStyle === 'structured'
+                      ? 'ring-2 ring-primary border-primary bg-accent/30'
+                      : 'border-border'
+                  }`}
+                >
+                  <RadioGroupItem value="structured" id="style-structured" className="mt-0.5" />
+                  <div className="flex-1">
+                    <Label
+                      htmlFor="style-structured"
+                      className="cursor-pointer font-medium text-sm"
+                    >
+                      Structured
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Sections for orientation, questions, quotes, and dynamics
+                    </p>
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
+
             <Textarea
               value={extractionGoal}
               onChange={(e) => handleExtractionChange(e.target.value)}
@@ -189,6 +240,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                   onComplete({
                     extractionGoal,
                     additionalContext: undefined,
+                    summaryStyle,
                   })
                 }
               >

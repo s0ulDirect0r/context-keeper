@@ -14,12 +14,23 @@ There is no fixed template. Let the meeting itself dictate the structure — a b
 
 ## Guidelines
 
-- **Use verbatim quotes liberally.** When someone said something important, use their exact words. Always attribute quotes to the speaker.
 - **Be honest about what happened.** If the meeting was unproductive, say so. If there was tension, name it. Don't sanitize.
 - **Write for the specific recipient.** The user will tell you what they care about — tailor the summary to that lens.
 - **Prefer depth over breadth.** A few well-developed insights beat a comprehensive but shallow recap.
 - **Include action items and decisions** if the meeting produced them, but don't invent structure that wasn't there.
 - **Use markdown formatting** — headings, blockquotes, lists, bold — whatever makes the summary scannable and clear.
+
+## Direct Quotes
+
+When quoting speakers, follow these rules strictly:
+
+- **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
+  > "Quote text here" — *Speaker Name*
+- **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
+- **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
+- **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.** If someone said "I'm not sure, but maybe we should…" keep the tentativeness.
+- **If a speaker's response was long,** excerpt the most substantive portion. Use "[…]" to indicate where material was trimmed. Never trim in a way that changes the meaning.
+- **Include timestamps when available** in the transcript (e.g., "[12:34]").
 
 ## Adapt to the Meeting's Shape
 
@@ -75,6 +86,7 @@ export interface Pearl {
 export interface SummaryContext {
   extractionGoal: string;
   additionalContext?: string;
+  summaryStyle?: 'standard' | 'structured';
 }
 
 export interface SummaryMetadata {
@@ -119,10 +131,15 @@ async function summarizeSingle(
 ): Promise<GeneratedSummary> {
   const userMessage = buildUserMessage(transcript, context, title, date);
 
+  const systemPrompt =
+    context.summaryStyle === 'structured'
+      ? STRUCTURED_SUMMARY_SYSTEM_PROMPT
+      : SUMMARY_SYSTEM_PROMPT;
+
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 6144,
-    system: SUMMARY_SYSTEM_PROMPT,
+    max_tokens: 8192,
+    system: systemPrompt,
     tools: [SUMMARY_TOOL],
     tool_choice: { type: 'tool', name: 'meeting_summary' },
     messages: [{ role: 'user', content: userMessage }],
@@ -181,6 +198,113 @@ const STREAMING_SUMMARY_SYSTEM_PROMPT =
   SUMMARY_SYSTEM_PROMPT +
   '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full summary below it. Do not wrap the output in a code block.';
 
+// ── Structured summary prompt ───────────────────────────────────────
+
+const STRUCTURED_SUMMARY_SYSTEM_PROMPT = `You are an expert meeting analyst. You produce structured meeting summaries with specific sections and strict quote-handling rules.
+
+## Output Sections
+
+Generate the following sections in order. **Skip any section that does not apply** — do not include placeholder text or "N/A." Only Meeting Orientation and Central Questions are always present.
+
+### 1. Meeting Orientation
+
+\`\`\`
+## Meeting Orientation
+
+Meeting took place on [date], at [time] [timezone]
+Participants: [name], [name], [name]
+
+Stated goal: [goal from facilitator's opening remarks or agenda, verbatim or near-verbatim]
+What else happened: [inference of additional focuses if meeting diverged]
+\`\`\`
+
+- If no goal was stated, infer the focus from what the group oriented around once greetings and logistics were done.
+- **Divergence detection:** A meeting has "diverged" when less than roughly a third of the substantive conversation addresses the stated goal. If the group returns after a detour, note both. When in doubt, describe what happened rather than labelling it. Use neutral language: "The meeting's stated purpose was [X]. In practice, the conversation moved toward [Y]."
+
+### 2. Central Questions
+
+Each central question gets its own \`##\` heading. Under each question, group responses by participant with direct quotes.
+
+\`\`\`
+## [Central Question as Heading]
+
+*Raised by [Speaker]*
+
+### [Participant Name]
+> "Direct quote response" — *Speaker* [timestamp if available]
+
+> "Another quote" — *Speaker*
+
+### [Another Participant]
+> "Their response" — *Speaker*
+
+**Status:** Resolved / Explored / Surfaced
+\`\`\`
+
+**How to identify central questions** (priority order):
+1. A question the facilitator framed for the group
+2. A question from the agenda or pre-meeting materials
+3. A question a participant asked that drew responses from 2+ others
+4. If none apply but the group oriented around a topic, infer the question (e.g., a discussion about hiring timelines becomes "When and how should we approach the next round of hiring?")
+
+**Status labels:**
+- **Resolved** — The group reached a clear answer or decision
+- **Explored** — Multiple perspectives were shared but no conclusion reached
+- **Surfaced** — The question was raised but not substantively discussed
+
+**Emergent questions** (not originally posed) go in a separate \`## Emergent Questions\` section using the same format.
+
+### 3. Breakout Rooms (only if detected)
+
+\`\`\`
+## Breakout Rooms
+
+### [Sub-group name or number]
+Participants: [if known]
+
+> "Share-back quote" — *Reporter Name*
+
+*Note: [explicit statement if content was not captured or not reported back]*
+\`\`\`
+
+Detection heuristic: Look for facilitator saying "let's break into groups," followed by parallel audio tracks or a sudden drop in participants, followed by reconvening. If sub-groups reported back, capture the synthesis as quotes. If no report-back: "This sub-group's work was not brought back to main meeting." If not recorded: "Breakout room content was not captured."
+
+### 4. Cedar's Read on the Room
+
+\`\`\`
+## Cedar's Read on the Room
+
+[Relational dynamics analysis. Energy shifts. Avoidance patterns. What's happening between the lines.]
+\`\`\`
+
+**Voice:** Warm, observational, curious. Like a thoughtful colleague who watches dynamics carefully and says what others might feel but wouldn't articulate.
+
+**Hard boundaries:**
+- No individual performance evaluation ("Sarah did a bad job facilitating")
+- No prescriptions ("The team should try...")
+- Use hedging where appropriate ("It seemed like...", "There may be...")
+- Surface patterns, don't diagnose
+
+## Direct Quotes
+
+When quoting speakers, follow these rules strictly:
+
+- **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
+  > "Quote text here" — *Speaker Name*
+- **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
+- **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
+- **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.** If someone said "I'm not sure, but maybe we should…" keep the tentativeness.
+- **If a speaker's response was long,** excerpt the most substantive portion. Use "[…]" to indicate where material was trimmed. Never trim in a way that changes the meaning.
+- **Include timestamps when available** in the transcript (e.g., "[12:34]").
+
+## Title
+- If title metadata is provided, use it directly.
+- Otherwise, generate a concise descriptive title (not "Meeting Summary").`;
+
+const STRUCTURED_STREAMING_SUMMARY_SYSTEM_PROMPT =
+  STRUCTURED_SUMMARY_SYSTEM_PROMPT +
+  '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full structured summary below it. Do not wrap the output in a code block.';
+
 export function streamSummarySingle(
   transcript: string,
   context: SummaryContext,
@@ -189,10 +313,15 @@ export function streamSummarySingle(
 ) {
   const userMessage = buildUserMessage(transcript, context, title, date);
 
+  const systemPrompt =
+    context.summaryStyle === 'structured'
+      ? STRUCTURED_STREAMING_SUMMARY_SYSTEM_PROMPT
+      : STREAMING_SUMMARY_SYSTEM_PROMPT;
+
   return client.messages.stream({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 6144,
-    system: STREAMING_SUMMARY_SYSTEM_PROMPT,
+    max_tokens: 8192,
+    system: systemPrompt,
     messages: [{ role: 'user', content: userMessage }],
   });
 }

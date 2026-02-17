@@ -253,17 +253,36 @@ export function EditableMarkdown({
     [chunks, onChange],
   );
 
+  // Detect Cedar's Read on the Room heading for collapsible rendering
+  const cedarIndex = chunks.findIndex((c) => /^##\s+Cedar[''']s\s+Read/i.test(c.trim()));
+
+  const beforeCedar = cedarIndex === -1 ? chunks : chunks.slice(0, cedarIndex);
+  const cedarChunks = cedarIndex === -1 ? [] : chunks.slice(cedarIndex + 1);
+
+  const renderChunk = (chunk: string, index: number) => (
+    <EditableChunk
+      key={index}
+      chunk={chunk}
+      onSave={(newText) => handleChunkSave(index, newText)}
+      readOnly={readOnly}
+      saveStatus={index === lastEditedIndex ? saveStatus : undefined}
+    />
+  );
+
   return (
     <div className="space-y-4">
-      {chunks.map((chunk, index) => (
-        <EditableChunk
-          key={index}
-          chunk={chunk}
-          onSave={(newText) => handleChunkSave(index, newText)}
-          readOnly={readOnly}
-          saveStatus={index === lastEditedIndex ? saveStatus : undefined}
-        />
-      ))}
+      {beforeCedar.map((chunk, index) => renderChunk(chunk, index))}
+
+      {cedarIndex !== -1 && (
+        <details className="border rounded-lg p-4 mt-6">
+          <summary className="cursor-pointer font-medium text-muted-foreground">
+            Cedar&apos;s Read on the Room
+          </summary>
+          <div className="mt-4 space-y-4">
+            {cedarChunks.map((chunk, i) => renderChunk(chunk, cedarIndex + 1 + i))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
