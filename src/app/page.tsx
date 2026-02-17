@@ -417,11 +417,11 @@ export default function Home() {
 
       await consumeSSE(response, handleSSEEvent);
     } catch (err) {
+      console.error('[startSummaryGeneration] Failed:', err);
       dispatch({
-        type: 'SET_ERROR',
+        type: 'GENERATION_FAILED',
         error: err instanceof Error ? err.message : 'Failed to generate summary',
       });
-      dispatch({ type: 'SET_STEP', step: 'context-wizard' });
     }
   };
 

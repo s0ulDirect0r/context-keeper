@@ -10,11 +10,11 @@ import { createRateLimiter } from '@/lib/rate-limit';
 import { buildSearchText } from '@/lib/search-text';
 import type { Database } from '@/lib/supabase/types';
 
-const MAX_TRANSCRIPT_BYTES = 100_000; // 100KB per transcript
+const MAX_TRANSCRIPT_BYTES = 500_000; // 500KB per transcript
 
 const summarizeSchema = z.object({
   transcripts: z
-    .array(z.string().max(MAX_TRANSCRIPT_BYTES, 'Transcript exceeds 100KB limit'))
+    .array(z.string().max(MAX_TRANSCRIPT_BYTES, 'Transcript exceeds 500KB limit'))
     .min(1, 'At least one transcript required')
     .max(10, 'Maximum 10 transcripts'),
   context: z.object({

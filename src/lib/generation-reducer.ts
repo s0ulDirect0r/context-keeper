@@ -145,6 +145,7 @@ export type GenerationAction =
   | { type: 'SET_TAG_SELECTION'; selection: Set<string> }
   | { type: 'SET_TAG_CUSTOM_TAGS'; customTags: Set<string> }
   | { type: 'SET_SAVED_SUMMARY_ID'; id: string }
+  | { type: 'GENERATION_FAILED'; error: string }
   | { type: 'START_OVER' };
 
 // ── Reducer ──────────────────────────────────────────────────────────
@@ -278,6 +279,10 @@ export function generationReducer(
 
     case 'SET_SAVED_SUMMARY_ID':
       return { ...state, savedSummaryId: action.id };
+
+    // Atomic error + step transition — avoids SET_STEP clearing the error
+    case 'GENERATION_FAILED':
+      return { ...state, step: 'context-wizard', error: action.error, isStreaming: false };
 
     // Full reset — preserves nothing (otterSession is external)
     case 'START_OVER':
