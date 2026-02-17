@@ -108,6 +108,8 @@ export default function Home() {
   const streamingMarkdownRef = useRef('');
   const prefetchedForSession = useRef<string | null>(null);
   const prefetchPromise = useRef<Promise<Recording[] | null> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const generationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load Otter connection based on auth state
   useEffect(() => {
@@ -385,7 +387,19 @@ export default function Home() {
     startSummaryGeneration(state.context!, mode);
   };
 
+  const cancelGeneration = () => {
+    if (generationTimeoutRef.current) {
+      clearTimeout(generationTimeoutRef.current);
+      generationTimeoutRef.current = null;
+    }
+    abortControllerRef.current?.abort('user_cancel');
+    abortControllerRef.current = null;
+  };
+
   const startSummaryGeneration = async (ctx: SummaryContext, mode: 'combined' | 'separate') => {
+    // Cancel any in-progress generation
+    cancelGeneration();
+
     // Reset streaming ref (can't be in reducer)
     streamingMarkdownRef.current = '';
     // Clear stale guest edits so they don't overwrite the new summary on mount
@@ -395,6 +409,14 @@ export default function Home() {
       /* noop */
     }
     dispatch({ type: 'GENERATION_START' });
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    // 120-second timeout safety net
+    generationTimeoutRef.current = setTimeout(() => {
+      controller.abort('timeout');
+    }, 120_000);
 
     try {
       const response = await fetch('/api/summarize', {
@@ -408,6 +430,7 @@ export default function Home() {
           recordingTitles: state.recordingTitles,
           recordingDates: state.recordingDates,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -417,11 +440,31 @@ export default function Home() {
 
       await consumeSSE(response, handleSSEEvent);
     } catch (err) {
-      console.error('[startSummaryGeneration] Failed:', err);
+      // Don't report user cancellations as errors
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        const reason = controller.signal.reason;
+        if (reason === 'timeout') {
+          dispatch({
+            type: 'GENERATION_FAILED',
+            error: 'Generation timed out. Try a shorter transcript or try again.',
+            stayOnGenerating: true,
+          });
+        } else {
+          // User cancelled — go back to context wizard
+          dispatch({ type: 'SET_STEP', step: 'context-wizard' });
+        }
+        return;
+      }
       dispatch({
         type: 'GENERATION_FAILED',
         error: err instanceof Error ? err.message : 'Failed to generate summary',
       });
+    } finally {
+      if (generationTimeoutRef.current) {
+        clearTimeout(generationTimeoutRef.current);
+        generationTimeoutRef.current = null;
+      }
+      abortControllerRef.current = null;
     }
   };
 
@@ -594,6 +637,13 @@ export default function Home() {
         <StreamingGenerationView
           markdown={state.streamingMarkdown}
           isStreaming={state.isStreaming}
+          error={state.error}
+          onCancel={cancelGeneration}
+          onRetry={() => {
+            if (state.context) {
+              startSummaryGeneration(state.context, state.summaryMode);
+            }
+          }}
         />
       )}
 
