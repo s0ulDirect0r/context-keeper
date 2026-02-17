@@ -136,11 +136,6 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
           {step === 'additional' &&
             'Optional \u2014 any context about the audience, the meeting, or what you need this for.'}
         </p>
-        {step === 'additional' && (
-          <p className="text-sm text-muted-foreground italic bg-muted/50 rounded-md p-3 mt-1 text-left">
-            {activeTemplate ? activeTemplate.step2Hint : GENERIC_HINT}
-          </p>
-        )}
       </div>
 
       <div className="space-y-4">
