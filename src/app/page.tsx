@@ -285,13 +285,13 @@ export default function Home() {
       });
       dispatch({ type: 'SET_STEP', step: 'otter-recordings' });
     } catch (err) {
-      dispatch({
-        type: 'SET_ERROR',
-        error: err instanceof Error ? err.message : 'Failed to fetch recordings',
-      });
       clearSession();
       setOtterSession(null);
-      dispatch({ type: 'SET_STEP', step: 'otter-login' });
+      dispatch({
+        type: 'SET_STEP_WITH_ERROR',
+        step: 'otter-login',
+        error: err instanceof Error ? err.message : 'Failed to fetch recordings',
+      });
     } finally {
       dispatch({ type: 'SET_LOADING_RECORDINGS', loading: false });
     }
@@ -460,6 +460,10 @@ export default function Home() {
         break;
 
       case 'error':
+        dispatch({
+          type: 'GENERATION_FAILED',
+          error: (data.message as string) || 'Something went wrong during generation',
+        });
         break;
     }
   };

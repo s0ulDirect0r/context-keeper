@@ -145,6 +145,7 @@ export type GenerationAction =
   | { type: 'SET_TAG_SELECTION'; selection: Set<string> }
   | { type: 'SET_TAG_CUSTOM_TAGS'; customTags: Set<string> }
   | { type: 'SET_SAVED_SUMMARY_ID'; id: string }
+  | { type: 'SET_STEP_WITH_ERROR'; step: Step; error: string }
   | { type: 'GENERATION_FAILED'; error: string }
   | { type: 'START_OVER' };
 
@@ -279,6 +280,10 @@ export function generationReducer(
 
     case 'SET_SAVED_SUMMARY_ID':
       return { ...state, savedSummaryId: action.id };
+
+    // Step transition that preserves an error message
+    case 'SET_STEP_WITH_ERROR':
+      return { ...state, step: action.step, error: action.error };
 
     // Atomic error + step transition — avoids SET_STEP clearing the error
     case 'GENERATION_FAILED':
