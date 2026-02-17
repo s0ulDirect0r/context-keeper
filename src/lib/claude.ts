@@ -25,7 +25,7 @@ There is no fixed template. Let the meeting itself dictate the structure — a b
 When quoting speakers, follow these rules strictly:
 
 - **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
-  > "Quote text here" — *Speaker Name*
+  > Quote text here — *Speaker Name*
 - **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
 - **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
 - **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.** If someone said "I'm not sure, but maybe we should…" keep the tentativeness.
@@ -231,12 +231,12 @@ Each central question gets its own \`##\` heading. Under each question, group re
 *Raised by [Speaker]*
 
 ### [Participant Name]
-> "Direct quote response" — *Speaker* [timestamp if available]
+> Direct quote response — *Speaker* [timestamp if available]
 
-> "Another quote" — *Speaker*
+> Another quote — *Speaker*
 
 ### [Another Participant]
-> "Their response" — *Speaker*
+> Their response — *Speaker*
 
 **Status:** Resolved / Explored / Surfaced
 \`\`\`
@@ -262,7 +262,7 @@ Each central question gets its own \`##\` heading. Under each question, group re
 ### [Sub-group name or number]
 Participants: [if known]
 
-> "Share-back quote" — *Reporter Name*
+> Share-back quote — *Reporter Name*
 
 *Note: [explicit statement if content was not captured or not reported back]*
 \`\`\`
@@ -290,7 +290,7 @@ Detection heuristic: Look for facilitator saying "let's break into groups," foll
 When quoting speakers, follow these rules strictly:
 
 - **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
-  > "Quote text here" — *Speaker Name*
+  > Quote text here — *Speaker Name*
 - **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
 - **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
 - **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.** If someone said "I'm not sure, but maybe we should…" keep the tentativeness.
