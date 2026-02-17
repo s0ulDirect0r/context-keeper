@@ -25,14 +25,18 @@ export function NavBar() {
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <Link href="/" className="font-semibold text-lg">
+          <Link href="/" className="font-bold text-2xl font-serif">
             Cedar
           </Link>
 
           {user && (
             <nav className="hidden sm:flex items-center gap-1">
               <Link href="/">
-                <Button variant="ghost" size="sm" className={cn(pathname === '/' && 'bg-muted')}>
+                <Button
+                  variant="ghost"
+                  size="default"
+                  className={cn('font-semibold', pathname === '/' && 'bg-muted')}
+                >
                   <Plus className="h-4 w-4 mr-1" />
                   New Summary
                 </Button>
@@ -40,8 +44,8 @@ export function NavBar() {
               <Link href="/dashboard">
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className={cn(pathname === '/dashboard' && 'bg-muted')}
+                  size="default"
+                  className={cn('font-semibold', pathname === '/dashboard' && 'bg-muted')}
                 >
                   <LayoutDashboard className="h-4 w-4 mr-1" />
                   Dashboard

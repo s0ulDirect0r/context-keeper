@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Fraunces } from 'next/font/google';
 import { AuthProvider } from '@/components/AuthProvider';
 import { AppModeProvider } from '@/components/AppModeProvider';
 import { NavBar } from '@/components/NavBar';
@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const fraunces = Fraunces({
+  variable: '--font-fraunces',
+  subsets: ['latin'],
+});
+
 export const metadata: Metadata = {
   title: 'Cedar',
   description: 'Turn your meeting recordings into orientation',
@@ -27,7 +32,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}
+      >
         <AuthProvider>
           <AppModeProvider>
             <NavBar />
