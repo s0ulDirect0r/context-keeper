@@ -17,27 +17,27 @@ const TEMPLATES = [
   {
     id: 'catch-up',
     label: 'Catch me up',
-    description: 'What happened and what do I need to know',
+    description: 'What happened and what matters most',
     extractionGoal:
       'Key context, decisions, and anything the recipient would need to understand the current state',
   },
   {
     id: 'align',
-    label: 'Get everyone aligned',
-    description: 'Same page, shared next steps',
+    label: 'Summarise for others',
+    description: 'Shared context and clear next steps',
     extractionGoal: 'What was agreed, who owns what, and the shared understanding of next steps',
   },
   {
     id: 'read-room',
     label: 'Help me read the room',
-    description: 'Give me the warm data, the vibe, and the relational dynamics',
+    description: 'The dynamics, tensions, and unspoken signals',
     extractionGoal:
       'The implicit dynamics present that might not be obvious to participants of the meeting',
   },
   {
     id: 'remember',
     label: 'Help me remember',
-    description: 'I want to reconnect with what happened',
+    description: 'Key moments, insights and quotes',
     extractionGoal:
       'Comprehensive notes with important quotes, nuances, and details I might forget. Turning points. Insights. Any decisions that were made.',
   },
@@ -119,13 +119,13 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">
-          {step === 'extraction' && 'What would you like help with here?'}
-          {step === 'format' && 'How should the summary look?'}
+          {step === 'extraction' && 'What can I help you with?'}
+          {step === 'format' && 'Choose a summary format.'}
           {step === 'additional' && 'Anything else I should know?'}
         </h2>
         <p className="text-muted-foreground">
           {step === 'extraction' && 'Pick a template to get started.'}
-          {step === 'format' && 'Pick a style, or describe your own format.'}
+          {step === 'format' && 'Not sure? Start with Standard.'}
           {step === 'additional' &&
             'Optional \u2014 any context about the audience, the meeting, or what you need this for.'}
         </p>
@@ -158,7 +158,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
             <Textarea
               value={extractionGoal}
               onChange={(e) => handleExtractionChange(e.target.value)}
-              placeholder='e.g., "Catch my cofounder up on the investor call", "Help me remember the details for my proposal"'
+              placeholder='e.g., "Catch my developer up on the user feedback call"'
               className="min-h-32"
             />
           </>
@@ -182,9 +182,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                 <RadioGroupItem value="standard" id="style-standard" className="mt-0.5" />
                 <div className="flex-1">
                   <span className="font-medium text-sm">Standard</span>
-                  <p className="text-xs text-muted-foreground">
-                    Free-form, adapts to meeting shape
-                  </p>
+                  <p className="text-xs text-muted-foreground">Adapts to the themes</p>
                 </div>
               </Label>
               <Label
@@ -198,9 +196,7 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                 <RadioGroupItem value="structured" id="style-structured" className="mt-0.5" />
                 <div className="flex-1">
                   <span className="font-medium text-sm">Structured</span>
-                  <p className="text-xs text-muted-foreground">
-                    Sections for orientation, questions, quotes, and dynamics
-                  </p>
+                  <p className="text-xs text-muted-foreground">Pull out central questions</p>
                 </div>
               </Label>
               <Label

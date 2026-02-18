@@ -40,6 +40,7 @@ const summarizeSchema = z.object({
   save: z.boolean().optional(),
   recordingTitles: z.array(z.string()).optional(),
   recordingDates: z.array(z.string()).optional(),
+  timezone: z.string().max(100).optional(),
 });
 
 // 10 requests per hour per IP
@@ -87,13 +88,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { transcripts, context, mode, save, recordingTitles, recordingDates } = parsed.data;
+  const { transcripts, context, mode, save, recordingTitles, recordingDates, timezone } =
+    parsed.data;
 
   const summaryContext: SummaryContext = {
     extractionGoal: context.extractionGoal,
     additionalContext: context.additionalContext,
     summaryStyle: context.summaryStyle,
     customFormatDescription: context.customFormatDescription,
+    timezone,
   };
 
   const summaryMode = mode === 'separate' ? 'separate' : 'combined';

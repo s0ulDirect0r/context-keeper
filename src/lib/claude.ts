@@ -88,6 +88,7 @@ export interface SummaryContext {
   additionalContext?: string;
   summaryStyle?: 'standard' | 'structured' | 'custom';
   customFormatDescription?: string;
+  timezone?: string;
 }
 
 export interface SummaryMetadata {
@@ -193,6 +194,9 @@ function buildUserMessage(
   if (date) {
     message += `\n**Meeting date (from recording metadata):** ${date}`;
   }
+  if (context.timezone) {
+    message += `\n**User's timezone:** ${context.timezone}`;
+  }
 
   message += `\n\n---\n\n**Transcript:**\n${transcript}`;
 
@@ -218,13 +222,17 @@ Generate the following sections in order. **Skip any section that does not apply
 \`\`\`
 ## Meeting Orientation
 
-Meeting took place on [date], at [time] [timezone]
-Participants: [name], [name], [name]
+**Meeting took place on** [Day of week], [Ordinal day] [Month name] [Year] at [h.mm][am/pm]
 
-Stated goal: [goal from facilitator's opening remarks or agenda, verbatim or near-verbatim]
-What else happened: [inference of additional focuses if meeting diverged]
+**Participants:** [name], [name], [name]
+
+**Stated goal:** [goal from facilitator's opening remarks or agenda, verbatim or near-verbatim]
+
+**What else happened:** [inference of additional focuses if meeting diverged]
 \`\`\`
 
+- **Date formatting:** Use the format "Sunday, 15th February 2026 at 6.26pm" — full day name, ordinal date (1st, 2nd, 3rd, etc.), full month name, year, then time as h.mm with am/pm (no space before am/pm). If the user's timezone is provided, convert the meeting date to that timezone. If no timezone is provided, use UTC.
+- Each field ("Meeting took place on", "Participants", "Stated goal", "What else happened") must be **bold** and on its own line, with a blank line between each field.
 - If no goal was stated, infer the focus from what the group oriented around once greetings and logistics were done.
 - **Divergence detection:** A meeting has "diverged" when less than roughly a third of the substantive conversation addresses the stated goal. If the group returns after a detour, note both. When in doubt, describe what happened rather than labelling it. Use neutral language: "The meeting's stated purpose was [X]. In practice, the conversation moved toward [Y]."
 
@@ -237,6 +245,8 @@ Each central question gets its own \`##\` heading. Under each question, group re
 
 *Raised by [Speaker]*
 
+[1-2 sentence factual summary of how this question was engaged with. Plain facts, no exaggeration — give a quick overview.]
+
 ### [Participant Name]
 > Direct quote response — *Speaker* [timestamp if available]
 
@@ -244,20 +254,18 @@ Each central question gets its own \`##\` heading. Under each question, group re
 
 ### [Another Participant]
 > Their response — *Speaker*
-
-**Status:** Resolved / Explored / Surfaced
 \`\`\`
+
+For each central question, write a **1-2 sentence engagement summary** placed between "Raised by" and the participant quotes. This summary should:
+- State plainly how the question was addressed (e.g., "Three participants offered perspectives, with broad agreement on X but divergence on Y.")
+- Focus on facts, not interpretation. Do not exaggerate or editorialize.
+- Give someone a quick overview so they can decide whether to read the full quotes.
 
 **How to identify central questions** (priority order):
 1. A question the facilitator framed for the group
 2. A question from the agenda or pre-meeting materials
 3. A question a participant asked that drew responses from 2+ others
 4. If none apply but the group oriented around a topic, infer the question (e.g., a discussion about hiring timelines becomes "When and how should we approach the next round of hiring?")
-
-**Status labels:**
-- **Resolved** — The group reached a clear answer or decision
-- **Explored** — Multiple perspectives were shared but no conclusion reached
-- **Surfaced** — The question was raised but not substantively discussed
 
 **Emergent questions** (not originally posed) go in a separate \`## Emergent Questions\` section using the same format.
 

@@ -445,6 +445,7 @@ export default function Home() {
           save: !!user,
           recordingTitles: state.recordingTitles,
           recordingDates: state.recordingDates,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
         signal: controller.signal,
       });
