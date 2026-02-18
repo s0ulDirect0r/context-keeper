@@ -125,6 +125,21 @@ export default function Home() {
     };
   }, []);
 
+  // Listen for "New Summary" clicks from the navbar when already on /
+  useEffect(() => {
+    const handler = () => {
+      streamingMarkdownRef.current = '';
+      try {
+        localStorage.removeItem('context-keeper-guest-edits');
+      } catch {
+        /* noop */
+      }
+      dispatch({ type: 'START_OVER' });
+    };
+    window.addEventListener('cedar:new-summary', handler);
+    return () => window.removeEventListener('cedar:new-summary', handler);
+  }, []);
+
   // Load Otter connection based on auth state
   useEffect(() => {
     const loadOtterConnection = async () => {

@@ -31,7 +31,15 @@ export function NavBar() {
 
           {user && (
             <nav className="hidden sm:flex items-center gap-1">
-              <Link href="/">
+              <Link
+                href="/"
+                onClick={(e) => {
+                  if (pathname === '/') {
+                    e.preventDefault();
+                    window.dispatchEvent(new CustomEvent('cedar:new-summary'));
+                  }
+                }}
+              >
                 <Button
                   variant="ghost"
                   size="default"
@@ -85,7 +93,16 @@ export function NavBar() {
       {/* Mobile nav for logged-in users */}
       {user && (
         <div className="sm:hidden border-t px-4 py-2 flex gap-2">
-          <Link href="/" className="flex-1">
+          <Link
+            href="/"
+            className="flex-1"
+            onClick={(e) => {
+              if (pathname === '/') {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('cedar:new-summary'));
+              }
+            }}
+          >
             <Button
               variant="ghost"
               size="sm"
