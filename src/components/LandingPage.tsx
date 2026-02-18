@@ -11,19 +11,75 @@ const steps = [
   {
     icon: FileText,
     title: 'Import',
-    description: 'Paste a transcript or connect Otter.ai',
+    description: 'Paste a transcript or connect with your Otter.ai',
   },
   {
     icon: Users,
-    title: 'Tell us who it\u2019s for',
-    description: 'Pick a template or describe your audience',
+    title: 'Add context',
+    description: 'Tell Cedar what you want to get from the meeting and why',
   },
   {
     icon: Sparkles,
-    title: 'Get your summary',
-    description: 'Tailored to exactly what they need',
+    title: 'Get a summary',
+    description: 'Shaped in the way that is most useful to you and share-able with others',
   },
 ] as const;
+
+const salesPitchLines = [
+  {
+    text: 'We know the challenge of being the person who exists between various contexts.',
+    emphasis: false,
+  },
+  { text: 'The weaver, the space-holder, the context artist.', emphasis: false },
+  { text: 'The connective tissue.', emphasis: false },
+  {
+    text: "You're someone who not only participates in meetings but also tracks the room.",
+    emphasis: false,
+  },
+  {
+    text: 'Who looks back, who sits with what happened, who tries to understand what it meant.',
+    emphasis: false,
+  },
+  { text: "You're the one who's managing the context gap.", emphasis: false },
+  {
+    text: 'You know who needs to be briefed, who might need to be filled in, or what needs to be remembered.',
+    emphasis: false,
+  },
+  { text: "You're also the one with limited memory, energy and a busy schedule.", emphasis: false },
+  { text: 'Cedar is built for that gap.', emphasis: true },
+  {
+    text: "It's an external memory that thinks like you so you can quickly get to the relevant information from each meeting.",
+    emphasis: true,
+  },
+  {
+    text: "For yourself or for others so that the meaning doesn't have to live only in your imperfect recollection of it.",
+    emphasis: true,
+  },
+] as const;
+
+function SalesPitchSection() {
+  return (
+    <section className="py-12 px-4 text-center">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">For the ones who manage context</h2>
+          <p className="text-lg text-muted-foreground">Memory has limits. Meaning doesn&apos;t.</p>
+        </div>
+
+        <div className="space-y-1">
+          {salesPitchLines.map((line) => (
+            <p
+              key={line.text}
+              className={`text-sm leading-relaxed ${line.emphasis ? 'text-foreground' : 'text-muted-foreground'}`}
+            >
+              {line.text}
+            </p>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function HowItWorksSection() {
   return (
@@ -78,6 +134,7 @@ export function LandingPage({ onTryFree, onSignUp, onSignIn }: LandingPageProps)
           </div>
         </div>
       </section>
+      <SalesPitchSection />
       <HowItWorksSection />
     </main>
   );
