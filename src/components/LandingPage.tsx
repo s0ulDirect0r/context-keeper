@@ -11,19 +11,43 @@ const steps = [
   {
     icon: FileText,
     title: 'Import',
-    description: 'Paste a transcript or connect Otter.ai',
+    description: 'Paste a transcript or connect with your Otter.ai',
   },
   {
     icon: Users,
-    title: 'Tell us who it\u2019s for',
-    description: 'Pick a template or describe your audience',
+    title: 'Add context',
+    description: 'Tell Cedar what you want to get from the meeting and why',
   },
   {
     icon: Sparkles,
-    title: 'Get your summary',
-    description: 'Tailored to exactly what they need',
+    title: 'Get a summary',
+    description: 'Shaped in the way that is most useful to you and share-able with others',
   },
 ] as const;
+
+function SalesPitchSection() {
+  return (
+    <section className="py-16 px-8 sm:px-4 text-center">
+      <div className="max-w-xl mx-auto space-y-8 text-base text-foreground/80">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">
+          Memory has limits. Meaning doesn&apos;t.
+        </h2>
+
+        <div className="space-y-1">
+          <p>You&apos;re the connective tissue.</p>
+          <p>You don&apos;t just attend meetings — you track the room.</p>
+          <p>Who needs to know what, what it meant, what happens next.</p>
+          <p>You&apos;re managing the context gap — with limited memory and a busy schedule.</p>
+          <p className="font-bold">Cedar is built for that gap.</p>
+          <p>
+            An external memory that thinks like you, so meaning doesn&apos;t live only in your
+            imperfect recollection of it.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function HowItWorksSection() {
   return (
@@ -78,6 +102,7 @@ export function LandingPage({ onTryFree, onSignUp, onSignIn }: LandingPageProps)
           </div>
         </div>
       </section>
+      <SalesPitchSection />
       <HowItWorksSection />
     </main>
   );
