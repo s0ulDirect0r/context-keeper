@@ -50,6 +50,8 @@ async function navigateToSavedSummary(page: import('@playwright/test').Page) {
 
   await page.getByText('Catch me up').click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
+  // Format step — Standard is pre-selected, click Next to skip
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: "That's all" }).click();
 
   await expect(page.getByText('Your Summary')).toBeVisible({ timeout: 15_000 });
