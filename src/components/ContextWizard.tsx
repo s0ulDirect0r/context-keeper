@@ -3,63 +3,69 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 import type { SummaryContext } from '@/lib/claude';
 
 interface Props {
   onComplete: (context: SummaryContext) => void;
   onBack: () => void;
-  recordingCount?: number;
 }
 
 const TEMPLATES = [
   {
     id: 'catch-up',
     label: 'Catch me up',
-    description: 'What happened and what do I need to know',
+    description: 'What happened and what matters most',
     extractionGoal:
       'Key context, decisions, and anything the recipient would need to understand the current state',
-    step2Hint:
-      'Who\u2019s this for and what do they already know? e.g., "My manager missed standup" or "My housemate needs the renovation update."',
   },
   {
     id: 'align',
-    label: 'Get everyone aligned',
-    description: 'Same page, shared next steps',
+    label: 'Summarise for others',
+    description: 'Shared context and clear next steps',
     extractionGoal: 'What was agreed, who owns what, and the shared understanding of next steps',
-    step2Hint:
-      'Who needs alignment and on what? e.g., "The whole team needs to know what changed" or "My friends need the plan for the trip."',
   },
   {
     id: 'read-room',
     label: 'Help me read the room',
-    description: 'Give me the warm data, the vibe, and the relational dynamics',
+    description: 'The dynamics, tensions, and unspoken signals',
     extractionGoal:
       'The implicit dynamics present that might not be obvious to participants of the meeting',
-    step2Hint:
-      'What is the current mood, energy, and vibe of the meeting? e.g., "The team is excited about the new project" or "My partner is frustrated with the contractor."',
   },
   {
     id: 'remember',
     label: 'Help me remember',
-    description: 'I want to reconnect with what happened',
+    description: 'Key moments, insights and quotes',
     extractionGoal:
       'Comprehensive notes with important quotes, nuances, and details I might forget. Turning points. Insights. Any decisions that were made.',
-    step2Hint:
-      'What key moments or decisions were made during the meeting? e.g., "We agreed to meet again next week" or "I promised to send an email with the details."',
   },
 ] as const;
 
-const GENERIC_HINT =
-  'Who\u2019s this for and what do they need to understand? The more I know about the gap between what you know and what they know, the better.';
+const SUMMARY_STYLES = ['standard', 'structured', 'custom'] as const;
+type SummaryStyle = (typeof SUMMARY_STYLES)[number];
 
-const STEPS = ['extraction', 'additional'] as const;
+function isSummaryStyle(value: string): value is SummaryStyle {
+  return (SUMMARY_STYLES as readonly string[]).includes(value);
+}
+
+const FORMAT_OPTIONS = [
+  { value: 'standard', label: 'Standard', description: 'Adapts to the themes' },
+  { value: 'structured', label: 'Structured', description: 'Pull out central questions' },
+  { value: 'custom', label: 'Custom', description: 'Describe the format you want' },
+] as const;
+
+const STEPS = ['extraction', 'format', 'additional'] as const;
 type Step = (typeof STEPS)[number];
 
-export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props) {
+export function ContextWizard({ onComplete, onBack }: Props) {
   const [step, setStep] = useState<Step>('extraction');
   const [extractionGoal, setExtractionGoal] = useState('');
   const [additional, setAdditional] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [summaryStyle, setSummaryStyle] = useState<SummaryStyle>('standard');
+  const [customFormatDescription, setCustomFormatDescription] = useState('');
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -86,8 +92,6 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
     }
   };
 
-  const activeTemplate = TEMPLATES.find((t) => t.id === selectedTemplate);
-
   const handleNext = () => {
     const nextIndex = stepIndex + 1;
     if (nextIndex < STEPS.length) {
@@ -96,6 +100,8 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
       onComplete({
         extractionGoal,
         additionalContext: additional || undefined,
+        summaryStyle,
+        customFormatDescription: summaryStyle === 'custom' ? customFormatDescription : undefined,
       });
     }
   };
@@ -112,6 +118,9 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
     switch (step) {
       case 'extraction':
         return extractionGoal.trim().length > 0;
+      case 'format':
+        if (summaryStyle === 'custom') return customFormatDescription.trim().length > 0;
+        return true;
       case 'additional':
         return true;
     }
@@ -121,20 +130,16 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">
-          {step === 'extraction' && `What would you like help with here`}
-          {step === 'extraction' && '?'}
+          {step === 'extraction' && 'What can I help you with?'}
+          {step === 'format' && 'Choose a summary format.'}
           {step === 'additional' && 'Anything else I should know?'}
         </h2>
         <p className="text-muted-foreground">
-          {step === 'extraction' && 'Pick a template or tell me in your own words.'}
+          {step === 'extraction' && 'Pick a template to get started.'}
+          {step === 'format' && 'Not sure? Start with Standard.'}
           {step === 'additional' &&
             'Optional \u2014 any context about the audience, the meeting, or what you need this for.'}
         </p>
-        {step === 'additional' && (
-          <p className="text-sm text-muted-foreground italic bg-muted/50 rounded-md p-3 mt-1 text-left">
-            {activeTemplate ? activeTemplate.step2Hint : GENERIC_HINT}
-          </p>
-        )}
       </div>
 
       <div className="space-y-4">
@@ -147,11 +152,12 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                   type="button"
                   aria-pressed={selectedTemplate === template.id}
                   onClick={() => handleTemplateClick(template.id)}
-                  className={`rounded-lg border p-3 text-left transition-colors hover:bg-accent/50 ${
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors hover:bg-accent/50',
                     selectedTemplate === template.id
                       ? 'ring-2 ring-primary border-primary bg-accent/30'
-                      : 'border-border'
-                  }`}
+                      : 'border-border',
+                  )}
                 >
                   <div className="font-medium text-sm">{template.label}</div>
                   <div className="text-xs text-muted-foreground mt-1">{template.description}</div>
@@ -159,12 +165,57 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
               ))}
             </div>
 
+            <p className="text-muted-foreground text-center">or, tell me in your own words</p>
+
             <Textarea
               value={extractionGoal}
               onChange={(e) => handleExtractionChange(e.target.value)}
-              placeholder='Or describe it yourself e.g., "Catch my cofounder up on the investor call", "Help me remember the details for my proposal"'
+              placeholder='e.g., "Catch my developer up on the user feedback call"'
               className="min-h-32"
             />
+          </>
+        )}
+
+        {step === 'format' && (
+          <>
+            <RadioGroup
+              value={summaryStyle}
+              onValueChange={(v) => {
+                if (isSummaryStyle(v)) setSummaryStyle(v);
+              }}
+              className="flex gap-3"
+            >
+              {FORMAT_OPTIONS.map((option) => (
+                <Label
+                  key={option.value}
+                  htmlFor={`style-${option.value}`}
+                  className={cn(
+                    'flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50',
+                    summaryStyle === option.value
+                      ? 'ring-2 ring-primary border-primary bg-accent/30'
+                      : 'border-border',
+                  )}
+                >
+                  <RadioGroupItem
+                    value={option.value}
+                    id={`style-${option.value}`}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-sm">{option.label}</span>
+                    <p className="text-xs text-muted-foreground">{option.description}</p>
+                  </div>
+                </Label>
+              ))}
+            </RadioGroup>
+            {summaryStyle === 'custom' && (
+              <Textarea
+                value={customFormatDescription}
+                onChange={(e) => setCustomFormatDescription(e.target.value)}
+                placeholder='e.g. "Bullet points grouped by speaker", "Email draft for my manager", "Action items only as a checklist"'
+                className="min-h-32"
+              />
+            )}
           </>
         )}
 
@@ -189,6 +240,9 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                   onComplete({
                     extractionGoal,
                     additionalContext: undefined,
+                    summaryStyle,
+                    customFormatDescription:
+                      summaryStyle === 'custom' ? customFormatDescription : undefined,
                   })
                 }
               >

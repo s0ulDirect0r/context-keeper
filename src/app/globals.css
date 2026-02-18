@@ -134,3 +134,12 @@
     font-family: var(--font-fraunces), serif;
   }
 }
+
+/* Pull-quote styling for direct quotes in summaries */
+.prose blockquote {
+  border-left: 3px solid var(--ring);
+  padding-left: 1rem;
+  font-style: italic;
+  margin: 1rem 0;
+  quotes: none;
+}

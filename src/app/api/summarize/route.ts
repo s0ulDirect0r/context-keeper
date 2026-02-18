@@ -18,18 +18,44 @@ const summarizeSchema = z.object({
     .array(z.string().max(MAX_TRANSCRIPT_BYTES, 'Transcript exceeds 500KB limit'))
     .min(1, 'At least one transcript required')
     .max(10, 'Maximum 10 transcripts'),
-  context: z.object({
-    extractionGoal: z.string().min(1).max(1000, 'Extraction goal exceeds 1000 chars'),
-    additionalContext: z.string().max(2000, 'Additional context exceeds 2000 chars').optional(),
-  }),
+  context: z
+    .object({
+      extractionGoal: z.string().min(1).max(1000, 'Extraction goal exceeds 1000 chars'),
+      additionalContext: z.string().max(2000, 'Additional context exceeds 2000 chars').optional(),
+      summaryStyle: z.enum(['standard', 'structured', 'custom']).optional(),
+      customFormatDescription: z
+        .string()
+        .max(2000, 'Custom format description exceeds 2000 chars')
+        .optional(),
+    })
+    .refine(
+      (ctx) =>
+        ctx.summaryStyle !== 'custom' || (ctx.customFormatDescription ?? '').trim().length > 0,
+      {
+        message: 'Custom format description is required when using custom style',
+        path: ['customFormatDescription'],
+      },
+    ),
   mode: z.enum(['combined', 'separate']).optional(),
   save: z.boolean().optional(),
   recordingTitles: z.array(z.string()).optional(),
   recordingDates: z.array(z.string()).optional(),
+  timezone: z
+    .string()
+    .max(100)
+    .regex(/^[A-Za-z_/+-]+$/, 'Invalid timezone format')
+    .optional(),
 });
 
 // 10 requests per hour per IP
 const limiter = createRateLimiter({ limit: 10, windowMs: 60 * 60 * 1000 });
+
+/** Strip quotation marks from blockquote pull-quotes so they render as clean Substack-style pullquotes. */
+function stripBlockquoteQuotes(markdown: string): string {
+  return markdown.replace(/^>\s*.+$/gm, (line) =>
+    line.replace(/^(>\s*)["\u201C\u201D]/, '$1').replace(/["\u201C\u201D]\s*$/, ''),
+  );
+}
 
 function deriveTitle(recordingTitles?: string[]): string {
   if (!recordingTitles || recordingTitles.length === 0) return 'Untitled Summary';
@@ -66,11 +92,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { transcripts, context, mode, save, recordingTitles, recordingDates } = parsed.data;
+  const { transcripts, context, mode, save, recordingTitles, recordingDates, timezone } =
+    parsed.data;
 
   const summaryContext: SummaryContext = {
     extractionGoal: context.extractionGoal,
     additionalContext: context.additionalContext,
+    summaryStyle: context.summaryStyle,
+    customFormatDescription: context.customFormatDescription,
+    timezone,
   };
 
   const summaryMode = mode === 'separate' ? 'separate' : 'combined';
@@ -129,7 +159,7 @@ export async function POST(request: Request) {
             },
           );
 
-          const summaries = generatedSummaries.map((s) => s.markdown);
+          const summaries = generatedSummaries.map((s) => stripBlockquoteQuotes(s.markdown));
           send('summary_done', { summaries });
 
           // Ensure tags are done before proceeding
@@ -201,6 +231,7 @@ export async function POST(request: Request) {
           });
 
           await messageStream.finalMessage();
+          accumulatedText = stripBlockquoteQuotes(accumulatedText);
           send('summary_done', { summaries: [accumulatedText] });
 
           // Ensure tags are done before proceeding
