@@ -81,6 +81,39 @@ export interface Database {
         };
         Relationships: [];
       };
+      vault_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          summary_id: string;
+          excerpt_text: string;
+          note: string | null;
+          chunk_index: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          summary_id: string;
+          excerpt_text: string;
+          note?: string | null;
+          chunk_index?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          summary_id?: string;
+          excerpt_text?: string;
+          note?: string | null;
+          chunk_index?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       otter_connections: {
         Row: {
           id: string;
@@ -142,6 +175,30 @@ export interface SavedPearl {
   concepts: string[];
   quote: ThemeQuote | null;
   createdAt: Date;
+}
+
+export interface SavedVaultItem {
+  id: string;
+  summaryId: string;
+  excerptText: string;
+  note: string | null;
+  chunkIndex: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export function toSavedVaultItem(
+  row: Database['public']['Tables']['vault_items']['Row'],
+): SavedVaultItem {
+  return {
+    id: row.id,
+    summaryId: row.summary_id,
+    excerptText: row.excerpt_text,
+    note: row.note,
+    chunkIndex: row.chunk_index,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
 }
 
 export function toSavedPearl(row: Database['public']['Tables']['pearls']['Row']): SavedPearl {

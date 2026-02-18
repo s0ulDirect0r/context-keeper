@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PearlsSidebar } from './PearlsSidebar';
+import { VaultSidebar } from './VaultSidebar';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
@@ -17,7 +18,7 @@ import * as Sentry from '@sentry/nextjs';
 import { downloadMarkdown, downloadPdf } from '@/lib/export';
 import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
-import type { SavedSummary, SavedPearl } from '@/lib/supabase/types';
+import type { SavedSummary, SavedPearl, SavedVaultItem } from '@/lib/supabase/types';
 import { isStructuredSummary } from '@/lib/summary-types';
 import { TagSelector } from './TagSelector';
 import { PearlsGeneratingView } from './PearlsGeneratingView';
@@ -38,6 +39,8 @@ interface BaseProps {
   savedPearls?: SavedPearl[];
   /** Called when pearls are persisted */
   onPearlsSaved?: (saved: SavedPearl[]) => void;
+  /** Vault items already saved in DB */
+  savedVaultItems?: SavedVaultItem[];
   /** Read-only mode (shared view) */
   readOnly?: boolean;
   /** Back to start */
@@ -99,6 +102,12 @@ export function SummaryView(props: SummaryViewProps) {
   const curatingPearls = curationDismissed ? undefined : props.pearls;
   const [displayPearls, setDisplayPearls] = useState<SavedPearl[]>(props.savedPearls ?? []);
 
+  // Vault state
+  const [vaultItems, setVaultItems] = useState<SavedVaultItem[]>(props.savedVaultItems ?? []);
+  const [selectedExcerpt, setSelectedExcerpt] = useState<string | null>(null);
+  const selectionRangeRef = useRef<Range | null>(null);
+  const summaryCardsRef = useRef<HTMLDivElement>(null);
+
   // Copy state
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -135,6 +144,26 @@ export function SummaryView(props: SummaryViewProps) {
   const summaryId = saved ? props.summary.id : savedSummaryId;
   const hasTranscripts =
     transcripts !== null && transcripts !== undefined && transcripts.length > 0;
+
+  // Capture text selection within summary cards for vault
+  // Works on both saved summaries and inline summaries that have been auto-saved
+  useEffect(() => {
+    const el = summaryCardsRef.current;
+    if (!el || readOnly || !summaryId || !user) return;
+
+    const handleMouseUp = () => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      if (text && text.length > 0 && selection && el.contains(selection.anchorNode)) {
+        setSelectedExcerpt(text);
+        // Store the Range for flash effect on save
+        selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
+      }
+    };
+
+    el.addEventListener('mouseup', handleMouseUp);
+    return () => el.removeEventListener('mouseup', handleMouseUp);
+  }, [readOnly, summaryId, user]);
 
   // Guest sign-up-to-save flow
   useEffect(() => {
@@ -442,6 +471,55 @@ export function SummaryView(props: SummaryViewProps) {
     props.onPearlsSaved?.(savedPearlList);
   };
 
+  // ── Vault handlers ──────────────────────────────────────────────
+
+  const flashSelectionRange = useCallback(() => {
+    const range = selectionRangeRef.current;
+    const container = summaryCardsRef.current;
+    if (!range || !container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const rects = range.getClientRects();
+
+    for (const rect of rects) {
+      const overlay = document.createElement('div');
+      overlay.style.position = 'absolute';
+      overlay.style.left = `${rect.left - containerRect.left + container.scrollLeft}px`;
+      overlay.style.top = `${rect.top - containerRect.top + container.scrollTop}px`;
+      overlay.style.width = `${rect.width}px`;
+      overlay.style.height = `${rect.height}px`;
+      overlay.style.backgroundColor = 'rgba(59, 130, 246, 0.35)';
+      overlay.style.borderRadius = '2px';
+      overlay.style.pointerEvents = 'none';
+      overlay.style.transition = 'opacity 1.5s ease-out';
+      container.appendChild(overlay);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          overlay.style.opacity = '0';
+        });
+      });
+      overlay.addEventListener('transitionend', () => overlay.remove());
+    }
+    selectionRangeRef.current = null;
+  }, []);
+
+  const handleVaultItemSaved = useCallback(
+    (item: SavedVaultItem) => {
+      setVaultItems((prev) => [item, ...prev]);
+      flashSelectionRange();
+    },
+    [flashSelectionRange],
+  );
+
+  const handleVaultItemDeleted = useCallback((id: string) => {
+    setVaultItems((prev) => prev.filter((i) => i.id !== id));
+  }, []);
+
+  const handleVaultItemUpdated = useCallback((item: SavedVaultItem) => {
+    setVaultItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+  }, []);
+
   // ── Determine sidebar mode ─────────────────────────────────────
 
   const hasCuratingPearls = curatingPearls && curatingPearls.length > 0;
@@ -636,71 +714,74 @@ export function SummaryView(props: SummaryViewProps) {
       )}
 
       {/* Summary cards */}
-      {markdownSummaries.map((summaryText, index) => (
-        <Card key={index}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
-              </CardTitle>
-              <div className="flex items-center gap-1.5 no-print">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(summaryText, index)}
-                  title="Copy to clipboard"
-                >
-                  {copiedIndex === index ? (
-                    <Check className="h-3.5 w-3.5" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {copiedIndex === index ? 'Copied!' : 'Copy'}
-                  </span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadMarkdown(summaryText, getExportTitle(index))}
-                  title="Download as Markdown"
-                >
-                  <FileDown className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Markdown</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadPdf(summaryText, getExportTitle(index))}
-                  title="Download as PDF"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">PDF</span>
-                </Button>
+      <div ref={summaryCardsRef} className="relative">
+        {markdownSummaries.map((summaryText, index) => (
+          <Card key={index} className={index > 0 ? 'mt-6' : ''}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {markdownSummaries.length > 1 ? `Summary ${index + 1}` : 'Summary'}
+                </CardTitle>
+                <div className="flex items-center gap-1.5 no-print">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(summaryText, index)}
+                    title="Copy to clipboard"
+                  >
+                    {copiedIndex === index ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {copiedIndex === index ? 'Copied!' : 'Copy'}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadMarkdown(summaryText, getExportTitle(index))}
+                    title="Download as Markdown"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Markdown</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadPdf(summaryText, getExportTitle(index))}
+                    title="Download as PDF"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">PDF</span>
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <EditableMarkdown
-              markdown={summaryText}
-              readOnly={readOnly}
-              saveStatus={saveStatus}
-              onChange={(newText) => {
-                setMarkdownSummaries((prev) => {
-                  const updated = [...prev];
-                  updated[index] = newText;
-                  if (summaryId) {
-                    persistSavedEdits(updated);
-                  } else {
-                    persistGuestEdits(updated);
-                  }
-                  return updated;
-                });
-              }}
-            />
-          </CardContent>
-        </Card>
-      ))}
+            </CardHeader>
+            <CardContent>
+              <EditableMarkdown
+                markdown={summaryText}
+                readOnly={readOnly}
+                saveStatus={saveStatus}
+                vaultedExcerpts={vaultItems.map((v) => v.excerptText)}
+                onChange={(newText) => {
+                  setMarkdownSummaries((prev) => {
+                    const updated = [...prev];
+                    updated[index] = newText;
+                    if (summaryId) {
+                      persistSavedEdits(updated);
+                    } else {
+                      persistGuestEdits(updated);
+                    }
+                    return updated;
+                  });
+                }}
+              />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Context card */}
       {context && (
@@ -839,8 +920,12 @@ export function SummaryView(props: SummaryViewProps) {
     </div>
   );
 
-  // Wrap in sidebar layout when pearls exist
-  if (!showPearlsSidebar) {
+  // Show vault sidebar for saved summaries when pearls sidebar isn't active
+  // Show vault for any summary with an ID (saved or auto-saved inline)
+  const showVaultSidebar = !!summaryId && !readOnly && !!user && !showPearlsSidebar;
+  const showSidebar = showPearlsSidebar || showVaultSidebar;
+
+  if (!showSidebar) {
     return summaryContent;
   }
 
@@ -848,45 +933,57 @@ export function SummaryView(props: SummaryViewProps) {
     <div className="flex flex-col lg:flex-row gap-8">
       {summaryContent}
       <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
-        {hasCuratingPearls ? (
-          <PearlsSidebar
-            mode="curate"
-            pearls={curatingPearls}
-            summaryId={summaryId ?? null}
-            onSaved={handlePearlsSaved}
-            isLoggedIn={!!user}
-          />
-        ) : hasDisplayPearls ? (
-          <PearlsSidebar mode="display" pearls={displayPearls} />
-        ) : isGeneratingPearls ? (
-          <PearlsGeneratingView
-            selectedTags={
-              inlineProps?.tagSelection ? Array.from(inlineProps.tagSelection) : undefined
-            }
-          />
-        ) : hasTagsForSidebar &&
-          inlineProps?.onTagSubmit &&
-          inlineProps.onTagSkip &&
-          inlineProps.tagSelection &&
-          inlineProps.onTagSelectionChange &&
-          inlineProps.tagCustomTags &&
-          inlineProps.onTagCustomTagsChange ? (
-          <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-              Focus your pearls
-            </h3>
-            <TagSelector
-              tags={inlineProps.conceptTags!}
-              generating={false}
-              onSubmit={inlineProps.onTagSubmit}
-              onSkip={inlineProps.onTagSkip}
-              selected={inlineProps.tagSelection}
-              onSelectedChange={inlineProps.onTagSelectionChange}
-              customTags={inlineProps.tagCustomTags}
-              onCustomTagsChange={inlineProps.onTagCustomTagsChange}
-              compact
+        {showPearlsSidebar ? (
+          hasCuratingPearls ? (
+            <PearlsSidebar
+              mode="curate"
+              pearls={curatingPearls}
+              summaryId={summaryId ?? null}
+              onSaved={handlePearlsSaved}
+              isLoggedIn={!!user}
             />
-          </div>
+          ) : hasDisplayPearls ? (
+            <PearlsSidebar mode="display" pearls={displayPearls} />
+          ) : isGeneratingPearls ? (
+            <PearlsGeneratingView
+              selectedTags={
+                inlineProps?.tagSelection ? Array.from(inlineProps.tagSelection) : undefined
+              }
+            />
+          ) : hasTagsForSidebar &&
+            inlineProps?.onTagSubmit &&
+            inlineProps.onTagSkip &&
+            inlineProps.tagSelection &&
+            inlineProps.onTagSelectionChange &&
+            inlineProps.tagCustomTags &&
+            inlineProps.onTagCustomTagsChange ? (
+            <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                Focus your pearls
+              </h3>
+              <TagSelector
+                tags={inlineProps.conceptTags!}
+                generating={false}
+                onSubmit={inlineProps.onTagSubmit}
+                onSkip={inlineProps.onTagSkip}
+                selected={inlineProps.tagSelection}
+                onSelectedChange={inlineProps.onTagSelectionChange}
+                customTags={inlineProps.tagCustomTags}
+                onCustomTagsChange={inlineProps.onTagCustomTagsChange}
+                compact
+              />
+            </div>
+          ) : null
+        ) : showVaultSidebar ? (
+          <VaultSidebar
+            summaryId={summaryId!}
+            items={vaultItems}
+            selectedExcerpt={selectedExcerpt}
+            onClearSelection={() => setSelectedExcerpt(null)}
+            onItemSaved={handleVaultItemSaved}
+            onItemDeleted={handleVaultItemDeleted}
+            onItemUpdated={handleVaultItemUpdated}
+          />
         ) : null}
       </aside>
     </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { SavedSummary } from '@/lib/supabase/types';
 import type { Database } from '@/lib/supabase/types';
 import type { SummaryContext } from '@/lib/claude';
@@ -11,9 +11,10 @@ import { getSummaryPreviewText } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Trash2, FileText, Loader2 } from 'lucide-react';
+import { Search, Trash2, FileText, Loader2, Bookmark } from 'lucide-react';
 import { toast } from 'sonner';
 import * as Sentry from '@sentry/nextjs';
+import { VaultDashboard, type VaultItemWithSummary } from '@/components/VaultDashboard';
 
 const PAGE_SIZE = 20;
 
@@ -35,12 +36,24 @@ function deserializeSummary(row: SummaryRow): SavedSummary {
   };
 }
 
+type Tab = 'summaries' | 'vault';
+
 interface DashboardClientProps {
   initialSummaries: SavedSummary[];
   totalCount: number;
+  initialTab?: Tab;
+  initialVaultItems?: VaultItemWithSummary[];
+  vaultTotalCount?: number;
 }
 
-export function DashboardClient({ initialSummaries, totalCount }: DashboardClientProps) {
+export function DashboardClient({
+  initialSummaries,
+  totalCount,
+  initialTab = 'summaries',
+  initialVaultItems = [],
+  vaultTotalCount = 0,
+}: DashboardClientProps) {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [summaries, setSummaries] = useState(initialSummaries);
   const [total, setTotal] = useState(totalCount);
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,7 +62,23 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
   const [loadingMore, setLoadingMore] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync tab with URL
+  const handleTabChange = useCallback(
+    (tab: Tab) => {
+      setActiveTab(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === 'vault') {
+        params.set('tab', 'vault');
+      } else {
+        params.delete('tab');
+      }
+      router.push(`/dashboard?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   // Debounce search input
   useEffect(() => {
@@ -161,96 +190,138 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Your library</h1>
         <p className="text-muted-foreground mt-1">
-          {total} {total === 1 ? 'summary' : 'summaries'} saved
+          {activeTab === 'summaries'
+            ? `${total} ${total === 1 ? 'summary' : 'summaries'} saved`
+            : `${vaultTotalCount} ${vaultTotalCount === 1 ? 'highlight' : 'highlights'} saved`}
         </p>
       </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search summaries..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-        {searching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-        )}
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-6 border-b">
+        <button
+          onClick={() => handleTabChange('summaries')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'summaries'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <FileText className="h-4 w-4" />
+          Summaries
+        </button>
+        <button
+          onClick={() => handleTabChange('vault')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'vault'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Bookmark className="h-4 w-4" />
+          Vault
+          {vaultTotalCount > 0 && (
+            <span className="ml-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-semibold px-1.5 py-0.5 leading-none">
+              {vaultTotalCount}
+            </span>
+          )}
+        </button>
       </div>
 
-      {summaries.length === 0 ? (
-        <div className="text-center py-12">
-          {total === 0 && !debouncedQuery ? (
-            <>
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Nothing here yet</h2>
-              <p className="text-muted-foreground mb-4">
-                Once you create a summary, it&apos;ll show up here.
-              </p>
-              <Link href="/">
-                <Button>Create your first</Button>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No matches</h2>
-              <p className="text-muted-foreground">Try different words?</p>
-            </>
-          )}
-        </div>
+      {/* Vault tab */}
+      {activeTab === 'vault' ? (
+        <VaultDashboard initialItems={initialVaultItems} totalCount={vaultTotalCount} />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {summaries.map((summary) => (
-              <Card
-                key={summary.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => router.push(`/summary/${summary.id}`)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg line-clamp-2">{summary.title}</CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(summary.id);
-                      }}
-                      disabled={deleting === summary.id}
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground line-clamp-3">
-                    {getSummaryPreviewText(summary.summaries).replace(/[#*_]/g, '').slice(0, 200)}
-                    ...
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    {formatDate(summary.createdAt)}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search summaries..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+            {searching && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
 
-          {hasMore && (
-            <div className="mt-8 text-center">
-              <Button variant="outline" onClick={handleLoadMore} disabled={loadingMore}>
-                {loadingMore ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  `Load More (${summaries.length} of ${total})`
-                )}
-              </Button>
+          {summaries.length === 0 ? (
+            <div className="text-center py-12">
+              {total === 0 && !debouncedQuery ? (
+                <>
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">Nothing here yet</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Once you create a summary, it&apos;ll show up here.
+                  </p>
+                  <Link href="/">
+                    <Button>Create your first</Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">No matches</h2>
+                  <p className="text-muted-foreground">Try different words?</p>
+                </>
+              )}
             </div>
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {summaries.map((summary) => (
+                  <Card
+                    key={summary.id}
+                    className="cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => router.push(`/summary/${summary.id}`)}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-lg line-clamp-2">{summary.title}</CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(summary.id);
+                          }}
+                          disabled={deleting === summary.id}
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {getSummaryPreviewText(summary.summaries)
+                          .replace(/[#*_]/g, '')
+                          .slice(0, 200)}
+                        ...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-3">
+                        {formatDate(summary.createdAt)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {hasMore && (
+                <div className="mt-8 text-center">
+                  <Button variant="outline" onClick={handleLoadMore} disabled={loadingMore}>
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      `Load More (${summaries.length} of ${total})`
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

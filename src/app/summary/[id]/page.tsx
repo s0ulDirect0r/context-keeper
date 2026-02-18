@@ -1,7 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedSummary, toSavedPearl, type Database } from '@/lib/supabase/types';
+import {
+  toSavedSummary,
+  toSavedPearl,
+  toSavedVaultItem,
+  type Database,
+} from '@/lib/supabase/types';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -47,6 +52,16 @@ export default async function SummaryPage({ params }: Props) {
   type PearlRow = Database['public']['Tables']['pearls']['Row'];
   const savedPearls = ((pearlRows ?? []) as PearlRow[]).map(toSavedPearl);
 
+  // Fetch vault items for this summary
+  const { data: vaultRows } = await supabase
+    .from('vault_items')
+    .select('*')
+    .eq('summary_id', id)
+    .order('created_at', { ascending: false });
+
+  type VaultRow = Database['public']['Tables']['vault_items']['Row'];
+  const savedVaultItems = ((vaultRows ?? []) as VaultRow[]).map(toSavedVaultItem);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
@@ -59,7 +74,11 @@ export default async function SummaryPage({ params }: Props) {
           </Link>
         </div>
 
-        <SummaryView summary={summary} savedPearls={savedPearls} />
+        <SummaryView
+          summary={summary}
+          savedPearls={savedPearls}
+          savedVaultItems={savedVaultItems}
+        />
       </div>
     </div>
   );
