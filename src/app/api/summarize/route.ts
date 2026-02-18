@@ -40,7 +40,11 @@ const summarizeSchema = z.object({
   save: z.boolean().optional(),
   recordingTitles: z.array(z.string()).optional(),
   recordingDates: z.array(z.string()).optional(),
-  timezone: z.string().max(100).optional(),
+  timezone: z
+    .string()
+    .max(100)
+    .regex(/^[A-Za-z_/+-]+$/, 'Invalid timezone format')
+    .optional(),
 });
 
 // 10 requests per hour per IP

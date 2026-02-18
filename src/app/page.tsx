@@ -668,7 +668,6 @@ export default function Home() {
                   : 'manual-transcript',
             )
           }
-          recordingCount={state.transcripts.length}
         />
       )}
 

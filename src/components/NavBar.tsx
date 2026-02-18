@@ -10,11 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Plus, LayoutDashboard, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const NEW_SUMMARY_EVENT = 'cedar:new-summary';
+
 export function NavBar() {
   const { user, loading, signOut } = useAuth();
   const { isAppMode } = useAppMode();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const pathname = usePathname();
+
+  const handleNewSummary = (e: React.MouseEvent) => {
+    if (pathname === '/') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent(NEW_SUMMARY_EVENT));
+    }
+  };
 
   // Hide nav on landing page for non-authenticated users (unless they're in app mode)
   if (!user && !loading && pathname === '/' && !isAppMode) {
@@ -31,15 +40,7 @@ export function NavBar() {
 
           {user && (
             <nav className="hidden sm:flex items-center gap-1">
-              <Link
-                href="/"
-                onClick={(e) => {
-                  if (pathname === '/') {
-                    e.preventDefault();
-                    window.dispatchEvent(new CustomEvent('cedar:new-summary'));
-                  }
-                }}
-              >
+              <Link href="/" onClick={handleNewSummary}>
                 <Button
                   variant="ghost"
                   size="default"
@@ -93,16 +94,7 @@ export function NavBar() {
       {/* Mobile nav for logged-in users */}
       {user && (
         <div className="sm:hidden border-t px-4 py-2 flex gap-2">
-          <Link
-            href="/"
-            className="flex-1"
-            onClick={(e) => {
-              if (pathname === '/') {
-                e.preventDefault();
-                window.dispatchEvent(new CustomEvent('cedar:new-summary'));
-              }
-            }}
-          >
+          <Link href="/" className="flex-1" onClick={handleNewSummary}>
             <Button
               variant="ghost"
               size="sm"

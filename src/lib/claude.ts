@@ -8,6 +8,29 @@ const client = new Anthropic();
 
 // ── Free-form summary prompt + tool ──────────────────────────────────
 
+// ── Shared prompt sections ───────────────────────────────────────────
+
+const DIRECT_QUOTES_SECTION = `## Direct Quotes
+
+When quoting speakers, follow these rules strictly:
+
+- **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
+  > Quote text here — *Speaker Name*
+- **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
+- **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
+- **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.** If someone said "I'm not sure, but maybe we should…" keep the tentativeness.
+- **If a speaker's response was long,** excerpt the most substantive portion. Use "[…]" to indicate where material was trimmed. Never trim in a way that changes the meaning.
+- **Include timestamps when available** in the transcript (e.g., "[12:34]").`;
+
+const TITLE_SECTION = `## Title
+- If title metadata is provided, use it directly.
+- Otherwise, generate a concise descriptive title (not "Meeting Summary").`;
+
+const STREAMING_SUFFIX =
+  '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full summary below it. Do not wrap the output in a code block.';
+
+// ── Free-form summary prompt + tool ──────────────────────────────────
+
 const SUMMARY_SYSTEM_PROMPT = `You are an expert meeting analyst. You write meeting summaries in whatever format best serves the content and the recipient's needs.
 
 There is no fixed template. Let the meeting itself dictate the structure — a brainstorm deserves different treatment than a status update, a difficult conversation, or a planning session.
@@ -20,17 +43,7 @@ There is no fixed template. Let the meeting itself dictate the structure — a b
 - **Include action items and decisions** if the meeting produced them, but don't invent structure that wasn't there.
 - **Use markdown formatting** — headings, blockquotes, lists, bold — whatever makes the summary scannable and clear.
 
-## Direct Quotes
-
-When quoting speakers, follow these rules strictly:
-
-- **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
-  > Quote text here — *Speaker Name*
-- **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
-- **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
-- **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.** If someone said "I'm not sure, but maybe we should…" keep the tentativeness.
-- **If a speaker's response was long,** excerpt the most substantive portion. Use "[…]" to indicate where material was trimmed. Never trim in a way that changes the meaning.
-- **Include timestamps when available** in the transcript (e.g., "[12:34]").
+${DIRECT_QUOTES_SECTION}
 
 ## Adapt to the Meeting's Shape
 
@@ -46,9 +59,7 @@ Recognize how the conversation was structured and let that shape the summary:
 
 Don't force-classify — some meetings are messy hybrids. But when the structure is clear, honor it.
 
-## Title
-- If title metadata is provided, use it directly.
-- Otherwise, generate a concise descriptive title (not "Meeting Summary").`;
+${TITLE_SECTION}`;
 
 const SUMMARY_TOOL: Anthropic.Tool = {
   name: 'meeting_summary',
@@ -132,13 +143,7 @@ async function summarizeSingle(
   date?: string,
 ): Promise<GeneratedSummary> {
   const userMessage = buildUserMessage(transcript, context, title, date);
-
-  const systemPrompt =
-    context.summaryStyle === 'structured'
-      ? STRUCTURED_SUMMARY_SYSTEM_PROMPT
-      : context.summaryStyle === 'custom'
-        ? CUSTOM_SUMMARY_SYSTEM_PROMPT
-        : SUMMARY_SYSTEM_PROMPT;
+  const systemPrompt = getSystemPrompt(context.summaryStyle, false);
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -202,12 +207,6 @@ function buildUserMessage(
 
   return message;
 }
-
-// ── Streaming summary (no tool_use, raw markdown output) ────────────
-
-const STREAMING_SUMMARY_SYSTEM_PROMPT =
-  SUMMARY_SYSTEM_PROMPT +
-  '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full summary below it. Do not wrap the output in a code block.';
 
 // ── Structured summary prompt ───────────────────────────────────────
 
@@ -284,49 +283,28 @@ Participants: [if known]
 
 Detection heuristic: Look for facilitator saying "let's break into groups," followed by parallel audio tracks or a sudden drop in participants, followed by reconvening. If sub-groups reported back, capture the synthesis as quotes. If no report-back: "This sub-group's work was not brought back to main meeting." If not recorded: "Breakout room content was not captured."
 
-## Direct Quotes
+${DIRECT_QUOTES_SECTION}
 
-When quoting speakers, follow these rules strictly:
-
-- **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
-  > Quote text here — *Speaker Name*
-- **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
-- **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
-- **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.** If someone said "I'm not sure, but maybe we should…" keep the tentativeness.
-- **If a speaker's response was long,** excerpt the most substantive portion. Use "[…]" to indicate where material was trimmed. Never trim in a way that changes the meaning.
-- **Include timestamps when available** in the transcript (e.g., "[12:34]").
-
-## Title
-- If title metadata is provided, use it directly.
-- Otherwise, generate a concise descriptive title (not "Meeting Summary").`;
-
-const STRUCTURED_STREAMING_SUMMARY_SYSTEM_PROMPT =
-  STRUCTURED_SUMMARY_SYSTEM_PROMPT +
-  '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full structured summary below it. Do not wrap the output in a code block.';
+${TITLE_SECTION}`;
 
 // ── Custom format prompt ────────────────────────────────────────────
 
 const CUSTOM_SUMMARY_SYSTEM_PROMPT = `You are summarizing a meeting transcript. The user will describe the exact format they want. Follow their formatting instructions precisely.
 
-## Direct Quotes
+${DIRECT_QUOTES_SECTION}
 
-When quoting speakers, follow these rules strictly:
+${TITLE_SECTION}`;
 
-- **Pull the speaker's actual words from the transcript.** Format quotes as blockquotes with attribution:
-  > Quote text here — *Speaker Name*
-- **Never mix AI-generated words with direct quotes.** Quotes must be clearly separated from your analysis.
-- **Lightly clean for readability:** Remove filler words ("um," "like," "you know"), false starts, and repeated words.
-- **Do not paraphrase, merge two separate remarks into one quote, or trim out hedging and uncertainty that changes the speaker's tone.**
-- **If a speaker's response was long,** excerpt the most substantive portion. Use "[…]" to indicate where material was trimmed.
-- **Include timestamps when available** in the transcript (e.g., "[12:34]").
-
-## Title
-- If title metadata is provided, use it directly.
-- Otherwise, generate a concise descriptive title (not "Meeting Summary").`;
-
-const CUSTOM_STREAMING_SUMMARY_SYSTEM_PROMPT =
-  CUSTOM_SUMMARY_SYSTEM_PROMPT +
-  '\n\nIMPORTANT: Begin your response with a single `# Title` heading on the first line, then write the full summary below it. Do not wrap the output in a code block.';
+/** Select the appropriate system prompt for the given summary style and mode. */
+function getSystemPrompt(style: SummaryContext['summaryStyle'], streaming: boolean): string {
+  const base =
+    style === 'structured'
+      ? STRUCTURED_SUMMARY_SYSTEM_PROMPT
+      : style === 'custom'
+        ? CUSTOM_SUMMARY_SYSTEM_PROMPT
+        : SUMMARY_SYSTEM_PROMPT;
+  return streaming ? base + STREAMING_SUFFIX : base;
+}
 
 export function streamSummarySingle(
   transcript: string,
@@ -335,13 +313,7 @@ export function streamSummarySingle(
   date?: string,
 ) {
   const userMessage = buildUserMessage(transcript, context, title, date);
-
-  const systemPrompt =
-    context.summaryStyle === 'structured'
-      ? STRUCTURED_STREAMING_SUMMARY_SYSTEM_PROMPT
-      : context.summaryStyle === 'custom'
-        ? CUSTOM_STREAMING_SUMMARY_SYSTEM_PROMPT
-        : STREAMING_SUMMARY_SYSTEM_PROMPT;
+  const systemPrompt = getSystemPrompt(context.summaryStyle, true);
 
   return client.messages.stream({
     model: 'claude-sonnet-4-20250514',

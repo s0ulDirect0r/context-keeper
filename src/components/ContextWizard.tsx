@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 import type { SummaryContext } from '@/lib/claude';
 
 interface Props {
   onComplete: (context: SummaryContext) => void;
   onBack: () => void;
-  recordingCount?: number;
 }
 
 const TEMPLATES = [
@@ -43,17 +43,28 @@ const TEMPLATES = [
   },
 ] as const;
 
+const SUMMARY_STYLES = ['standard', 'structured', 'custom'] as const;
+type SummaryStyle = (typeof SUMMARY_STYLES)[number];
+
+function isSummaryStyle(value: string): value is SummaryStyle {
+  return (SUMMARY_STYLES as readonly string[]).includes(value);
+}
+
+const FORMAT_OPTIONS = [
+  { value: 'standard', label: 'Standard', description: 'Adapts to the themes' },
+  { value: 'structured', label: 'Structured', description: 'Pull out central questions' },
+  { value: 'custom', label: 'Custom', description: 'Describe the format you want' },
+] as const;
+
 const STEPS = ['extraction', 'format', 'additional'] as const;
 type Step = (typeof STEPS)[number];
 
-export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props) {
+export function ContextWizard({ onComplete, onBack }: Props) {
   const [step, setStep] = useState<Step>('extraction');
   const [extractionGoal, setExtractionGoal] = useState('');
   const [additional, setAdditional] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [summaryStyle, setSummaryStyle] = useState<'standard' | 'structured' | 'custom'>(
-    'standard',
-  );
+  const [summaryStyle, setSummaryStyle] = useState<SummaryStyle>('standard');
   const [customFormatDescription, setCustomFormatDescription] = useState('');
 
   const stepIndex = STEPS.indexOf(step);
@@ -141,11 +152,12 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
                   type="button"
                   aria-pressed={selectedTemplate === template.id}
                   onClick={() => handleTemplateClick(template.id)}
-                  className={`rounded-lg border p-3 text-left transition-colors hover:bg-accent/50 ${
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors hover:bg-accent/50',
                     selectedTemplate === template.id
                       ? 'ring-2 ring-primary border-primary bg-accent/30'
-                      : 'border-border'
-                  }`}
+                      : 'border-border',
+                  )}
                 >
                   <div className="font-medium text-sm">{template.label}</div>
                   <div className="text-xs text-muted-foreground mt-1">{template.description}</div>
@@ -168,51 +180,33 @@ export function ContextWizard({ onComplete, onBack, recordingCount = 1 }: Props)
           <>
             <RadioGroup
               value={summaryStyle}
-              onValueChange={(v) => setSummaryStyle(v as 'standard' | 'structured' | 'custom')}
+              onValueChange={(v) => {
+                if (isSummaryStyle(v)) setSummaryStyle(v);
+              }}
               className="flex gap-3"
             >
-              <Label
-                htmlFor="style-standard"
-                className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                  summaryStyle === 'standard'
-                    ? 'ring-2 ring-primary border-primary bg-accent/30'
-                    : 'border-border'
-                }`}
-              >
-                <RadioGroupItem value="standard" id="style-standard" className="mt-0.5" />
-                <div className="flex-1">
-                  <span className="font-medium text-sm">Standard</span>
-                  <p className="text-xs text-muted-foreground">Adapts to the themes</p>
-                </div>
-              </Label>
-              <Label
-                htmlFor="style-structured"
-                className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                  summaryStyle === 'structured'
-                    ? 'ring-2 ring-primary border-primary bg-accent/30'
-                    : 'border-border'
-                }`}
-              >
-                <RadioGroupItem value="structured" id="style-structured" className="mt-0.5" />
-                <div className="flex-1">
-                  <span className="font-medium text-sm">Structured</span>
-                  <p className="text-xs text-muted-foreground">Pull out central questions</p>
-                </div>
-              </Label>
-              <Label
-                htmlFor="style-custom"
-                className={`flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                  summaryStyle === 'custom'
-                    ? 'ring-2 ring-primary border-primary bg-accent/30'
-                    : 'border-border'
-                }`}
-              >
-                <RadioGroupItem value="custom" id="style-custom" className="mt-0.5" />
-                <div className="flex-1">
-                  <span className="font-medium text-sm">Custom</span>
-                  <p className="text-xs text-muted-foreground">Describe the format you want</p>
-                </div>
-              </Label>
+              {FORMAT_OPTIONS.map((option) => (
+                <Label
+                  key={option.value}
+                  htmlFor={`style-${option.value}`}
+                  className={cn(
+                    'flex-1 flex items-start space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/50',
+                    summaryStyle === option.value
+                      ? 'ring-2 ring-primary border-primary bg-accent/30'
+                      : 'border-border',
+                  )}
+                >
+                  <RadioGroupItem
+                    value={option.value}
+                    id={`style-${option.value}`}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-sm">{option.label}</span>
+                    <p className="text-xs text-muted-foreground">{option.description}</p>
+                  </div>
+                </Label>
+              ))}
             </RadioGroup>
             {summaryStyle === 'custom' && (
               <Textarea
