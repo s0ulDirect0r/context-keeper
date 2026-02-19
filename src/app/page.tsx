@@ -15,7 +15,7 @@ import { SummaryModeSelector } from '@/components/generation/SummaryModeSelector
 import { SummaryView } from '@/components/summary/SummaryView';
 import { StreamingGenerationView } from '@/components/generation/StreamingGenerationView';
 import type { Recording } from '@/lib/otter';
-import type { SummaryContext, ConceptTag } from '@/lib/claude';
+import type { SummaryContext } from '@/models/types';
 import {
   getStoredSession,
   storeSession,
@@ -519,23 +519,11 @@ export default function Home() {
         });
         break;
 
-      case 'tags_extracting':
-        dispatch({ type: 'SSE_TAGS_EXTRACTING' });
-        break;
-
-      case 'tags_done':
-        dispatch({
-          type: 'SSE_TAGS_DONE',
-          tags: (data.tags || []) as ConceptTag[],
-        });
-        break;
-
       case 'complete':
         dispatch({
           type: 'SSE_COMPLETE',
           savedSummaryId: data.savedSummaryId as string | undefined,
           summaries: data.summaries as string[] | undefined,
-          tags: data.tags as ConceptTag[] | undefined,
         });
         // Notify user if DB save failed during generation
         if (data.saveError) {

@@ -1,12 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedSummary, toSavedPearl, type Database } from '@/lib/supabase/types';
+import { getSummaryById } from '@/models/summaries';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-
-type SummaryRow = Database['public']['Tables']['summaries']['Row'];
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -24,28 +22,11 @@ export default async function SummaryPage({ params }: Props) {
     redirect('/');
   }
 
-  const { data: row, error } = await supabase
-    .from('summaries')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .single();
+  const summary = await getSummaryById(supabase, id, user.id);
 
-  if (error || !row) {
+  if (!summary) {
     notFound();
   }
-
-  const summary = toSavedSummary(row as SummaryRow);
-
-  // Fetch pearls for this summary
-  const { data: pearlRows } = await supabase
-    .from('pearls')
-    .select('*')
-    .eq('summary_id', id)
-    .order('created_at', { ascending: true });
-
-  type PearlRow = Database['public']['Tables']['pearls']['Row'];
-  const savedPearls = ((pearlRows ?? []) as PearlRow[]).map(toSavedPearl);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -59,7 +40,7 @@ export default async function SummaryPage({ params }: Props) {
           </Link>
         </div>
 
-        <SummaryView summary={summary} savedPearls={savedPearls} />
+        <SummaryView summary={summary} />
       </div>
     </div>
   );

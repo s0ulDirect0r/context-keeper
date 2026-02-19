@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { SavedSummary } from '@/lib/supabase/types';
 import type { Database } from '@/lib/supabase/types';
-import type { SummaryContext } from '@/lib/claude';
-import type { SummaryContent } from '@/lib/summary-types';
+import type { SavedSummary, SummaryContext, SummaryContent } from '@/models/types';
 import { getSummaryPreviewText } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +25,6 @@ function deserializeSummary(row: SummaryRow): SavedSummary {
     summaries: row.summaries as unknown as SummaryContent,
     context: row.context as unknown as SummaryContext,
     transcripts: (row.transcripts as unknown as string[] | null) ?? null,
-    selectedTags: row.selected_tags ?? null,
     shareToken: row.share_token ?? null,
     isShared: row.is_shared ?? false,
     createdAt: new Date(row.created_at),

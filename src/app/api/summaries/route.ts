@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
-import { type SummaryContext, type Pearl } from '@/lib/claude';
-import { createClient } from '@/lib/supabase/server';
-import type { Database } from '@/lib/supabase/types';
-import { buildSearchText } from '@/lib/search-text';
+import { requireAuth } from '@/lib/auth';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { getSummaries, saveSummary, deriveTitle } from '@/models/summaries';
 
 // 30 requests per minute for read operations
 const listLimiter = createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
@@ -16,12 +14,6 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-const pearlSchema = z.object({
-  insight: z.string().min(1),
-  concepts: z.array(z.string()),
-  quote: z.string().nullable().optional(),
-});
-
 const saveSummarySchema = z.object({
   summaries: z.array(z.string()).min(1, 'At least one summary required'),
   context: z.object({
@@ -30,15 +22,7 @@ const saveSummarySchema = z.object({
   }),
   recordingTitles: z.array(z.string()).optional(),
   transcripts: z.array(z.string()).optional(),
-  pearls: z.array(pearlSchema).optional(),
 });
-
-function deriveTitle(recordingTitles?: string[]): string {
-  if (!recordingTitles || recordingTitles.length === 0) return 'Untitled Summary';
-  if (recordingTitles.length === 1) return recordingTitles[0];
-  if (recordingTitles.length === 2) return recordingTitles.join(' & ');
-  return `${recordingTitles[0]} & ${recordingTitles[1]} + ${recordingTitles.length - 2} more`;
-}
 
 export async function GET(request: Request) {
   const { allowed, retryAfter } = listLimiter.check(request);
@@ -61,49 +45,27 @@ export async function GET(request: Request) {
 
     const { q, limit, offset } = parsed.data;
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    let query = supabase.from('summaries').select('*', { count: 'exact' }).eq('user_id', user.id);
+    const result = await getSummaries(auth.supabase, auth.user.id, { q, limit, offset });
 
-    if (q) {
-      // Full-text search via GIN index (requires search_text column from migration)
-      // Falls back to ILIKE on title if column doesn't exist yet
-      query = query.textSearch('search_text', q, { type: 'websearch', config: 'english' });
-    }
-
-    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
-
-    let { data: summaries, count, error } = await query;
-
-    // Fallback: if textSearch failed (column missing), retry with ILIKE on title
-    if (error && q) {
-      const fallback = supabase
-        .from('summaries')
-        .select('*', { count: 'exact' })
-        .eq('user_id', user.id)
-        .ilike('title', `%${q}%`)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
-      ({ data: summaries, count, error } = await fallback);
-    }
-
-    if (error) {
-      logger.error(
-        'Failed to fetch summaries',
-        { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
-        error,
-      );
+    if (!result) {
+      logger.error('Failed to fetch summaries', {
+        route: '/api/summaries',
+        requestId: request.headers.get('x-request-id') ?? undefined,
+      });
       return NextResponse.json({ error: 'Failed to fetch summaries' }, { status: 500 });
     }
 
-    return NextResponse.json({ summaries: summaries ?? [], total: count ?? 0, limit, offset });
+    return NextResponse.json({
+      summaries: result.summaries,
+      total: result.total,
+      limit,
+      offset,
+    });
   } catch (error) {
     logger.error(
       'List summaries error',
@@ -126,78 +88,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const { summaries, context, recordingTitles, transcripts, pearls } = parsed.data;
+    const { summaries, context, recordingTitles, transcripts } = parsed.data;
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const summaryContext: SummaryContext = {
-      extractionGoal: context.extractionGoal,
-      additionalContext: context.additionalContext,
-    };
-
     const title = deriveTitle(recordingTitles);
 
-    const summariesMap: Record<string, string> = {};
-    summaries.forEach((s, i) => {
-      summariesMap[String(i)] = s;
+    const savedSummaryId = await saveSummary(auth.supabase, {
+      userId: auth.user.id,
+      title,
+      summaries,
+      context: {
+        extractionGoal: context.extractionGoal,
+        additionalContext: context.additionalContext,
+      },
+      transcripts,
     });
 
-    const insertData: Database['public']['Tables']['summaries']['Insert'] = {
-      user_id: user.id,
-      title,
-      summaries:
-        summaries as unknown as Database['public']['Tables']['summaries']['Insert']['summaries'],
-      context:
-        summaryContext as unknown as Database['public']['Tables']['summaries']['Insert']['context'],
-      transcripts:
-        transcripts as unknown as Database['public']['Tables']['summaries']['Insert']['transcripts'],
-      search_text: buildSearchText(title, summariesMap),
-    };
-
-    const { data, error: saveError } = await supabase
-      .from('summaries')
-      .insert(insertData)
-      .select('id')
-      .single();
-
-    if (saveError) {
-      logger.error(
-        'Failed to save summary',
-        { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
-        saveError,
-      );
+    if (!savedSummaryId) {
+      logger.error('Failed to save summary', {
+        route: '/api/summaries',
+        requestId: request.headers.get('x-request-id') ?? undefined,
+      });
       return NextResponse.json({ error: 'Failed to save summary' }, { status: 500 });
     }
 
-    // Save pearls if provided (guest sign-up-to-save flow)
-    if (pearls && pearls.length > 0) {
-      const pearlRows = (pearls as Pearl[]).map((pearl) => ({
-        user_id: user.id,
-        summary_id: data.id,
-        insight: pearl.insight,
-        concepts: pearl.concepts,
-        quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
-      }));
-
-      const { error: pearlError } = await supabase.from('pearls').insert(pearlRows);
-
-      if (pearlError) {
-        logger.error(
-          'Failed to save pearls during summary save',
-          { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
-          pearlError,
-        );
-      }
-    }
-
-    return NextResponse.json({ savedSummaryId: data.id, title });
+    return NextResponse.json({ savedSummaryId, title });
   } catch (error) {
     logger.error(
       'Save summary error',

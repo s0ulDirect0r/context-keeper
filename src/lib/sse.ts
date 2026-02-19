@@ -54,11 +54,11 @@ export async function consumeSSE(
  */
 export async function consumeSSEToCompletion(
   response: Response,
-): Promise<{ savedSummaryId?: string; summaries?: string[]; tags?: unknown[] }> {
+): Promise<{ savedSummaryId?: string; summaries?: string[] }> {
   let result: Record<string, unknown> = {};
   await consumeSSE(response, (event, data) => {
     if (event === 'complete') result = data;
     if (event === 'error') throw new Error((data.message as string) || 'SSE error');
   });
-  return result as { savedSummaryId?: string; summaries?: string[]; tags?: unknown[] };
+  return result as { savedSummaryId?: string; summaries?: string[] };
 }

@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { buildSearchText } from '@/lib/search-text';
+import { requireAuth } from '@/lib/auth';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import crypto from 'crypto';
+import { updateSummary, deleteSummary } from '@/models/summaries';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -54,79 +53,33 @@ export async function PATCH(request: Request, { params }: Props) {
       );
     }
 
-    const validatedBody = parsed.data;
-
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Verify ownership and get current data for search_text recomputation
-    const { data: existing, error: fetchError } = await supabase
-      .from('summaries')
-      .select('id, user_id, share_token, title, summaries')
-      .eq('id', id)
-      .single();
+    // Map API snake_case to model camelCase
+    const { is_shared, ...rest } = parsed.data;
+    const result = await updateSummary(auth.supabase, id, auth.user.id, {
+      ...rest,
+      isShared: is_shared,
+    });
 
-    if (fetchError || !existing) {
+    if (result.error === 'not_found') {
       return NextResponse.json({ error: 'Summary not found' }, { status: 404 });
     }
-
-    if (existing.user_id !== user.id) {
+    if (result.error === 'forbidden') {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
-
-    // Build update object from validated fields
-    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
-
-    if (validatedBody.title !== undefined) updateData.title = validatedBody.title;
-    if (validatedBody.summaries !== undefined) updateData.summaries = validatedBody.summaries;
-    if (validatedBody.context !== undefined) updateData.context = validatedBody.context;
-    if (validatedBody.is_shared !== undefined) updateData.is_shared = validatedBody.is_shared;
-    if (validatedBody.transcripts !== undefined) updateData.transcripts = validatedBody.transcripts;
-
-    // Recompute search_text when title or summaries change
-    if (validatedBody.title !== undefined || validatedBody.summaries !== undefined) {
-      const newTitle = validatedBody.title ?? existing.title;
-      const newSummaries = validatedBody.summaries ?? (existing.summaries as string[]);
-      const summariesMap: Record<string, string> = {};
-      if (Array.isArray(newSummaries)) {
-        newSummaries.forEach((s: string, i: number) => {
-          summariesMap[String(i)] = String(s);
-        });
-      }
-      updateData.search_text = buildSearchText(newTitle, summariesMap);
-    }
-
-    // Generate share token when enabling sharing for the first time
-    if (validatedBody.is_shared === true && !existing.share_token) {
-      updateData.share_token = crypto.randomBytes(16).toString('base64url');
-    }
-
-    const { data, error: updateError } = await supabase
-      .from('summaries')
-      .update(updateData)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (updateError) {
-      logger.error(
-        'Failed to update summary',
-        {
-          route: '/api/summaries/[id]',
-          requestId: request.headers.get('x-request-id') ?? undefined,
-        },
-        updateError,
-      );
+    if (result.error === 'update_failed') {
+      logger.error('Failed to update summary', {
+        route: '/api/summaries/[id]',
+        requestId: request.headers.get('x-request-id') ?? undefined,
+      });
       return NextResponse.json({ error: 'Failed to update summary' }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(result.data);
   } catch (error) {
     logger.error(
       'Update summary error',
@@ -153,42 +106,21 @@ export async function DELETE(request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Invalid summary ID' }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Verify ownership
-    const { data: existing, error: fetchError } = await supabase
-      .from('summaries')
-      .select('id, user_id')
-      .eq('id', id)
-      .single();
+    const result = await deleteSummary(auth.supabase, id, auth.user.id);
 
-    if (fetchError || !existing) {
+    if (result.error === 'not_found') {
       return NextResponse.json({ error: 'Summary not found' }, { status: 404 });
     }
-
-    if (existing.user_id !== user.id) {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-    }
-
-    // Pearls are deleted automatically via ON DELETE CASCADE
-    const { error: deleteError } = await supabase.from('summaries').delete().eq('id', id);
-
-    if (deleteError) {
-      logger.error(
-        'Failed to delete summary',
-        {
-          route: '/api/summaries/[id]',
-          requestId: request.headers.get('x-request-id') ?? undefined,
-        },
-        deleteError,
-      );
+    if (result.error === 'delete_failed') {
+      logger.error('Failed to delete summary', {
+        route: '/api/summaries/[id]',
+        requestId: request.headers.get('x-request-id') ?? undefined,
+      });
       return NextResponse.json({ error: 'Failed to delete summary' }, { status: 500 });
     }
 
