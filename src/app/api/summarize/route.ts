@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NextResponse } from 'next/server';
 import { streamAndPersistSummary } from '@/services/summarize';
 import type { SummaryContext } from '@/models/types';
 import { createClient } from '@/lib/supabase/server';
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   // Rate limit check
   const { allowed, retryAfter } = limiter.check(request);
   if (!allowed) {
-    return Response.json(
+    return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429, headers: { 'Retry-After': String(retryAfter) } },
     );
@@ -61,12 +62,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
   const parsed = summarizeSchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json(
+    return NextResponse.json(
       { error: 'Validation failed', details: parsed.error.issues.map((i) => i.message) },
       { status: 400 },
     );

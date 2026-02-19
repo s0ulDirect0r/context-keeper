@@ -6,6 +6,11 @@ import type { Database } from '@/lib/supabase/types';
 import type { SavedSummary, SummaryContent, SummaryContext } from './types';
 
 type SummaryRow = Database['public']['Tables']['summaries']['Row'];
+type SummaryUpdate = Database['public']['Tables']['summaries']['Update'];
+
+// Columns selected for listing queries — excludes large transcripts and search_text
+const LISTING_COLUMNS =
+  'id, user_id, title, summaries, context, share_token, is_shared, created_at, updated_at' as const;
 
 // ── Row mapper ─────────────────────────────────────────────────────
 
@@ -32,15 +37,20 @@ export function deriveTitle(recordingTitles?: string[]): string {
   return `${recordingTitles[0]} & ${recordingTitles[1]} + ${recordingTitles.length - 2} more`;
 }
 
-// ── Search text ────────────────────────────────────────────────────
+// ── Internal helpers ───────────────────────────────────────────────
 
-export function buildSearchText(title: string, summaries: Record<string, string>): string {
+function buildSearchText(title: string, summaries: Record<string, string>): string {
   const parts = [title];
   for (const text of Object.values(summaries)) {
     parts.push(text);
   }
   // Cap at 50KB to avoid oversized rows
   return parts.join('\n').slice(0, 50_000);
+}
+
+/** Escape ILIKE wildcards to prevent semantic injection in search terms. */
+function escapeIlike(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&');
 }
 
 // ── Data access ────────────────────────────────────────────────────
@@ -85,7 +95,10 @@ export async function getSummaries(
   userId: string,
   opts: { q?: string; limit: number; offset: number },
 ): Promise<{ summaries: SummaryRow[]; total: number } | null> {
-  let query = supabase.from('summaries').select('*', { count: 'exact' }).eq('user_id', userId);
+  let query = supabase
+    .from('summaries')
+    .select(LISTING_COLUMNS, { count: 'exact' })
+    .eq('user_id', userId);
 
   if (opts.q) {
     query = query.textSearch('search_text', opts.q, { type: 'websearch', config: 'english' });
@@ -101,9 +114,9 @@ export async function getSummaries(
   if (error && opts.q) {
     const fallback = supabase
       .from('summaries')
-      .select('*', { count: 'exact' })
+      .select(LISTING_COLUMNS, { count: 'exact' })
       .eq('user_id', userId)
-      .ilike('title', `%${opts.q}%`)
+      .ilike('title', `%${escapeIlike(opts.q)}%`)
       .order('created_at', { ascending: false })
       .range(opts.offset, opts.offset + opts.limit - 1);
     ({ data, count, error } = await fallback);
@@ -142,16 +155,10 @@ export async function getSharedSummary(
 
   if (error || !row) return null;
 
+  // Reuse toSavedSummary mapping but override transcripts (hidden for shared views)
   return {
-    id: row.id,
-    title: row.title,
-    summaries: row.summaries as unknown as SummaryContent,
-    context: row.context as unknown as SummaryContext,
-    transcripts: null, // Intentionally hidden for shared views
-    shareToken: row.share_token,
-    isShared: row.is_shared,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
+    ...toSavedSummary(row as SummaryRow),
+    transcripts: null,
   };
 }
 
@@ -163,7 +170,7 @@ export async function updateSummary(
     title?: string;
     summaries?: string[];
     context?: { extractionGoal: string; additionalContext?: string };
-    is_shared?: boolean;
+    isShared?: boolean;
     transcripts?: string[];
   },
 ): Promise<{ data: SummaryRow | null; error: 'not_found' | 'forbidden' | 'update_failed' | null }> {
@@ -182,13 +189,19 @@ export async function updateSummary(
     return { data: null, error: 'forbidden' };
   }
 
-  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const updateData: SummaryUpdate = { updated_at: new Date().toISOString() };
 
   if (updates.title !== undefined) updateData.title = updates.title;
-  if (updates.summaries !== undefined) updateData.summaries = updates.summaries;
-  if (updates.context !== undefined) updateData.context = updates.context;
-  if (updates.is_shared !== undefined) updateData.is_shared = updates.is_shared;
-  if (updates.transcripts !== undefined) updateData.transcripts = updates.transcripts;
+  if (updates.summaries !== undefined)
+    updateData.summaries =
+      updates.summaries as unknown as Database['public']['Tables']['summaries']['Update']['summaries'];
+  if (updates.context !== undefined)
+    updateData.context =
+      updates.context as unknown as Database['public']['Tables']['summaries']['Update']['context'];
+  if (updates.isShared !== undefined) updateData.is_shared = updates.isShared;
+  if (updates.transcripts !== undefined)
+    updateData.transcripts =
+      updates.transcripts as unknown as Database['public']['Tables']['summaries']['Update']['transcripts'];
 
   // Recompute search_text when title or summaries change
   if (updates.title !== undefined || updates.summaries !== undefined) {
@@ -204,7 +217,7 @@ export async function updateSummary(
   }
 
   // Generate share token when enabling sharing for the first time
-  if (updates.is_shared === true && !existing.share_token) {
+  if (updates.isShared === true && !existing.share_token) {
     updateData.share_token = crypto.randomBytes(16).toString('base64url');
   }
 
@@ -223,24 +236,15 @@ export async function deleteSummary(
   supabase: SupabaseClient<Database>,
   summaryId: string,
   userId: string,
-): Promise<{ error: 'not_found' | 'forbidden' | 'delete_failed' | null }> {
-  // Verify ownership
-  const { data: existing, error: fetchError } = await supabase
+): Promise<{ error: 'not_found' | 'delete_failed' | null }> {
+  // Single DELETE with user_id check — RLS provides defense-in-depth
+  const { count, error } = await supabase
     .from('summaries')
-    .select('id, user_id')
+    .delete({ count: 'exact' })
     .eq('id', summaryId)
-    .single();
+    .eq('user_id', userId);
 
-  if (fetchError || !existing) {
-    return { error: 'not_found' };
-  }
-
-  if (existing.user_id !== userId) {
-    return { error: 'forbidden' };
-  }
-
-  const { error: deleteError } = await supabase.from('summaries').delete().eq('id', summaryId);
-
-  if (deleteError) return { error: 'delete_failed' };
+  if (error) return { error: 'delete_failed' };
+  if (count === 0) return { error: 'not_found' };
   return { error: null };
 }

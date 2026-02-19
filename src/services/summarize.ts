@@ -2,16 +2,18 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/types';
+import Anthropic from '@anthropic-ai/sdk';
 import type { SummaryContext, SummaryMetadata, GeneratedSummary } from '@/models/types';
 import { deriveTitle, saveSummary } from '@/models/summaries';
-import { anthropic } from '@/lib/ai-client';
 import { SUMMARY_TOOL, getSystemPrompt, buildUserMessage } from './prompts/summary';
 import { logger } from '@/lib/logger';
+
+const anthropic = new Anthropic();
 
 // ── Text transforms ────────────────────────────────────────────────
 
 /** Strip quotation marks from blockquote pull-quotes so they render as clean pullquotes. */
-export function stripBlockquoteQuotes(markdown: string): string {
+function stripBlockquoteQuotes(markdown: string): string {
   return markdown.replace(/^>\s*.+$/gm, (line) =>
     line.replace(/^(>\s*)[""\u201C\u201D]/, '$1').replace(/[""\u201C\u201D]\s*$/, ''),
   );
@@ -19,7 +21,7 @@ export function stripBlockquoteQuotes(markdown: string): string {
 
 // ── Summary generation ─────────────────────────────────────────────
 
-export async function generateSummary(
+async function generateSummary(
   transcripts: string[],
   context: SummaryContext,
   mode: 'combined' | 'separate',
@@ -80,7 +82,7 @@ async function summarizeSingle(
   throw new Error('Failed to generate summary from Claude');
 }
 
-export function streamSummarySingle(
+function streamSummarySingle(
   transcript: string,
   context: SummaryContext,
   title?: string,

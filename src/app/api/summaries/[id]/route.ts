@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAuth } from '@/lib/auth';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { updateSummary, deleteSummary } from '@/models/summaries';
@@ -53,16 +53,17 @@ export async function PATCH(request: Request, { params }: Props) {
       );
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const result = await updateSummary(supabase, id, user.id, parsed.data);
+    // Map API snake_case to model camelCase
+    const { is_shared, ...rest } = parsed.data;
+    const result = await updateSummary(auth.supabase, id, auth.user.id, {
+      ...rest,
+      isShared: is_shared,
+    });
 
     if (result.error === 'not_found') {
       return NextResponse.json({ error: 'Summary not found' }, { status: 404 });
@@ -105,22 +106,15 @@ export async function DELETE(request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Invalid summary ID' }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const result = await deleteSummary(supabase, id, user.id);
+    const result = await deleteSummary(auth.supabase, id, auth.user.id);
 
     if (result.error === 'not_found') {
       return NextResponse.json({ error: 'Summary not found' }, { status: 404 });
-    }
-    if (result.error === 'forbidden') {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
     if (result.error === 'delete_failed') {
       logger.error('Failed to delete summary', {

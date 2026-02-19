@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAuth } from '@/lib/auth';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { getSummaries, saveSummary, deriveTitle } from '@/models/summaries';
@@ -45,16 +45,12 @@ export async function GET(request: Request) {
 
     const { q, limit, offset } = parsed.data;
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const result = await getSummaries(supabase, user.id, { q, limit, offset });
+    const result = await getSummaries(auth.supabase, auth.user.id, { q, limit, offset });
 
     if (!result) {
       logger.error('Failed to fetch summaries', {
@@ -94,19 +90,15 @@ export async function POST(request: Request) {
 
     const { summaries, context, recordingTitles, transcripts } = parsed.data;
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await requireAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const title = deriveTitle(recordingTitles);
 
-    const savedSummaryId = await saveSummary(supabase, {
-      userId: user.id,
+    const savedSummaryId = await saveSummary(auth.supabase, {
+      userId: auth.user.id,
       title,
       summaries,
       context: {

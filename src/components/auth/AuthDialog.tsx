@@ -123,7 +123,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'sign-in' }: Auth
           </DialogTitle>
           <DialogDescription>
             {mode === 'sign-in' && 'Sign in so I can save your summaries.'}
-            {mode === 'sign-up' && "I'll keep your summaries and pearls safe."}
+            {mode === 'sign-up' && "I'll keep your summaries safe."}
             {mode === 'magic-link' && "I'll send you a link — no password needed."}
             {mode === 'check-email' && 'I sent you a link — check your inbox.'}
           </DialogDescription>
