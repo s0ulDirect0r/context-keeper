@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { SummaryContext, SummaryMetadata, GeneratedSummary } from '@/models/types';
 
-// Re-export shared types so server-side consumers can still import from claude.ts
-export type { SummaryContent } from './summary-types';
+// Re-export domain types so existing consumers can still import from claude.ts
+export type { SummaryContent } from '@/models/types';
+export type { SummaryContext, SummaryMetadata, GeneratedSummary } from '@/models/types';
 
 const client = new Anthropic();
 
@@ -80,23 +82,7 @@ const SUMMARY_TOOL: Anthropic.Tool = {
   },
 };
 
-export interface SummaryContext {
-  extractionGoal: string;
-  additionalContext?: string;
-  summaryStyle?: 'standard' | 'structured' | 'custom';
-  customFormatDescription?: string;
-  timezone?: string;
-}
-
-export interface SummaryMetadata {
-  titles?: string[];
-  dates?: string[];
-}
-
-export interface GeneratedSummary {
-  title: string;
-  markdown: string;
-}
+// Types are now defined in @/models/types and re-exported above.
 
 export async function generateSummary(
   transcripts: string[],

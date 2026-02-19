@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedSummary, type Database } from '@/lib/supabase/types';
+import { toSavedSummary } from '@/models/summaries';
+import type { Database } from '@/lib/supabase/types';
 import { logger } from '@/lib/logger';
 import { DashboardClient } from './DashboardClient';
 

@@ -1,5 +1,5 @@
-import type { SummaryContext } from '@/lib/claude';
-import type { SummaryContent } from '@/lib/summary-types';
+// Supabase database types — kept here because they mirror the auto-generated schema.
+// Domain types (SavedSummary, etc.) live in @/models/types.
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -14,7 +14,6 @@ export interface Database {
           summaries: Json;
           context: Json;
           transcripts: Json | null;
-          selected_tags: string[] | null;
           share_token: string | null;
           is_shared: boolean;
           search_text: string | null;
@@ -28,7 +27,6 @@ export interface Database {
           summaries: Json;
           context: Json;
           transcripts?: Json | null;
-          selected_tags?: string[] | null;
           share_token?: string;
           is_shared?: boolean;
           search_text?: string | null;
@@ -42,7 +40,6 @@ export interface Database {
           summaries?: Json;
           context?: Json;
           transcripts?: Json | null;
-          selected_tags?: string[] | null;
           share_token?: string;
           is_shared?: boolean;
           search_text?: string | null;
@@ -92,30 +89,5 @@ export interface Database {
   };
 }
 
-export interface SavedSummary {
-  id: string;
-  title: string;
-  summaries: SummaryContent;
-  context: SummaryContext;
-  transcripts: string[] | null;
-  shareToken: string | null;
-  isShared: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export function toSavedSummary(
-  row: Database['public']['Tables']['summaries']['Row'],
-): SavedSummary {
-  return {
-    id: row.id,
-    title: row.title,
-    summaries: row.summaries as unknown as SummaryContent,
-    context: row.context as unknown as SummaryContext,
-    transcripts: (row.transcripts as unknown as string[] | null) ?? null,
-    shareToken: row.share_token ?? null,
-    isShared: row.is_shared ?? false,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
+// Re-export domain types for backwards compatibility
+export type { SavedSummary } from '@/models/types';
