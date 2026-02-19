@@ -1,4 +1,4 @@
-import type { SummaryContext, Pearl, ConceptTag } from './claude';
+import type { SummaryContext } from './claude';
 import type { SummaryContent } from './summary-types';
 import type { Recording } from './otter';
 
@@ -14,26 +14,6 @@ export type Step =
   | 'summary-mode'
   | 'generating'
   | 'summary';
-
-// ── Phase gates ──────────────────────────────────────────────────────
-// Explicit booleans that track which async operations have completed.
-// Eliminates race conditions from implicit "is this array empty?" checks.
-
-export interface GenerationPhase {
-  summaryReady: boolean;
-  tagsExtracting: boolean;
-  tagsReady: boolean;
-  pearlsGenerating: boolean;
-  pearlsReady: boolean;
-}
-
-const initialPhase: GenerationPhase = {
-  summaryReady: false,
-  tagsExtracting: false,
-  tagsReady: false,
-  pearlsGenerating: false,
-  pearlsReady: false,
-};
 
 // ── State ────────────────────────────────────────────────────────────
 
@@ -66,15 +46,6 @@ export interface GenerationState {
 
   // Generation output
   summaries: SummaryContent;
-  conceptTags: ConceptTag[];
-  pearls: Pearl[];
-
-  // Phase gates
-  phase: GenerationPhase;
-
-  // Tag selection (lifted so it survives generating→summary transition)
-  tagSelection: Set<string>;
-  tagCustomTags: Set<string>;
 
   // Persistence
   savedSummaryId: string | null;
@@ -99,11 +70,6 @@ export const initialState: GenerationState = {
   streamingMarkdown: '',
   isStreaming: false,
   summaries: [],
-  conceptTags: [],
-  pearls: [],
-  phase: initialPhase,
-  tagSelection: new Set(),
-  tagCustomTags: new Set(),
   savedSummaryId: null,
   error: null,
 };
@@ -131,19 +97,11 @@ export type GenerationAction =
   | { type: 'GENERATION_START' }
   | { type: 'SSE_SUMMARY_CHUNK'; text: string }
   | { type: 'SSE_SUMMARY_DONE'; summaries?: SummaryContent }
-  | { type: 'SSE_TAGS_EXTRACTING' }
-  | { type: 'SSE_TAGS_DONE'; tags: ConceptTag[] }
   | {
       type: 'SSE_COMPLETE';
       savedSummaryId?: string;
       summaries?: SummaryContent;
-      tags?: ConceptTag[];
     }
-  | { type: 'PEARLS_GENERATING' }
-  | { type: 'PEARLS_DONE'; pearls: Pearl[] }
-  | { type: 'PEARLS_FAILED' }
-  | { type: 'SET_TAG_SELECTION'; selection: Set<string> }
-  | { type: 'SET_TAG_CUSTOM_TAGS'; customTags: Set<string> }
   | { type: 'SET_SAVED_SUMMARY_ID'; id: string }
   | { type: 'SET_STEP_WITH_ERROR'; step: Step; error: string }
   | { type: 'GENERATION_FAILED'; error: string; stayOnGenerating?: boolean }
@@ -199,13 +157,8 @@ export function generationReducer(
         streamingMarkdown: '',
         isStreaming: false,
         summaries: [],
-        conceptTags: [],
-        pearls: [],
-        tagSelection: new Set(),
-        tagCustomTags: new Set(),
         savedSummaryId: null,
         error: null,
-        phase: initialPhase,
         step: 'generating',
       };
 
@@ -221,20 +174,6 @@ export function generationReducer(
         ...state,
         isStreaming: false,
         summaries: action.summaries ?? state.summaries,
-        phase: { ...state.phase, summaryReady: true },
-      };
-
-    case 'SSE_TAGS_EXTRACTING':
-      return {
-        ...state,
-        phase: { ...state.phase, tagsExtracting: true },
-      };
-
-    case 'SSE_TAGS_DONE':
-      return {
-        ...state,
-        conceptTags: action.tags,
-        phase: { ...state.phase, tagsExtracting: false, tagsReady: true },
       };
 
     case 'SSE_COMPLETE':
@@ -242,41 +181,8 @@ export function generationReducer(
         ...state,
         savedSummaryId: action.savedSummaryId ?? state.savedSummaryId,
         summaries: action.summaries ?? state.summaries,
-        conceptTags: action.tags ?? state.conceptTags,
-        phase: {
-          ...state.phase,
-          summaryReady: true,
-          tagsExtracting: false,
-          tagsReady: true,
-        },
         step: 'summary',
       };
-
-    case 'PEARLS_GENERATING':
-      return {
-        ...state,
-        error: null,
-        phase: { ...state.phase, pearlsGenerating: true },
-      };
-
-    case 'PEARLS_DONE':
-      return {
-        ...state,
-        pearls: action.pearls,
-        phase: { ...state.phase, pearlsGenerating: false, pearlsReady: true },
-      };
-
-    case 'PEARLS_FAILED':
-      return {
-        ...state,
-        phase: { ...state.phase, pearlsGenerating: false },
-      };
-
-    case 'SET_TAG_SELECTION':
-      return { ...state, tagSelection: action.selection };
-
-    case 'SET_TAG_CUSTOM_TAGS':
-      return { ...state, tagCustomTags: action.customTags };
 
     case 'SET_SAVED_SUMMARY_ID':
       return { ...state, savedSummaryId: action.id };

@@ -27,7 +27,6 @@ function deserializeSummary(row: SummaryRow): SavedSummary {
     summaries: row.summaries as unknown as SummaryContent,
     context: row.context as unknown as SummaryContext,
     transcripts: (row.transcripts as unknown as string[] | null) ?? null,
-    selectedTags: row.selected_tags ?? null,
     shareToken: row.share_token ?? null,
     isShared: row.is_shared ?? false,
     createdAt: new Date(row.created_at),

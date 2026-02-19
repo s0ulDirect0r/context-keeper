@@ -177,7 +177,6 @@ export async function DELETE(request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    // Pearls are deleted automatically via ON DELETE CASCADE
     const { error: deleteError } = await supabase.from('summaries').delete().eq('id', id);
 
     if (deleteError) {

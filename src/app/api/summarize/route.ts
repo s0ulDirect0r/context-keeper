@@ -1,10 +1,5 @@
 import { z } from 'zod';
-import {
-  generateSummary,
-  extractTags,
-  streamSummarySingle,
-  type SummaryContext,
-} from '@/lib/claude';
+import { generateSummary, streamSummarySingle, type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { buildSearchText } from '@/lib/search-text';
@@ -136,17 +131,6 @@ export async function POST(request: Request) {
       };
 
       try {
-        // Start tag extraction in parallel — it only needs the transcript + context.
-        // Use .then() to send tags_done as soon as tags resolve, even if summary
-        // is still streaming (JS is single-threaded so enqueue calls are safe).
-        send('tags_extracting', {});
-        let resolvedTags: Awaited<ReturnType<typeof extractTags>> = [];
-        const tagPromise = extractTags(combinedTranscript, summaryContext).then((tags) => {
-          resolvedTags = tags;
-          send('tags_done', { tags });
-          return tags;
-        });
-
         if (summaryMode === 'separate' && transcripts.length > 1) {
           // Non-streaming fallback for separate mode
           const generatedSummaries = await generateSummary(
@@ -162,10 +146,7 @@ export async function POST(request: Request) {
           const summaries = generatedSummaries.map((s) => stripBlockquoteQuotes(s.markdown));
           send('summary_done', { summaries });
 
-          // Ensure tags are done before proceeding
-          await tagPromise;
-
-          // Save summary to DB (pearls saved later after tag selection)
+          // Save summary to DB
           let savedSummaryId: string | null = null;
           if (userId && supabase) {
             let title = deriveTitle(recordingTitles);
@@ -208,7 +189,6 @@ export async function POST(request: Request) {
           send('complete', {
             savedSummaryId,
             summaries,
-            tags: resolvedTags,
             saveError: !savedSummaryId && !!userId,
           });
         } else {
@@ -234,9 +214,6 @@ export async function POST(request: Request) {
           accumulatedText = stripBlockquoteQuotes(accumulatedText);
           send('summary_done', { summaries: [accumulatedText] });
 
-          // Ensure tags are done before proceeding
-          await tagPromise;
-
           // Extract title from first heading in the accumulated markdown
           const titleMatch = accumulatedText.match(/^#\s+(.+)$/m);
           const extractedTitle = titleMatch ? titleMatch[1].trim() : 'Untitled Summary';
@@ -247,7 +224,7 @@ export async function POST(request: Request) {
             displayTitle = extractedTitle;
           }
 
-          // Save summary to DB (pearls saved later after tag selection)
+          // Save summary to DB
           let savedSummaryId: string | null = null;
           if (userId && supabase) {
             const { data, error: saveError } = await supabase
@@ -281,7 +258,6 @@ export async function POST(request: Request) {
           send('complete', {
             savedSummaryId,
             summaries: [accumulatedText],
-            tags: resolvedTags,
             saveError: !savedSummaryId && !!userId,
           });
         }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
-import { type SummaryContext, type Pearl } from '@/lib/claude';
+import { type SummaryContext } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 import { buildSearchText } from '@/lib/search-text';
@@ -16,12 +16,6 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-const pearlSchema = z.object({
-  insight: z.string().min(1),
-  concepts: z.array(z.string()),
-  quote: z.string().nullable().optional(),
-});
-
 const saveSummarySchema = z.object({
   summaries: z.array(z.string()).min(1, 'At least one summary required'),
   context: z.object({
@@ -30,7 +24,6 @@ const saveSummarySchema = z.object({
   }),
   recordingTitles: z.array(z.string()).optional(),
   transcripts: z.array(z.string()).optional(),
-  pearls: z.array(pearlSchema).optional(),
 });
 
 function deriveTitle(recordingTitles?: string[]): string {
@@ -126,7 +119,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { summaries, context, recordingTitles, transcripts, pearls } = parsed.data;
+    const { summaries, context, recordingTitles, transcripts } = parsed.data;
 
     const supabase = await createClient();
     const {
@@ -174,27 +167,6 @@ export async function POST(request: Request) {
         saveError,
       );
       return NextResponse.json({ error: 'Failed to save summary' }, { status: 500 });
-    }
-
-    // Save pearls if provided (guest sign-up-to-save flow)
-    if (pearls && pearls.length > 0) {
-      const pearlRows = (pearls as Pearl[]).map((pearl) => ({
-        user_id: user.id,
-        summary_id: data.id,
-        insight: pearl.insight,
-        concepts: pearl.concepts,
-        quote: (pearl.quote ?? null) as Database['public']['Tables']['pearls']['Insert']['quote'],
-      }));
-
-      const { error: pearlError } = await supabase.from('pearls').insert(pearlRows);
-
-      if (pearlError) {
-        logger.error(
-          'Failed to save pearls during summary save',
-          { route: '/api/summaries', requestId: request.headers.get('x-request-id') ?? undefined },
-          pearlError,
-        );
-      }
     }
 
     return NextResponse.json({ savedSummaryId: data.id, title });

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableMarkdown } from './EditableMarkdown';
-import { PearlsSidebar } from './PearlsSidebar';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
@@ -15,12 +14,10 @@ import { Pencil, Loader2, Share2, Check, Link, Copy, FileDown, FileText } from '
 import { toast } from 'sonner';
 import * as Sentry from '@sentry/nextjs';
 import { downloadMarkdown, downloadPdf } from '@/lib/export';
-import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
+import type { SummaryContext } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
-import type { SavedSummary, SavedPearl } from '@/lib/supabase/types';
+import type { SavedSummary } from '@/lib/supabase/types';
 import { isStructuredSummary } from '@/lib/summary-types';
-import { TagSelector } from './TagSelector';
-import { PearlsGeneratingView } from './PearlsGeneratingView';
 
 // ── Prop shapes ──────────────────────────────────────────────────────
 
@@ -32,12 +29,6 @@ interface InlineData {
 }
 
 interface BaseProps {
-  /** Pearls from AI extraction (curation mode) */
-  pearls?: Pearl[];
-  /** Pearls already saved in DB (display mode) */
-  savedPearls?: SavedPearl[];
-  /** Called when pearls are persisted */
-  onPearlsSaved?: (saved: SavedPearl[]) => void;
   /** Read-only mode (shared view) */
   readOnly?: boolean;
   /** Back to start */
@@ -51,19 +42,6 @@ interface InlineProps extends BaseProps {
   savedSummaryId?: string | null;
   /** Called when guest signs up and summary gets saved */
   onSaved?: (id: string) => void;
-  /** Tags for sidebar selection (when user dismissed the tag modal) */
-  conceptTags?: ConceptTag[];
-  /** Called when user submits tags from the sidebar */
-  onTagSubmit?: (selectedTags: string[]) => void;
-  /** Called when user skips tag selection from the sidebar */
-  onTagSkip?: () => void;
-  /** Whether pearls are currently being generated */
-  generatingPearls?: boolean;
-  /** Controlled tag selection state */
-  tagSelection?: Set<string>;
-  onTagSelectionChange?: (next: Set<string>) => void;
-  tagCustomTags?: Set<string>;
-  onTagCustomTagsChange?: (next: Set<string>) => void;
 }
 
 interface SavedProps extends BaseProps {
@@ -93,11 +71,6 @@ export function SummaryView(props: SummaryViewProps) {
   // Mutable state for regeneration
   const [summaries, setSummaries] = useState(initialSummaries);
   const [context, setContext] = useState(initialContext);
-
-  // Pearl state — derive curation pearls from props, dismiss after save
-  const [curationDismissed, setCurationDismissed] = useState(false);
-  const curatingPearls = curationDismissed ? undefined : props.pearls;
-  const [displayPearls, setDisplayPearls] = useState<SavedPearl[]>(props.savedPearls ?? []);
 
   // Copy state
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -149,7 +122,6 @@ export function SummaryView(props: SummaryViewProps) {
           context,
           recordingTitles: inlineProps.data.recordingTitles,
           transcripts: inlineProps.data.transcripts,
-          pearls: curatingPearls?.filter((p) => p.id),
         }),
       })
         .then((res) => res.json())
@@ -370,10 +342,6 @@ export function SummaryView(props: SummaryViewProps) {
         setSummaries(newSummaries);
         setContext(newContext);
         setEditingContext(false);
-
-        // Clear existing pearls — user will need to regenerate via tag selection
-        setCurationDismissed(true);
-        setDisplayPearls([]);
       } else {
         if (data.savedSummaryId) {
           router.push(`/summary/${data.savedSummaryId}`);
@@ -436,29 +404,9 @@ export function SummaryView(props: SummaryViewProps) {
     setTimeout(() => setCopiedShareLink(false), 2000);
   };
 
-  const handlePearlsSaved = (savedPearlList: SavedPearl[]) => {
-    setDisplayPearls(savedPearlList);
-    setCurationDismissed(true);
-    props.onPearlsSaved?.(savedPearlList);
-  };
-
-  // ── Determine sidebar mode ─────────────────────────────────────
-
-  const hasCuratingPearls = curatingPearls && curatingPearls.length > 0;
-  const hasDisplayPearls = displayPearls.length > 0;
-  const inlineProps = !saved ? (props as InlineProps) : null;
-  const isGeneratingPearls = inlineProps?.generatingPearls ?? false;
-  const hasTagsForSidebar =
-    inlineProps?.conceptTags &&
-    inlineProps.conceptTags.length > 0 &&
-    !hasCuratingPearls &&
-    !hasDisplayPearls;
-  const showPearlsSidebar =
-    hasCuratingPearls || hasDisplayPearls || hasTagsForSidebar || isGeneratingPearls;
-
   // ── Render ─────────────────────────────────────────────────────
 
-  const summaryContent = (
+  return (
     <div className="space-y-6 min-w-0 flex-1 max-w-3xl">
       {/* Header */}
       {saved ? (
@@ -836,59 +784,6 @@ export function SummaryView(props: SummaryViewProps) {
       )}
 
       {!saved && <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />}
-    </div>
-  );
-
-  // Wrap in sidebar layout when pearls exist
-  if (!showPearlsSidebar) {
-    return summaryContent;
-  }
-
-  return (
-    <div className="flex flex-col lg:flex-row gap-8">
-      {summaryContent}
-      <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
-        {hasCuratingPearls ? (
-          <PearlsSidebar
-            mode="curate"
-            pearls={curatingPearls}
-            summaryId={summaryId ?? null}
-            onSaved={handlePearlsSaved}
-            isLoggedIn={!!user}
-          />
-        ) : hasDisplayPearls ? (
-          <PearlsSidebar mode="display" pearls={displayPearls} />
-        ) : isGeneratingPearls ? (
-          <PearlsGeneratingView
-            selectedTags={
-              inlineProps?.tagSelection ? Array.from(inlineProps.tagSelection) : undefined
-            }
-          />
-        ) : hasTagsForSidebar &&
-          inlineProps?.onTagSubmit &&
-          inlineProps.onTagSkip &&
-          inlineProps.tagSelection &&
-          inlineProps.onTagSelectionChange &&
-          inlineProps.tagCustomTags &&
-          inlineProps.onTagCustomTagsChange ? (
-          <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-4 space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-              Focus your pearls
-            </h3>
-            <TagSelector
-              tags={inlineProps.conceptTags!}
-              generating={false}
-              onSubmit={inlineProps.onTagSubmit}
-              onSkip={inlineProps.onTagSkip}
-              selected={inlineProps.tagSelection}
-              onSelectedChange={inlineProps.onTagSelectionChange}
-              customTags={inlineProps.tagCustomTags}
-              onCustomTagsChange={inlineProps.onTagCustomTagsChange}
-              compact
-            />
-          </div>
-        ) : null}
-      </aside>
     </div>
   );
 }
