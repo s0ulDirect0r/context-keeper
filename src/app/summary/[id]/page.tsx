@@ -1,13 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedSummary } from '@/models/summaries';
-import type { Database } from '@/lib/supabase/types';
+import { getSummaryById } from '@/models/summaries';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-
-type SummaryRow = Database['public']['Tables']['summaries']['Row'];
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -25,18 +22,11 @@ export default async function SummaryPage({ params }: Props) {
     redirect('/');
   }
 
-  const { data: row, error } = await supabase
-    .from('summaries')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .single();
+  const summary = await getSummaryById(supabase, id, user.id);
 
-  if (error || !row) {
+  if (!summary) {
     notFound();
   }
-
-  const summary = toSavedSummary(row as SummaryRow);
 
   return (
     <div className="container mx-auto px-4 py-8">

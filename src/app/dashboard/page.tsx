@@ -1,11 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedSummary } from '@/models/summaries';
-import type { Database } from '@/lib/supabase/types';
-import { logger } from '@/lib/logger';
+import { getSummaries, toSavedSummary } from '@/models/summaries';
 import { DashboardClient } from './DashboardClient';
-
-type SummaryRow = Database['public']['Tables']['summaries']['Row'];
 
 const PAGE_SIZE = 20;
 
@@ -20,22 +16,8 @@ export default async function DashboardPage() {
     redirect('/');
   }
 
-  const {
-    data: rows,
-    count,
-    error,
-  } = await supabase
-    .from('summaries')
-    .select('*', { count: 'exact' })
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .range(0, PAGE_SIZE - 1);
+  const result = await getSummaries(supabase, user.id, { limit: PAGE_SIZE, offset: 0 });
+  const summaries = (result?.summaries ?? []).map(toSavedSummary);
 
-  if (error) {
-    logger.error('Failed to fetch summaries', { route: '/dashboard' }, error);
-  }
-
-  const summaries = ((rows ?? []) as SummaryRow[]).map(toSavedSummary);
-
-  return <DashboardClient initialSummaries={summaries} totalCount={count ?? 0} />;
+  return <DashboardClient initialSummaries={summaries} totalCount={result?.total ?? 0} />;
 }
