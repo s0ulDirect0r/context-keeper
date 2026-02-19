@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { generateSummary, streamSummarySingle, type SummaryContext } from '@/lib/claude';
+import { generateSummary, streamSummarySingle } from '@/services/summarize';
+import type { SummaryContext } from '@/models/types';
 import { createClient } from '@/lib/supabase/server';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { buildSearchText } from '@/lib/search-text';
