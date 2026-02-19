@@ -52,6 +52,11 @@ export function NotesSidebar({
     const trimmedNote = noteText.trim();
     if (!selectedExcerpt && !trimmedNote) return;
 
+    // Flush any pending tag input so it doesn't get lost
+    const pendingTag = newTagInput.trim().toLowerCase();
+    const finalTags =
+      pendingTag && !newTags.includes(pendingTag) ? [...newTags, pendingTag] : newTags;
+
     setSaving(true);
     try {
       const res = await fetch('/api/vault', {
@@ -61,7 +66,7 @@ export function NotesSidebar({
           summaryId,
           excerptText: selectedExcerpt || undefined,
           note: trimmedNote || undefined,
-          tags: newTags.length > 0 ? newTags : undefined,
+          tags: finalTags.length > 0 ? finalTags : undefined,
         }),
       });
       const data = await res.json();
@@ -164,21 +169,30 @@ export function NotesSidebar({
       {(showNewNote || selectedExcerpt) && (
         <div className="rounded-lg border border-amber-300 dark:border-amber-700/50 bg-white dark:bg-amber-950/30 shadow-sm p-3 space-y-2">
           {selectedExcerpt && (
-            <>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                From summary
-              </p>
-              <p className="text-sm leading-relaxed text-foreground line-clamp-3 italic">
-                &ldquo;{selectedExcerpt}&rdquo;
-              </p>
-            </>
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  From summary
+                </p>
+                <p className="text-sm leading-relaxed text-foreground line-clamp-3 italic">
+                  &ldquo;{selectedExcerpt}&rdquo;
+                </p>
+              </div>
+              <button
+                onClick={onClearSelection}
+                className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors mt-0.5"
+                aria-label="Remove quote"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
           <Textarea
             ref={noteRef}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             placeholder={selectedExcerpt ? 'Add your thoughts...' : 'Write a note...'}
-            className="min-h-[60px] text-sm"
+            className="min-h-[120px] text-sm"
             maxLength={2000}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
