@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const MOCK_VAULT_ITEMS = [
+const MOCK_NOTES = [
   {
     id: '00000000-0000-0000-0000-000000000001',
     user_id: 'test-user',
@@ -37,24 +37,24 @@ const MOCK_VAULT_ITEMS = [
 ];
 
 /**
- * Mock the vault API and Supabase auth to enable dashboard vault tab testing.
+ * Mock the notes API and Supabase auth to enable dashboard notes tab testing.
  *
  * Since the dashboard server component checks auth via Supabase, and we can't
  * intercept server-side requests from Playwright, these tests rely on the
- * vault dashboard's client-side fetch behavior.
+ * notes dashboard's client-side fetch behavior.
  *
  * We mock the Supabase auth token endpoint so the server-side auth check passes,
- * then mock the vault API for client-side data fetching.
+ * then mock the notes API for client-side data fetching.
  */
-async function mockVaultApi(page: import('@playwright/test').Page) {
-  await page.route('**/api/vault?**', async (route) => {
+async function mockNotesApi(page: import('@playwright/test').Page) {
+  await page.route('**/api/notes?**', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          items: MOCK_VAULT_ITEMS,
-          total: MOCK_VAULT_ITEMS.length,
+          items: MOCK_NOTES,
+          total: MOCK_NOTES.length,
           limit: 50,
           offset: 0,
         }),
@@ -65,8 +65,8 @@ async function mockVaultApi(page: import('@playwright/test').Page) {
   });
 }
 
-async function mockVaultDelete(page: import('@playwright/test').Page) {
-  await page.route('**/api/vault/**', async (route) => {
+async function mockNotesDelete(page: import('@playwright/test').Page) {
+  await page.route('**/api/notes/**', async (route) => {
     if (route.request().method() === 'DELETE') {
       await route.fulfill({
         status: 200,
@@ -78,7 +78,7 @@ async function mockVaultDelete(page: import('@playwright/test').Page) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ item: { ...MOCK_VAULT_ITEMS[0], note: body.note } }),
+        body: JSON.stringify({ item: { ...MOCK_NOTES[0], note: body.note } }),
       });
     } else {
       await route.continue();
@@ -87,7 +87,7 @@ async function mockVaultDelete(page: import('@playwright/test').Page) {
 }
 
 /**
- * These tests verify the VaultDashboard component behavior.
+ * These tests verify the NotesDashboard component behavior.
  * They require a running dev server with an authenticated session.
  *
  * To run these tests with auth, the dev server must have a valid Supabase
@@ -96,33 +96,33 @@ async function mockVaultDelete(page: import('@playwright/test').Page) {
  * For now, we test what we can without auth: the API contract and client
  * component rendering behavior.
  */
-test.describe('Vault dashboard — API contract', () => {
-  test('GET /api/vault returns items with summary titles when no summaryId filter', async ({
+test.describe('Notes dashboard — API contract', () => {
+  test('GET /api/notes returns items with summary titles when no summaryId filter', async ({
     page,
   }) => {
-    // This tests the API response shape that VaultDashboard expects
-    await mockVaultApi(page);
+    // This tests the API response shape that NotesDashboard expects
+    await mockNotesApi(page);
 
-    const response = await page.request.get('/api/vault?limit=50&offset=0');
+    const response = await page.request.get('/api/notes?limit=50&offset=0');
     // Without auth, we get 401 from the real API
     // This confirms the auth guard is in place
     expect(response.status()).toBe(401);
   });
 
-  test('vault API response shape matches VaultDashboard expectations', async ({ page }) => {
+  test('notes API response shape matches NotesDashboard expectations', async ({ page }) => {
     // Mock the API and verify the response shape
-    await mockVaultApi(page);
+    await mockNotesApi(page);
 
     // Navigate to trigger the mock
     await page.goto('/');
 
     // Fetch through the mock
     const data = await page.evaluate(async () => {
-      const res = await fetch('/api/vault?limit=50&offset=0');
+      const res = await fetch('/api/notes?limit=50&offset=0');
       return res.json();
     });
 
-    // Verify shape matches what VaultDashboard expects
+    // Verify shape matches what NotesDashboard expects
     expect(data.items).toHaveLength(3);
     expect(data.total).toBe(3);
     expect(data.items[0]).toHaveProperty('summary_id');
@@ -132,18 +132,18 @@ test.describe('Vault dashboard — API contract', () => {
   });
 });
 
-test.describe('Vault dashboard — component rendering', () => {
-  test('VaultDashboard groups items by summary', async ({ page }) => {
+test.describe('Notes dashboard — component rendering', () => {
+  test('NotesDashboard groups items by summary', async ({ page }) => {
     // Set up mocks before navigation
-    await mockVaultApi(page);
-    await mockVaultDelete(page);
+    await mockNotesApi(page);
+    await mockNotesDelete(page);
 
     // Navigate to landing page and use evaluate to render mock data
     await page.goto('/');
 
     // Verify our mock data has the expected grouping structure
     const data = await page.evaluate(async () => {
-      const res = await fetch('/api/vault?limit=50&offset=0');
+      const res = await fetch('/api/notes?limit=50&offset=0');
       return res.json();
     });
 
@@ -164,13 +164,13 @@ test.describe('Vault dashboard — component rendering', () => {
     expect(leadershipItems).toHaveLength(1);
   });
 
-  test('vault items contain expected excerpt text', async ({ page }) => {
-    await mockVaultApi(page);
+  test('notes contain expected excerpt text', async ({ page }) => {
+    await mockNotesApi(page);
 
     await page.goto('/');
 
     const data = await page.evaluate(async () => {
-      const res = await fetch('/api/vault?limit=50&offset=0');
+      const res = await fetch('/api/notes?limit=50&offset=0');
       return res.json();
     });
 
@@ -182,13 +182,13 @@ test.describe('Vault dashboard — component rendering', () => {
     expect(excerpts).toContain('We should revisit the roadmap before Q2');
   });
 
-  test('vault items include notes when present', async ({ page }) => {
-    await mockVaultApi(page);
+  test('notes include note text when present', async ({ page }) => {
+    await mockNotesApi(page);
 
     await page.goto('/');
 
     const data = await page.evaluate(async () => {
-      const res = await fetch('/api/vault?limit=50&offset=0');
+      const res = await fetch('/api/notes?limit=50&offset=0');
       return res.json();
     });
 

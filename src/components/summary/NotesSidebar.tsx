@@ -6,21 +6,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import * as Sentry from '@sentry/nextjs';
 import { StickyNote, Loader2, Trash2, Pencil, Check, X, Tag, Plus } from 'lucide-react';
-import type { SavedVaultItem } from '@/lib/supabase/types';
+import type { SavedNote } from '@/lib/supabase/types';
 
 interface NotesSidebarProps {
   summaryId: string;
-  items: SavedVaultItem[];
+  items: SavedNote[];
   /** Text the user has selected in the summary */
   selectedExcerpt: string | null;
   /** Clear the selection after save or dismiss */
   onClearSelection: () => void;
   /** Called after a new item is saved */
-  onItemSaved: (item: SavedVaultItem) => void;
+  onItemSaved: (item: SavedNote) => void;
   /** Called after an item is deleted */
   onItemDeleted: (id: string) => void;
   /** Called after an item is updated */
-  onItemUpdated: (item: SavedVaultItem) => void;
+  onItemUpdated: (item: SavedNote) => void;
 }
 
 export function NotesSidebar({
@@ -59,7 +59,7 @@ export function NotesSidebar({
 
     setSaving(true);
     try {
-      const res = await fetch('/api/vault', {
+      const res = await fetch('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,7 +89,7 @@ export function NotesSidebar({
   const handleDelete = async (id: string) => {
     if (!confirm('Remove this note?')) return;
     try {
-      const res = await fetch(`/api/vault/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete');
       onItemDeleted(id);
       toast.success('Note removed');
@@ -101,7 +101,7 @@ export function NotesSidebar({
 
   const handleUpdate = async (id: string, updates: { note?: string | null; tags?: string[] }) => {
     try {
-      const res = await fetch(`/api/vault/${id}`, {
+      const res = await fetch(`/api/notes/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -308,7 +308,7 @@ export function NotesSidebar({
 }
 
 /** Collect all unique tags across items for autocomplete */
-function getAllTags(items: SavedVaultItem[]): string[] {
+function getAllTags(items: SavedNote[]): string[] {
   const tagSet = new Set<string>();
   for (const item of items) {
     for (const tag of item.tags) {
@@ -324,7 +324,7 @@ function NoteCard({
   onUpdate,
   allTags,
 }: {
-  item: SavedVaultItem;
+  item: SavedNote;
   onDelete: (id: string) => void;
   onUpdate: (id: string, updates: { note?: string | null; tags?: string[] }) => Promise<void>;
   allTags: string[];

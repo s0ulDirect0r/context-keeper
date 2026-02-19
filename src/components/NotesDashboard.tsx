@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import * as Sentry from '@sentry/nextjs';
 
-export interface VaultItemWithSummary {
+export interface NoteWithSummary {
   id: string;
   summaryId: string;
   summaryTitle: string;
@@ -18,16 +18,16 @@ export interface VaultItemWithSummary {
   createdAt: string; // ISO string (serialized from server)
 }
 
-interface VaultDashboardProps {
-  initialItems: VaultItemWithSummary[];
+interface NotesDashboardProps {
+  initialItems: NoteWithSummary[];
   totalCount: number;
 }
 
-/** Group vault items by summary, maintaining reverse-chronological order of first item per group. */
-function groupBySummary(items: VaultItemWithSummary[]) {
+/** Group notes by summary, maintaining reverse-chronological order of first item per group. */
+function groupBySummary(items: NoteWithSummary[]) {
   const groups = new Map<
     string,
-    { summaryId: string; summaryTitle: string; items: VaultItemWithSummary[] }
+    { summaryId: string; summaryTitle: string; items: NoteWithSummary[] }
   >();
 
   for (const item of items) {
@@ -46,7 +46,7 @@ function groupBySummary(items: VaultItemWithSummary[]) {
   return Array.from(groups.values());
 }
 
-function deserializeVaultRow(item: Record<string, unknown>): VaultItemWithSummary {
+function deserializeNoteRow(item: Record<string, unknown>): NoteWithSummary {
   return {
     id: item.id as string,
     summaryId: item.summary_id as string,
@@ -58,7 +58,7 @@ function deserializeVaultRow(item: Record<string, unknown>): VaultItemWithSummar
   };
 }
 
-export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps) {
+export function NotesDashboard({ initialItems, totalCount }: NotesDashboardProps) {
   const [items, setItems] = useState(initialItems);
   const [total, setTotal] = useState(totalCount);
   const [loading, setLoading] = useState(false);
@@ -72,18 +72,18 @@ export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps
     if (initialItems.length > 0 || total > 0) return;
 
     let cancelled = false;
-    async function fetchVaultItems() {
+    async function fetchNotes() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/vault?limit=${PAGE_SIZE}&offset=0`);
+        const res = await fetch(`/api/notes?limit=${PAGE_SIZE}&offset=0`);
         if (!res.ok) throw new Error('Failed to fetch');
         const data = await res.json();
         if (cancelled) return;
-        setItems(data.items.map(deserializeVaultRow));
+        setItems(data.items.map(deserializeNoteRow));
         setTotal(data.total);
       } catch (err) {
         if (!cancelled) {
-          toast.error('Failed to load vault items');
+          toast.error('Failed to load notes');
           Sentry.captureException(err);
         }
       } finally {
@@ -91,7 +91,7 @@ export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps
       }
     }
 
-    fetchVaultItems();
+    fetchNotes();
     return () => {
       cancelled = true;
     };
@@ -104,10 +104,10 @@ export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps
         limit: String(PAGE_SIZE),
         offset: String(items.length),
       });
-      const res = await fetch(`/api/vault?${params}`);
+      const res = await fetch(`/api/notes?${params}`);
       if (!res.ok) throw new Error('Load more failed');
       const data = await res.json();
-      const newItems = data.items.map(deserializeVaultRow);
+      const newItems = data.items.map(deserializeNoteRow);
       setItems((prev) => [...prev, ...newItems]);
       setTotal(data.total);
     } catch (err) {
@@ -121,7 +121,7 @@ export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps
   const handleDelete = async (id: string) => {
     if (!confirm('Remove this note?')) return;
     try {
-      const res = await fetch(`/api/vault/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete');
       setItems((prev) => prev.filter((item) => item.id !== id));
       setTotal((prev) => prev - 1);
@@ -134,7 +134,7 @@ export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps
 
   const handleNoteUpdate = async (id: string, newNote: string | null) => {
     try {
-      const res = await fetch(`/api/vault/${id}`, {
+      const res = await fetch(`/api/notes/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ note: newNote }),
@@ -191,7 +191,7 @@ export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps
 
           <div className="space-y-2 ml-6 border-l-2 border-amber-200 dark:border-amber-800/40 pl-4">
             {group.items.map((item) => (
-              <VaultDashboardItem
+              <NoteDashboardItem
                 key={item.id}
                 item={item}
                 onDelete={handleDelete}
@@ -220,12 +220,12 @@ export function VaultDashboard({ initialItems, totalCount }: VaultDashboardProps
   );
 }
 
-function VaultDashboardItem({
+function NoteDashboardItem({
   item,
   onDelete,
   onNoteUpdate,
 }: {
-  item: VaultItemWithSummary;
+  item: NoteWithSummary;
   onDelete: (id: string) => void;
   onNoteUpdate: (id: string, note: string | null) => Promise<void>;
 }) {

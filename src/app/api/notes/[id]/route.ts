@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedVaultItem, type Database } from '@/lib/supabase/types';
+import { toSavedNote, type Database } from '@/lib/supabase/types';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
-const updateVaultItemSchema = z.object({
+const updateNoteSchema = z.object({
   note: z.string().max(2000, 'Note exceeds 2000 chars').nullable().optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
 });
@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Invalid JSON body', requestId }, { status: 400 });
     }
 
-    const parsed = updateVaultItemSchema.safeParse(body);
+    const parsed = updateNoteSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         {
@@ -61,14 +61,14 @@ export async function PATCH(request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Authentication required', requestId }, { status: 401 });
     }
 
-    const updateFields: Database['public']['Tables']['vault_items']['Update'] = {
+    const updateFields: Database['public']['Tables']['notes']['Update'] = {
       updated_at: new Date().toISOString(),
     };
     if (parsed.data.note !== undefined) updateFields.note = parsed.data.note;
     if (parsed.data.tags !== undefined) updateFields.tags = parsed.data.tags;
 
     const { data, error: updateError } = await supabase
-      .from('vault_items')
+      .from('notes')
       .update(updateFields)
       .eq('id', id)
       .eq('user_id', user.id)
@@ -76,25 +76,18 @@ export async function PATCH(request: Request, { params }: Props) {
       .single();
 
     if (updateError) {
-      logger.error(
-        'Failed to update vault item',
-        { route: '/api/vault/[id]', requestId },
-        updateError,
-      );
-      return NextResponse.json(
-        { error: 'Failed to update vault item', requestId },
-        { status: 500 },
-      );
+      logger.error('Failed to update note', { route: '/api/notes/[id]', requestId }, updateError);
+      return NextResponse.json({ error: 'Failed to update note', requestId }, { status: 500 });
     }
 
     if (!data) {
-      return NextResponse.json({ error: 'Vault item not found', requestId }, { status: 404 });
+      return NextResponse.json({ error: 'Note not found', requestId }, { status: 404 });
     }
 
-    type VaultRow = Database['public']['Tables']['vault_items']['Row'];
-    return NextResponse.json({ item: toSavedVaultItem(data as VaultRow) });
+    type NoteRow = Database['public']['Tables']['notes']['Row'];
+    return NextResponse.json({ item: toSavedNote(data as NoteRow) });
   } catch (error) {
-    logger.error('Update vault item error', { route: '/api/vault/[id]', requestId }, error);
+    logger.error('Update note error', { route: '/api/notes/[id]', requestId }, error);
     return NextResponse.json({ error: 'Internal server error', requestId }, { status: 500 });
   }
 }
@@ -123,26 +116,19 @@ export async function DELETE(request: Request, { params }: Props) {
     }
 
     const { error: deleteError } = await supabase
-      .from('vault_items')
+      .from('notes')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);
 
     if (deleteError) {
-      logger.error(
-        'Failed to delete vault item',
-        { route: '/api/vault/[id]', requestId },
-        deleteError,
-      );
-      return NextResponse.json(
-        { error: 'Failed to delete vault item', requestId },
-        { status: 500 },
-      );
+      logger.error('Failed to delete note', { route: '/api/notes/[id]', requestId }, deleteError);
+      return NextResponse.json({ error: 'Failed to delete note', requestId }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    logger.error('Delete vault item error', { route: '/api/vault/[id]', requestId }, error);
+    logger.error('Delete note error', { route: '/api/notes/[id]', requestId }, error);
     return NextResponse.json({ error: 'Internal server error', requestId }, { status: 500 });
   }
 }

@@ -1,12 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import {
-  toSavedSummary,
-  toSavedPearl,
-  toSavedVaultItem,
-  type Database,
-} from '@/lib/supabase/types';
+import { toSavedSummary, toSavedPearl, toSavedNote, type Database } from '@/lib/supabase/types';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -52,15 +47,15 @@ export default async function SummaryPage({ params }: Props) {
   type PearlRow = Database['public']['Tables']['pearls']['Row'];
   const savedPearls = ((pearlRows ?? []) as PearlRow[]).map(toSavedPearl);
 
-  // Fetch vault items for this summary
-  const { data: vaultRows } = await supabase
-    .from('vault_items')
+  // Fetch notes for this summary
+  const { data: noteRows } = await supabase
+    .from('notes')
     .select('*')
     .eq('summary_id', id)
     .order('created_at', { ascending: false });
 
-  type VaultRow = Database['public']['Tables']['vault_items']['Row'];
-  const savedVaultItems = ((vaultRows ?? []) as VaultRow[]).map(toSavedVaultItem);
+  type NoteRow = Database['public']['Tables']['notes']['Row'];
+  const savedNotes = ((noteRows ?? []) as NoteRow[]).map(toSavedNote);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -74,11 +69,7 @@ export default async function SummaryPage({ params }: Props) {
           </Link>
         </div>
 
-        <SummaryView
-          summary={summary}
-          savedPearls={savedPearls}
-          savedVaultItems={savedVaultItems}
-        />
+        <SummaryView summary={summary} savedPearls={savedPearls} savedNotes={savedNotes} />
       </div>
     </div>
   );

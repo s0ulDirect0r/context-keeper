@@ -18,7 +18,7 @@ import * as Sentry from '@sentry/nextjs';
 import { downloadMarkdown, downloadPdf } from '@/lib/export';
 import type { SummaryContext, Pearl, ConceptTag } from '@/lib/claude';
 import type { SummaryContent } from '@/lib/summary-types';
-import type { SavedSummary, SavedPearl, SavedVaultItem } from '@/lib/supabase/types';
+import type { SavedSummary, SavedPearl, SavedNote } from '@/lib/supabase/types';
 import { isStructuredSummary } from '@/lib/summary-types';
 import { TagSelector } from './TagSelector';
 import { PearlsGeneratingView } from './PearlsGeneratingView';
@@ -39,8 +39,8 @@ interface BaseProps {
   savedPearls?: SavedPearl[];
   /** Called when pearls are persisted */
   onPearlsSaved?: (saved: SavedPearl[]) => void;
-  /** Vault items already saved in DB */
-  savedVaultItems?: SavedVaultItem[];
+  /** Notes already saved in DB */
+  savedNotes?: SavedNote[];
   /** Read-only mode (shared view) */
   readOnly?: boolean;
   /** Back to start */
@@ -102,8 +102,8 @@ export function SummaryView(props: SummaryViewProps) {
   const curatingPearls = curationDismissed ? undefined : props.pearls;
   const [displayPearls, setDisplayPearls] = useState<SavedPearl[]>(props.savedPearls ?? []);
 
-  // Vault state
-  const [vaultItems, setVaultItems] = useState<SavedVaultItem[]>(props.savedVaultItems ?? []);
+  // Notes state
+  const [notes, setNotes] = useState<SavedNote[]>(props.savedNotes ?? []);
   const [selectedExcerpt, setSelectedExcerpt] = useState<string | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
   const summaryCardsRef = useRef<HTMLDivElement>(null);
@@ -145,7 +145,7 @@ export function SummaryView(props: SummaryViewProps) {
   const hasTranscripts =
     transcripts !== null && transcripts !== undefined && transcripts.length > 0;
 
-  // Capture text selection within summary cards for vault
+  // Capture text selection within summary cards for notes
   // Works on both saved summaries and inline summaries that have been auto-saved
   useEffect(() => {
     const el = summaryCardsRef.current;
@@ -471,7 +471,7 @@ export function SummaryView(props: SummaryViewProps) {
     props.onPearlsSaved?.(savedPearlList);
   };
 
-  // ── Vault handlers ──────────────────────────────────────────────
+  // ── Note handlers ──────────────────────────────────────────────
 
   const flashSelectionRange = useCallback(() => {
     const range = selectionRangeRef.current;
@@ -504,20 +504,20 @@ export function SummaryView(props: SummaryViewProps) {
     selectionRangeRef.current = null;
   }, []);
 
-  const handleVaultItemSaved = useCallback(
-    (item: SavedVaultItem) => {
-      setVaultItems((prev) => [item, ...prev]);
+  const handleNoteSaved = useCallback(
+    (item: SavedNote) => {
+      setNotes((prev) => [item, ...prev]);
       flashSelectionRange();
     },
     [flashSelectionRange],
   );
 
-  const handleVaultItemDeleted = useCallback((id: string) => {
-    setVaultItems((prev) => prev.filter((i) => i.id !== id));
+  const handleNoteDeleted = useCallback((id: string) => {
+    setNotes((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
-  const handleVaultItemUpdated = useCallback((item: SavedVaultItem) => {
-    setVaultItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+  const handleNoteUpdated = useCallback((item: SavedNote) => {
+    setNotes((prev) => prev.map((i) => (i.id === item.id ? item : i)));
   }, []);
 
   // ── Determine sidebar mode ─────────────────────────────────────
@@ -764,7 +764,7 @@ export function SummaryView(props: SummaryViewProps) {
                 markdown={summaryText}
                 readOnly={readOnly}
                 saveStatus={saveStatus}
-                vaultedExcerpts={vaultItems.filter((v) => v.excerptText).map((v) => v.excerptText!)}
+                savedExcerpts={notes.filter((n) => n.excerptText).map((n) => n.excerptText!)}
                 onChange={(newText) => {
                   setMarkdownSummaries((prev) => {
                     const updated = [...prev];
@@ -920,8 +920,8 @@ export function SummaryView(props: SummaryViewProps) {
     </div>
   );
 
-  // Show vault sidebar for saved summaries when pearls sidebar isn't active
-  // Show vault for any summary with an ID (saved or auto-saved inline)
+  // Show notes sidebar for saved summaries when pearls sidebar isn't active
+  // Show notes for any summary with an ID (saved or auto-saved inline)
   const showNotesSidebar = !!summaryId && !readOnly && !!user && !showPearlsSidebar;
   const showSidebar = showPearlsSidebar || showNotesSidebar;
 
@@ -977,12 +977,12 @@ export function SummaryView(props: SummaryViewProps) {
         ) : showNotesSidebar ? (
           <NotesSidebar
             summaryId={summaryId!}
-            items={vaultItems}
+            items={notes}
             selectedExcerpt={selectedExcerpt}
             onClearSelection={() => setSelectedExcerpt(null)}
-            onItemSaved={handleVaultItemSaved}
-            onItemDeleted={handleVaultItemDeleted}
-            onItemUpdated={handleVaultItemUpdated}
+            onItemSaved={handleNoteSaved}
+            onItemDeleted={handleNoteDeleted}
+            onItemUpdated={handleNoteUpdated}
           />
         ) : null}
       </aside>

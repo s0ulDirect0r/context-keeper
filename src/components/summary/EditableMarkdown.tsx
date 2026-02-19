@@ -110,11 +110,11 @@ interface EditableChunkProps {
   readOnly?: boolean;
   /** Show save indicator in the pencil icon's position */
   saveStatus?: SaveStatus;
-  /** Whether this chunk contains vaulted text */
-  isVaulted?: boolean;
+  /** Whether this chunk contains text saved as a note */
+  isSaved?: boolean;
 }
 
-function EditableChunk({ chunk, onSave, readOnly, saveStatus, isVaulted }: EditableChunkProps) {
+function EditableChunk({ chunk, onSave, readOnly, saveStatus, isSaved }: EditableChunkProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(chunk);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -196,7 +196,7 @@ function EditableChunk({ chunk, onSave, readOnly, saveStatus, isVaulted }: Edita
 
   return (
     <div className="group relative pr-8">
-      {isVaulted && (
+      {isSaved && (
         <Bookmark className="absolute -left-5 top-0.5 h-3.5 w-3.5 text-blue-400 dark:text-blue-500 fill-blue-400/30 dark:fill-blue-500/30" />
       )}
       <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -243,8 +243,8 @@ interface EditableMarkdownProps {
   onChange: (newMarkdown: string) => void;
   readOnly?: boolean;
   saveStatus?: SaveStatus;
-  /** Excerpt texts from vault items — chunks containing these get a bookmark marker */
-  vaultedExcerpts?: string[];
+  /** Excerpt texts from notes — chunks containing these get a bookmark marker */
+  savedExcerpts?: string[];
 }
 
 export function EditableMarkdown({
@@ -252,18 +252,18 @@ export function EditableMarkdown({
   onChange,
   readOnly,
   saveStatus,
-  vaultedExcerpts,
+  savedExcerpts,
 }: EditableMarkdownProps) {
   const chunks = useMemo(() => parseChunks(markdown), [markdown]);
   const [lastEditedIndex, setLastEditedIndex] = useState<number | null>(null);
 
-  // Compute which chunks contain vaulted text
-  const vaultedChunkIndices = useMemo(() => {
-    if (!vaultedExcerpts || vaultedExcerpts.length === 0) return new Set<number>();
+  // Compute which chunks contain text saved as notes
+  const savedChunkIndices = useMemo(() => {
+    if (!savedExcerpts || savedExcerpts.length === 0) return new Set<number>();
     const indices = new Set<number>();
     for (let i = 0; i < chunks.length; i++) {
       const plainChunk = stripMarkdown(chunks[i]).toLowerCase();
-      for (const excerpt of vaultedExcerpts) {
+      for (const excerpt of savedExcerpts) {
         // Normalize whitespace in excerpt too for robust matching
         const normalizedExcerpt = excerpt.replace(/\s+/g, ' ').trim().toLowerCase();
         if (normalizedExcerpt.length > 0 && plainChunk.includes(normalizedExcerpt)) {
@@ -273,7 +273,7 @@ export function EditableMarkdown({
       }
     }
     return indices;
-  }, [chunks, vaultedExcerpts]);
+  }, [chunks, savedExcerpts]);
 
   const handleChunkSave = useCallback(
     (index: number, newText: string) => {
@@ -298,7 +298,7 @@ export function EditableMarkdown({
           onSave={(newText) => handleChunkSave(index, newText)}
           readOnly={readOnly}
           saveStatus={index === lastEditedIndex ? saveStatus : undefined}
-          isVaulted={vaultedChunkIndices.has(index)}
+          isSaved={savedChunkIndices.has(index)}
         />
       ))}
     </div>

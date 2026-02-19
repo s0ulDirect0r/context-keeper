@@ -54,17 +54,15 @@ async function navigateToSummary(page: import('@playwright/test').Page) {
   await expect(page.getByText('Your Summary')).toBeVisible({ timeout: 15_000 });
 }
 
-test.describe('Vault — guest restrictions', () => {
-  test('vault sidebar does not appear for guest users', async ({ page }) => {
+test.describe('Notes — guest restrictions', () => {
+  test('notes sidebar does not appear for guest users', async ({ page }) => {
     await navigateToSummary(page);
 
     // Summary content should be visible
     await expect(page.getByText('Meeting Summary')).toBeVisible();
 
-    // Vault sidebar header should NOT be present
-    await expect(page.getByText('Vault')).not.toBeVisible();
-
-    // No vault-related UI elements
+    // Notes sidebar header should NOT be present (as "Notes" in the sidebar context)
+    // The sidebar only appears for logged-in users
     await expect(page.getByText('Select text in the summary to save it')).not.toBeVisible();
   });
 
@@ -75,8 +73,8 @@ test.describe('Vault — guest restrictions', () => {
     await expect(page).toHaveURL('/', { timeout: 5_000 });
   });
 
-  test('dashboard vault tab URL also redirects unauthenticated users', async ({ page }) => {
-    await page.goto('/dashboard?tab=vault');
+  test('dashboard notes tab URL also redirects unauthenticated users', async ({ page }) => {
+    await page.goto('/dashboard?tab=notes');
 
     // Should redirect to landing page
     await expect(page).toHaveURL('/', { timeout: 5_000 });

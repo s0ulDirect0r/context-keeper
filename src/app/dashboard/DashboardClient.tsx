@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, Trash2, FileText, Loader2, StickyNote } from 'lucide-react';
 import { toast } from 'sonner';
 import * as Sentry from '@sentry/nextjs';
-import { VaultDashboard, type VaultItemWithSummary } from '@/components/VaultDashboard';
+import { NotesDashboard, type NoteWithSummary } from '@/components/NotesDashboard';
 
 const PAGE_SIZE = 20;
 
@@ -36,22 +36,22 @@ function deserializeSummary(row: SummaryRow): SavedSummary {
   };
 }
 
-type Tab = 'summaries' | 'vault';
+type Tab = 'summaries' | 'notes';
 
 interface DashboardClientProps {
   initialSummaries: SavedSummary[];
   totalCount: number;
   initialTab?: Tab;
-  initialVaultItems?: VaultItemWithSummary[];
-  vaultTotalCount?: number;
+  initialNotes?: NoteWithSummary[];
+  notesTotalCount?: number;
 }
 
 export function DashboardClient({
   initialSummaries,
   totalCount,
   initialTab = 'summaries',
-  initialVaultItems = [],
-  vaultTotalCount = 0,
+  initialNotes = [],
+  notesTotalCount = 0,
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [summaries, setSummaries] = useState(initialSummaries);
@@ -70,8 +70,8 @@ export function DashboardClient({
     (tab: Tab) => {
       setActiveTab(tab);
       const params = new URLSearchParams(searchParams.toString());
-      if (tab === 'vault') {
-        params.set('tab', 'vault');
+      if (tab === 'notes') {
+        params.set('tab', 'notes');
       } else {
         params.delete('tab');
       }
@@ -192,7 +192,7 @@ export function DashboardClient({
         <p className="text-muted-foreground mt-1">
           {activeTab === 'summaries'
             ? `${total} ${total === 1 ? 'summary' : 'summaries'} saved`
-            : `${vaultTotalCount} ${vaultTotalCount === 1 ? 'note' : 'notes'} saved`}
+            : `${notesTotalCount} ${notesTotalCount === 1 ? 'note' : 'notes'} saved`}
         </p>
       </div>
 
@@ -210,26 +210,26 @@ export function DashboardClient({
           Summaries
         </button>
         <button
-          onClick={() => handleTabChange('vault')}
+          onClick={() => handleTabChange('notes')}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'vault'
+            activeTab === 'notes'
               ? 'border-primary text-primary'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           <StickyNote className="h-4 w-4" />
           Notes
-          {vaultTotalCount > 0 && (
+          {notesTotalCount > 0 && (
             <span className="ml-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-semibold px-1.5 py-0.5 leading-none">
-              {vaultTotalCount}
+              {notesTotalCount}
             </span>
           )}
         </button>
       </div>
 
-      {/* Vault tab */}
-      {activeTab === 'vault' ? (
-        <VaultDashboard initialItems={initialVaultItems} totalCount={vaultTotalCount} />
+      {/* Notes tab */}
+      {activeTab === 'notes' ? (
+        <NotesDashboard initialItems={initialNotes} totalCount={notesTotalCount} />
       ) : (
         <>
           <div className="relative mb-6">

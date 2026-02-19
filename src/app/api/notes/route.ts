@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { toSavedVaultItem, type Database } from '@/lib/supabase/types';
+import { toSavedNote, type Database } from '@/lib/supabase/types';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
-const createVaultItemSchema = z
+const createNoteSchema = z
   .object({
     summaryId: z.string().uuid('Invalid summary ID'),
     excerptText: z.string().max(2000, 'Excerpt exceeds 2000 chars').optional(),
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     if (summaryId) {
       // Sidebar view: simple query, no join needed
       const { data, count, error } = await supabase
-        .from('vault_items')
+        .from('notes')
         .select('*', { count: 'exact' })
         .eq('user_id', user.id)
         .eq('summary_id', summaryId)
@@ -76,16 +76,13 @@ export async function GET(request: Request) {
         .range(offset, offset + limit - 1);
 
       if (error) {
-        logger.error('Failed to fetch vault items', { route: '/api/vault', requestId }, error);
-        return NextResponse.json(
-          { error: 'Failed to fetch vault items', requestId },
-          { status: 500 },
-        );
+        logger.error('Failed to fetch notes', { route: '/api/notes', requestId }, error);
+        return NextResponse.json({ error: 'Failed to fetch notes', requestId }, { status: 500 });
       }
 
-      type VaultRow = Database['public']['Tables']['vault_items']['Row'];
+      type NoteRow = Database['public']['Tables']['notes']['Row'];
       return NextResponse.json({
-        items: ((data ?? []) as VaultRow[]).map(toSavedVaultItem),
+        items: ((data ?? []) as NoteRow[]).map(toSavedNote),
         total: count ?? 0,
         limit,
         offset,
@@ -94,7 +91,7 @@ export async function GET(request: Request) {
 
     // Dashboard view: join summary title for grouping
     let dashboardQuery = supabase
-      .from('vault_items')
+      .from('notes')
       .select('*, summaries(title)', { count: 'exact' })
       .eq('user_id', user.id);
 
@@ -107,11 +104,8 @@ export async function GET(request: Request) {
       .range(offset, offset + limit - 1);
 
     if (error) {
-      logger.error('Failed to fetch vault items', { route: '/api/vault', requestId }, error);
-      return NextResponse.json(
-        { error: 'Failed to fetch vault items', requestId },
-        { status: 500 },
-      );
+      logger.error('Failed to fetch notes', { route: '/api/notes', requestId }, error);
+      return NextResponse.json({ error: 'Failed to fetch notes', requestId }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -121,7 +115,7 @@ export async function GET(request: Request) {
       offset,
     });
   } catch (error) {
-    logger.error('List vault items error', { route: '/api/vault', requestId }, error);
+    logger.error('List notes error', { route: '/api/notes', requestId }, error);
     return NextResponse.json({ error: 'Failed to process request', requestId }, { status: 500 });
   }
 }
@@ -145,7 +139,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid JSON body', requestId }, { status: 400 });
     }
 
-    const parsed = createVaultItemSchema.safeParse(body);
+    const parsed = createNoteSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         {
@@ -168,7 +162,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Authentication required', requestId }, { status: 401 });
     }
 
-    const insertData: Database['public']['Tables']['vault_items']['Insert'] = {
+    const insertData: Database['public']['Tables']['notes']['Insert'] = {
       user_id: user.id,
       summary_id: summaryId,
       excerpt_text: excerptText ?? null,
@@ -178,20 +172,20 @@ export async function POST(request: Request) {
     };
 
     const { data, error: insertError } = await supabase
-      .from('vault_items')
+      .from('notes')
       .insert(insertData)
       .select('*')
       .single();
 
     if (insertError) {
-      logger.error('Failed to save vault item', { route: '/api/vault', requestId }, insertError);
-      return NextResponse.json({ error: 'Failed to save vault item', requestId }, { status: 500 });
+      logger.error('Failed to save note', { route: '/api/notes', requestId }, insertError);
+      return NextResponse.json({ error: 'Failed to save note', requestId }, { status: 500 });
     }
 
-    type VaultRow = Database['public']['Tables']['vault_items']['Row'];
-    return NextResponse.json({ item: toSavedVaultItem(data as VaultRow) }, { status: 201 });
+    type NoteRow = Database['public']['Tables']['notes']['Row'];
+    return NextResponse.json({ item: toSavedNote(data as NoteRow) }, { status: 201 });
   } catch (error) {
-    logger.error('Save vault item error', { route: '/api/vault', requestId }, error);
+    logger.error('Save note error', { route: '/api/notes', requestId }, error);
     return NextResponse.json({ error: 'Internal server error', requestId }, { status: 500 });
   }
 }

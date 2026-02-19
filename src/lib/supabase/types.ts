@@ -81,7 +81,7 @@ export interface Database {
         };
         Relationships: [];
       };
-      vault_items: {
+      notes: {
         Row: {
           id: string;
           user_id: string;
@@ -180,7 +180,7 @@ export interface SavedPearl {
   createdAt: Date;
 }
 
-export interface SavedVaultItem {
+export interface SavedNote {
   id: string;
   summaryId: string;
   excerptText: string | null;
@@ -191,9 +191,7 @@ export interface SavedVaultItem {
   updatedAt: Date;
 }
 
-export function toSavedVaultItem(
-  row: Database['public']['Tables']['vault_items']['Row'],
-): SavedVaultItem {
+export function toSavedNote(row: Database['public']['Tables']['notes']['Row']): SavedNote {
   return {
     id: row.id,
     summaryId: row.summary_id,
