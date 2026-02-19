@@ -2,8 +2,14 @@ import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { buildSearchText } from '@/lib/search-text';
+import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import crypto from 'crypto';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// 30 mutations per minute per IP (shared across PATCH + DELETE)
+const limiter = createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
 
 const patchSummarySchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -23,8 +29,21 @@ interface Props {
 }
 
 export async function PATCH(request: Request, { params }: Props) {
+  const { allowed, retryAfter } = limiter.check(request);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
+
   try {
     const { id } = await params;
+
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json({ error: 'Invalid summary ID' }, { status: 400 });
+    }
+
     const body = await request.json();
 
     const parsed = patchSummarySchema.safeParse(body);
@@ -118,9 +137,21 @@ export async function PATCH(request: Request, { params }: Props) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: Props) {
+export async function DELETE(request: Request, { params }: Props) {
+  const { allowed, retryAfter } = limiter.check(request);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
+
   try {
     const { id } = await params;
+
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json({ error: 'Invalid summary ID' }, { status: 400 });
+    }
 
     const supabase = await createClient();
     const {
@@ -146,10 +177,7 @@ export async function DELETE(_request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    // Delete associated data first (foreign key constraints)
-    await supabase.from('pearls').delete().eq('summary_id', id);
-
-    // Delete the summary
+    // Pearls are deleted automatically via ON DELETE CASCADE
     const { error: deleteError } = await supabase.from('summaries').delete().eq('id', id);
 
     if (deleteError) {
@@ -157,7 +185,7 @@ export async function DELETE(_request: Request, { params }: Props) {
         'Failed to delete summary',
         {
           route: '/api/summaries/[id]',
-          requestId: _request.headers.get('x-request-id') ?? undefined,
+          requestId: request.headers.get('x-request-id') ?? undefined,
         },
         deleteError,
       );
@@ -170,7 +198,7 @@ export async function DELETE(_request: Request, { params }: Props) {
       'Delete summary error',
       {
         route: '/api/summaries/[id]',
-        requestId: _request.headers.get('x-request-id') ?? undefined,
+        requestId: request.headers.get('x-request-id') ?? undefined,
       },
       error,
     );

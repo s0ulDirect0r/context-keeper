@@ -131,7 +131,10 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
     setDeleting(id);
     try {
       const res = await fetch(`/api/summaries/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Delete failed (${res.status})`);
+      }
       setSummaries((prev) => prev.filter((s) => s.id !== id));
       setTotal((prev) => prev - 1);
     } catch (err) {

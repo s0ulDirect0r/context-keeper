@@ -54,19 +54,24 @@ No other cross-group dependencies exist.
 
 ## API Routes
 
+> See also: CLAUDE.md "API Routes" table (keep both in sync when adding routes).
+
 | Route                   | Method | Purpose                                         | Auth                       | Rate limit |
 | ----------------------- | ------ | ----------------------------------------------- | -------------------------- | ---------- |
 | `/api/summarize`        | POST   | Generate summaries via Claude (SSE stream)      | Optional (saves if authed) | 10/hr      |
-| `/api/summaries`        | GET    | List/search user's summaries                    | Required                   | —          |
+| `/api/summaries`        | GET    | List/search user's summaries                    | Required                   | 30/min     |
 | `/api/summaries`        | POST   | Save a summary                                  | Required                   | —          |
-| `/api/summaries/[id]`   | PATCH  | Update summary fields (title, content, sharing) | Required + ownership       | —          |
-| `/api/summaries/[id]`   | DELETE | Delete summary and associated data              | Required + ownership       | —          |
-| `/api/pearls`           | POST   | Save curated pearls for a summary               | Required                   | —          |
-| `/api/pearls/generate`  | POST   | Generate pearls via Claude for selected tags    | Required                   | —          |
-| `/api/tags`             | POST   | Extract concept tags from summary content       | Required                   | —          |
+| `/api/summaries/[id]`   | PATCH  | Update summary fields (title, content, sharing) | Required + ownership       | 30/min     |
+| `/api/summaries/[id]`   | DELETE | Delete summary and associated data              | Required + ownership       | 30/min     |
+| `/api/pearls`           | POST   | Save curated pearls for a summary               | Required                   | 30/hr      |
+| `/api/pearls/generate`  | POST   | Generate pearls via Claude for selected tags    | Required                   | 30/hr      |
+| `/api/tags`             | POST   | Extract concept tags from summary content       | Required                   | 30/hr      |
 | `/api/otter/login`      | POST   | Authenticate with Otter.ai                      | —                          | 5/min      |
 | `/api/otter/recordings` | GET    | Fetch user's Otter recordings                   | —                          | —          |
 | `/api/otter/recordings` | POST   | Get transcripts for selected recordings         | —                          | —          |
+| `/api/otter/connection` | GET    | Get user's saved Otter connection               | Required                   | —          |
+| `/api/otter/connection` | PUT    | Save/update Otter connection credentials        | Required                   | —          |
+| `/api/otter/connection` | DELETE | Remove saved Otter connection                   | Required                   | —          |
 
 ## State Management
 

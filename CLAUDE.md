@@ -47,19 +47,24 @@ supabase migration new <name>  # Create new migration
 
 ### API Routes
 
+> Full table with auth & rate-limit details: see ARCHITECTURE.md.
+
 | Route                   | Method | Purpose                                               |
 | ----------------------- | ------ | ----------------------------------------------------- |
 | `/api/summarize`        | POST   | Generate summaries via Claude (SSE stream), auto-save |
 | `/api/summaries`        | GET    | List/search user's summaries                          |
 | `/api/summaries`        | POST   | Save a summary                                        |
 | `/api/summaries/[id]`   | PATCH  | Update summary fields (title, content, sharing)       |
-| `/api/summaries/[id]`   | DELETE | Delete summary and associated pearls                  |
+| `/api/summaries/[id]`   | DELETE | Delete summary (pearls cascade automatically)         |
 | `/api/pearls`           | POST   | Save curated pearls for a summary                     |
 | `/api/pearls/generate`  | POST   | Generate pearls via Claude for selected tags          |
 | `/api/tags`             | POST   | Extract concept tags from summary content             |
 | `/api/otter/login`      | POST   | Authenticate with Otter.ai                            |
 | `/api/otter/recordings` | GET    | Fetch user's Otter recordings                         |
 | `/api/otter/recordings` | POST   | Get transcripts for selected recordings               |
+| `/api/otter/connection` | GET    | Get user's saved Otter connection                     |
+| `/api/otter/connection` | PUT    | Save/update Otter connection credentials              |
+| `/api/otter/connection` | DELETE | Remove saved Otter connection                         |
 
 ### Database Tables
 

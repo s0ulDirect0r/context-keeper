@@ -14,11 +14,7 @@ import { ContextWizard } from '@/components/generation/ContextWizard';
 import { SummaryModeSelector } from '@/components/generation/SummaryModeSelector';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { StreamingGenerationView } from '@/components/generation/StreamingGenerationView';
-import { createClient } from '@/lib/supabase/client';
-import type { Database } from '@/lib/supabase/types';
 import type { Recording } from '@/lib/otter';
-
-type OtterConnectionRow = Database['public']['Tables']['otter_connections']['Row'];
 import type { SummaryContext, ConceptTag } from '@/lib/claude';
 import {
   getStoredSession,
@@ -146,24 +142,20 @@ export default function Home() {
       setOtterSession(null);
 
       if (user) {
-        const supabase = createClient();
-        const { data, error } = await supabase.from('otter_connections').select('*').single();
-
-        if (error) {
-          if (error.code !== 'PGRST116') {
-            Sentry.captureException(error);
+        try {
+          const res = await fetch('/api/otter/connection');
+          if (!res.ok) throw new Error(`Failed to load connection (${res.status})`);
+          const data = await res.json();
+          if (data.connection) {
+            setOtterSession({
+              email: data.connection.email,
+              userId: data.connection.userId,
+              cookies: data.connection.cookies,
+              csrfToken: data.connection.csrfToken,
+            });
           }
-          return;
-        }
-
-        const row = data as OtterConnectionRow;
-        if (row) {
-          setOtterSession({
-            email: row.otter_email,
-            userId: row.otter_user_id,
-            cookies: row.cookies,
-            csrfToken: row.csrf_token ?? undefined,
-          });
+        } catch (err) {
+          Sentry.captureException(err);
         }
       } else {
         setOtterSession(getStoredSession());
@@ -271,16 +263,23 @@ export default function Home() {
     };
 
     if (user) {
-      const supabase = createClient();
-      const { error } = await supabase.from('otter_connections').upsert({
-        user_id: user.id,
-        otter_email: email,
-        otter_user_id: data.userId,
-        cookies: data.cookies,
-        csrf_token: data.csrfToken,
-      });
-      if (error) {
-        Sentry.captureException(error);
+      try {
+        const saveRes = await fetch('/api/otter/connection', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            otter_email: email,
+            otter_user_id: data.userId,
+            cookies: data.cookies,
+            csrf_token: data.csrfToken,
+          }),
+        });
+        if (!saveRes.ok) {
+          const body = await saveRes.json().catch(() => ({}));
+          Sentry.captureException(new Error(body.error || 'Failed to save otter connection'));
+        }
+      } catch (err) {
+        Sentry.captureException(err);
       }
     } else if (remember) {
       storeSession(session);
@@ -570,8 +569,7 @@ export default function Home() {
 
   const handleDisconnectOtter = async () => {
     if (user) {
-      const supabase = createClient();
-      await supabase.from('otter_connections').delete().eq('user_id', user.id);
+      await fetch('/api/otter/connection', { method: 'DELETE' });
     } else {
       clearSession();
     }
