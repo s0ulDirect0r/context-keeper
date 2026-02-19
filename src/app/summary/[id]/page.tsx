@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { toSavedSummary, toSavedPearl, type Database } from '@/lib/supabase/types';
-import { SummaryView } from '@/components/SummaryView';
+import { SummaryView } from '@/components/summary/SummaryView';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 

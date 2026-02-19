@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import type { SavedSummary } from '@/lib/supabase/types';
 import type { Database } from '@/lib/supabase/types';
 import type { SummaryContext } from '@/lib/claude';
@@ -50,7 +49,6 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
   const [loadingMore, setLoadingMore] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce search input
@@ -131,14 +129,17 @@ export function DashboardClient({ initialSummaries, totalCount }: DashboardClien
     if (!confirm('Are you sure you want to delete this summary?')) return;
 
     setDeleting(id);
-    const { error } = await supabase.from('summaries').delete().eq('id', id);
-
-    if (error) {
-      toast.error('Failed to delete summary');
-      Sentry.captureException(error);
-    } else {
+    try {
+      const res = await fetch(`/api/summaries/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Delete failed (${res.status})`);
+      }
       setSummaries((prev) => prev.filter((s) => s.id !== id));
       setTotal((prev) => prev - 1);
+    } catch (err) {
+      toast.error('Failed to delete summary');
+      Sentry.captureException(err);
     }
     setDeleting(null);
   };
