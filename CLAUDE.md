@@ -37,18 +37,29 @@ supabase migration new <name>  # Create new migration
 ### Key Directories
 
 - `src/app/` - Next.js App Router pages and API routes
-- `src/components/` - React components (Radix UI wrappers in `ui/`)
+- `src/components/` - React components organized by feature group:
+  - `auth/` - Authentication & session mode (AuthProvider, AuthDialog, AppModeProvider)
+  - `generation/` - Transcript input & summary generation pipeline
+  - `summary/` - Summary display, editing, pearls & tags
+  - `ui/` - Radix UI primitives (button, card, input, etc.)
 - `src/lib/` - Utilities: `claude.ts` (AI), `otter.ts` (API client), `supabase/` (DB)
 - `supabase/migrations/` - Database schema migrations
 
 ### API Routes
 
-| Route                        | Purpose                                                  |
-| ---------------------------- | -------------------------------------------------------- |
-| `POST /api/summarize`        | Generate summaries via Claude, extract themes, auto-save |
-| `POST /api/otter/login`      | Authenticate with Otter.ai                               |
-| `GET /api/otter/recordings`  | Fetch user's Otter recordings                            |
-| `POST /api/otter/recordings` | Get transcripts for selected recordings                  |
+| Route                   | Method | Purpose                                               |
+| ----------------------- | ------ | ----------------------------------------------------- |
+| `/api/summarize`        | POST   | Generate summaries via Claude (SSE stream), auto-save |
+| `/api/summaries`        | GET    | List/search user's summaries                          |
+| `/api/summaries`        | POST   | Save a summary                                        |
+| `/api/summaries/[id]`   | PATCH  | Update summary fields (title, content, sharing)       |
+| `/api/summaries/[id]`   | DELETE | Delete summary and associated pearls                  |
+| `/api/pearls`           | POST   | Save curated pearls for a summary                     |
+| `/api/pearls/generate`  | POST   | Generate pearls via Claude for selected tags          |
+| `/api/tags`             | POST   | Extract concept tags from summary content             |
+| `/api/otter/login`      | POST   | Authenticate with Otter.ai                            |
+| `/api/otter/recordings` | GET    | Fetch user's Otter recordings                         |
+| `/api/otter/recordings` | POST   | Get transcripts for selected recordings               |
 
 ### Database Tables
 
@@ -81,3 +92,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 - **Otter integration:** Uses unofficial API; credentials stored per-user in Supabase or localStorage for guests
 - **Parallel processing:** Summary generation and theme extraction run concurrently
 - **Theme extraction:** Returns abstract conceptual themes with supporting quotes, not surface-level topics
+- **Data access rule:** Client components must never call Supabase directly for data mutations — all data ops go through API routes. Direct Supabase is only for server components (SSR) and auth state (`AuthProvider`).

@@ -117,3 +117,63 @@ export async function PATCH(request: Request, { params }: Props) {
     return NextResponse.json({ error: 'Failed to update summary' }, { status: 500 });
   }
 }
+
+export async function DELETE(_request: Request, { params }: Props) {
+  try {
+    const { id } = await params;
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Verify ownership
+    const { data: existing, error: fetchError } = await supabase
+      .from('summaries')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existing) {
+      return NextResponse.json({ error: 'Summary not found' }, { status: 404 });
+    }
+
+    if (existing.user_id !== user.id) {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
+    // Delete associated data first (foreign key constraints)
+    await supabase.from('pearls').delete().eq('summary_id', id);
+
+    // Delete the summary
+    const { error: deleteError } = await supabase.from('summaries').delete().eq('id', id);
+
+    if (deleteError) {
+      logger.error(
+        'Failed to delete summary',
+        {
+          route: '/api/summaries/[id]',
+          requestId: _request.headers.get('x-request-id') ?? undefined,
+        },
+        deleteError,
+      );
+      return NextResponse.json({ error: 'Failed to delete summary' }, { status: 500 });
+    }
+
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    logger.error(
+      'Delete summary error',
+      {
+        route: '/api/summaries/[id]',
+        requestId: _request.headers.get('x-request-id') ?? undefined,
+      },
+      error,
+    );
+    return NextResponse.json({ error: 'Failed to delete summary' }, { status: 500 });
+  }
+}

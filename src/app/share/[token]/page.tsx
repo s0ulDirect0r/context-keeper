@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { SummaryView } from '@/components/SummaryView';
+import { SummaryView } from '@/components/summary/SummaryView';
 import { toSavedPearl, type Database } from '@/lib/supabase/types';
 import type { SavedSummary } from '@/lib/supabase/types';
 import type { SummaryContext } from '@/lib/claude';

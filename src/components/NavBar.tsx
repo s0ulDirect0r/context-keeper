@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/components/AuthProvider';
-import { useAppMode } from '@/components/AppModeProvider';
-import { AuthDialog } from '@/components/AuthDialog';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useAppMode } from '@/components/auth/AppModeProvider';
+import { AuthDialog } from '@/components/auth/AuthDialog';
 import { Button } from '@/components/ui/button';
 import { Plus, LayoutDashboard, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';

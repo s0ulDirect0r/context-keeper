@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Fraunces } from 'next/font/google';
-import { AuthProvider } from '@/components/AuthProvider';
-import { AppModeProvider } from '@/components/AppModeProvider';
+import { AuthProvider } from '@/components/auth/AuthProvider';
+import { AppModeProvider } from '@/components/auth/AppModeProvider';
 import { NavBar } from '@/components/NavBar';
 import { Toaster } from 'sonner';
 import './globals.css';
