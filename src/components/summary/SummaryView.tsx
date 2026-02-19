@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PearlsSidebar } from './PearlsSidebar';
-import { VaultSidebar } from './VaultSidebar';
+import { NotesSidebar } from './NotesSidebar';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { copyRichText, structuredSummaryToMarkdown } from '@/lib/utils';
@@ -764,7 +764,7 @@ export function SummaryView(props: SummaryViewProps) {
                 markdown={summaryText}
                 readOnly={readOnly}
                 saveStatus={saveStatus}
-                vaultedExcerpts={vaultItems.map((v) => v.excerptText)}
+                vaultedExcerpts={vaultItems.filter((v) => v.excerptText).map((v) => v.excerptText!)}
                 onChange={(newText) => {
                   setMarkdownSummaries((prev) => {
                     const updated = [...prev];
@@ -922,8 +922,8 @@ export function SummaryView(props: SummaryViewProps) {
 
   // Show vault sidebar for saved summaries when pearls sidebar isn't active
   // Show vault for any summary with an ID (saved or auto-saved inline)
-  const showVaultSidebar = !!summaryId && !readOnly && !!user && !showPearlsSidebar;
-  const showSidebar = showPearlsSidebar || showVaultSidebar;
+  const showNotesSidebar = !!summaryId && !readOnly && !!user && !showPearlsSidebar;
+  const showSidebar = showPearlsSidebar || showNotesSidebar;
 
   if (!showSidebar) {
     return summaryContent;
@@ -932,7 +932,7 @@ export function SummaryView(props: SummaryViewProps) {
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       {summaryContent}
-      <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-8 lg:self-start shrink-0 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
+      <aside className="w-full lg:w-72 xl:w-80 lg:sticky lg:top-[4.5rem] lg:self-start shrink-0 lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto lg:overscroll-contain">
         {showPearlsSidebar ? (
           hasCuratingPearls ? (
             <PearlsSidebar
@@ -974,8 +974,8 @@ export function SummaryView(props: SummaryViewProps) {
               />
             </div>
           ) : null
-        ) : showVaultSidebar ? (
-          <VaultSidebar
+        ) : showNotesSidebar ? (
+          <NotesSidebar
             summaryId={summaryId!}
             items={vaultItems}
             selectedExcerpt={selectedExcerpt}

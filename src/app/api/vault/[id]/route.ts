@@ -6,7 +6,8 @@ import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
 const updateVaultItemSchema = z.object({
-  note: z.string().max(1000, 'Note exceeds 1000 chars').nullable(),
+  note: z.string().max(2000, 'Note exceeds 2000 chars').nullable().optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
 });
 
 // 60 updates per hour per IP
@@ -60,12 +61,15 @@ export async function PATCH(request: Request, { params }: Props) {
       return NextResponse.json({ error: 'Authentication required', requestId }, { status: 401 });
     }
 
+    const updateFields: Database['public']['Tables']['vault_items']['Update'] = {
+      updated_at: new Date().toISOString(),
+    };
+    if (parsed.data.note !== undefined) updateFields.note = parsed.data.note;
+    if (parsed.data.tags !== undefined) updateFields.tags = parsed.data.tags;
+
     const { data, error: updateError } = await supabase
       .from('vault_items')
-      .update({
-        note: parsed.data.note,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateFields)
       .eq('id', id)
       .eq('user_id', user.id)
       .select('*')

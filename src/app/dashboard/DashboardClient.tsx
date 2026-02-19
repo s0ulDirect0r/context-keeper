@@ -11,7 +11,7 @@ import { getSummaryPreviewText } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Trash2, FileText, Loader2, Bookmark } from 'lucide-react';
+import { Search, Trash2, FileText, Loader2, StickyNote } from 'lucide-react';
 import { toast } from 'sonner';
 import * as Sentry from '@sentry/nextjs';
 import { VaultDashboard, type VaultItemWithSummary } from '@/components/VaultDashboard';
@@ -192,7 +192,7 @@ export function DashboardClient({
         <p className="text-muted-foreground mt-1">
           {activeTab === 'summaries'
             ? `${total} ${total === 1 ? 'summary' : 'summaries'} saved`
-            : `${vaultTotalCount} ${vaultTotalCount === 1 ? 'highlight' : 'highlights'} saved`}
+            : `${vaultTotalCount} ${vaultTotalCount === 1 ? 'note' : 'notes'} saved`}
         </p>
       </div>
 
@@ -217,10 +217,10 @@ export function DashboardClient({
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Bookmark className="h-4 w-4" />
-          Vault
+          <StickyNote className="h-4 w-4" />
+          Notes
           {vaultTotalCount > 0 && (
-            <span className="ml-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-semibold px-1.5 py-0.5 leading-none">
+            <span className="ml-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-semibold px-1.5 py-0.5 leading-none">
               {vaultTotalCount}
             </span>
           )}

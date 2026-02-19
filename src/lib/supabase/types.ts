@@ -86,9 +86,10 @@ export interface Database {
           id: string;
           user_id: string;
           summary_id: string;
-          excerpt_text: string;
+          excerpt_text: string | null;
           note: string | null;
           chunk_index: number | null;
+          tags: string[];
           created_at: string;
           updated_at: string;
         };
@@ -96,9 +97,10 @@ export interface Database {
           id?: string;
           user_id: string;
           summary_id: string;
-          excerpt_text: string;
+          excerpt_text?: string | null;
           note?: string | null;
           chunk_index?: number | null;
+          tags?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -106,9 +108,10 @@ export interface Database {
           id?: string;
           user_id?: string;
           summary_id?: string;
-          excerpt_text?: string;
+          excerpt_text?: string | null;
           note?: string | null;
           chunk_index?: number | null;
+          tags?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -180,9 +183,10 @@ export interface SavedPearl {
 export interface SavedVaultItem {
   id: string;
   summaryId: string;
-  excerptText: string;
+  excerptText: string | null;
   note: string | null;
   chunkIndex: number | null;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -196,6 +200,7 @@ export function toSavedVaultItem(
     excerptText: row.excerpt_text,
     note: row.note,
     chunkIndex: row.chunk_index,
+    tags: row.tags ?? [],
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };

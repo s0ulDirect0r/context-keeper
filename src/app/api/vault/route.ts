@@ -5,17 +5,23 @@ import { toSavedVaultItem, type Database } from '@/lib/supabase/types';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
-const createVaultItemSchema = z.object({
-  summaryId: z.string().uuid('Invalid summary ID'),
-  excerptText: z.string().min(1, 'Excerpt is required').max(2000, 'Excerpt exceeds 2000 chars'),
-  note: z.string().max(1000, 'Note exceeds 1000 chars').optional(),
-  chunkIndex: z.number().int().min(0).optional(),
-});
+const createVaultItemSchema = z
+  .object({
+    summaryId: z.string().uuid('Invalid summary ID'),
+    excerptText: z.string().max(2000, 'Excerpt exceeds 2000 chars').optional(),
+    note: z.string().max(2000, 'Note exceeds 2000 chars').optional(),
+    chunkIndex: z.number().int().min(0).optional(),
+    tags: z.array(z.string().max(50)).max(10).default([]),
+  })
+  .refine((data) => data.excerptText || data.note, {
+    message: 'Either excerptText or note is required',
+  });
 
 const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0),
   summaryId: z.string().uuid().optional(),
+  tag: z.string().max(50).optional(),
 });
 
 // 60 saves per hour per IP
@@ -48,7 +54,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const { limit, offset, summaryId } = parsed.data;
+    const { limit, offset, summaryId, tag } = parsed.data;
 
     const supabase = await createClient();
     const {
@@ -87,10 +93,16 @@ export async function GET(request: Request) {
     }
 
     // Dashboard view: join summary title for grouping
-    const { data, count, error } = await supabase
+    let dashboardQuery = supabase
       .from('vault_items')
       .select('*, summaries(title)', { count: 'exact' })
-      .eq('user_id', user.id)
+      .eq('user_id', user.id);
+
+    if (tag) {
+      dashboardQuery = dashboardQuery.contains('tags', [tag]);
+    }
+
+    const { data, count, error } = await dashboardQuery
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -145,7 +157,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { summaryId, excerptText, note, chunkIndex } = parsed.data;
+    const { summaryId, excerptText, note, chunkIndex, tags } = parsed.data;
 
     const supabase = await createClient();
     const {
@@ -159,9 +171,10 @@ export async function POST(request: Request) {
     const insertData: Database['public']['Tables']['vault_items']['Insert'] = {
       user_id: user.id,
       summary_id: summaryId,
-      excerpt_text: excerptText,
+      excerpt_text: excerptText ?? null,
       note: note ?? null,
       chunk_index: chunkIndex ?? null,
+      tags,
     };
 
     const { data, error: insertError } = await supabase

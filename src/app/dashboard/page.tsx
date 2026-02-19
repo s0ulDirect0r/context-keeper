@@ -68,8 +68,9 @@ export default async function DashboardPage({ searchParams }: Props) {
       id: row.id as string,
       summaryId: row.summary_id as string,
       summaryTitle: (row.summaries as { title: string } | null)?.title ?? 'Untitled',
-      excerptText: row.excerpt_text as string,
+      excerptText: (row.excerpt_text as string | null) ?? null,
       note: row.note as string | null,
+      tags: (row.tags as string[]) ?? [],
       createdAt: row.created_at as string,
     }));
     vaultTotal = vaultCount ?? 0;
