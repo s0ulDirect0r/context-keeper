@@ -1,5 +1,4 @@
-import type { SummaryContext } from './claude';
-import type { SummaryContent } from './summary-types';
+import type { SummaryContext, SummaryContent } from '@/models/types';
 import type { Recording } from './otter';
 
 // ── Step type ────────────────────────────────────────────────────────

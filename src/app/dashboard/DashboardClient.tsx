@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { SavedSummary } from '@/lib/supabase/types';
 import type { Database } from '@/lib/supabase/types';
-import type { SummaryContext } from '@/lib/claude';
-import type { SummaryContent } from '@/lib/summary-types';
+import type { SavedSummary, SummaryContext, SummaryContent } from '@/models/types';
 import { getSummaryPreviewText } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

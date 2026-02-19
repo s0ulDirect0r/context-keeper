@@ -88,6 +88,3 @@ export interface Database {
     CompositeTypes: Record<string, never>;
   };
 }
-
-// Re-export domain types for backwards compatibility
-export type { SavedSummary } from '@/models/types';

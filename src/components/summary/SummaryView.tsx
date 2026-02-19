@@ -14,10 +14,8 @@ import { Pencil, Loader2, Share2, Check, Link, Copy, FileDown, FileText } from '
 import { toast } from 'sonner';
 import * as Sentry from '@sentry/nextjs';
 import { downloadMarkdown, downloadPdf } from '@/lib/export';
-import type { SummaryContext } from '@/lib/claude';
-import type { SummaryContent } from '@/lib/summary-types';
-import type { SavedSummary } from '@/lib/supabase/types';
-import { isStructuredSummary } from '@/lib/summary-types';
+import type { SavedSummary, SummaryContext, SummaryContent } from '@/models/types';
+import { isStructuredSummary } from '@/models/types';
 
 // ── Prop shapes ──────────────────────────────────────────────────────
 

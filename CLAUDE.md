@@ -31,18 +31,20 @@ supabase migration new <name>  # Create new migration
 
 1. **Input** → User selects Otter.ai recordings or pastes transcript manually
 2. **Context Gathering** → Multi-step wizard collects audience, priorities, and purpose
-3. **Summary Generation** → Claude API generates summaries + extracts themes in parallel
+3. **Summary Generation** → Claude API generates tailored summaries via streaming
 4. **Persistence** → Logged-in users get auto-save to Supabase; guests use localStorage
 
 ### Key Directories
 
-- `src/app/` - Next.js App Router pages and API routes
+- `src/models/` - Domain types (`types.ts`) and data access (`summaries.ts`, `otter.ts`)
+- `src/services/` - AI operations (`summarize.ts`) and prompt templates (`prompts/`)
+- `src/app/` - Next.js App Router pages and thin API route controllers
 - `src/components/` - React components organized by feature group:
   - `auth/` - Authentication & session mode (AuthProvider, AuthDialog, AppModeProvider)
   - `generation/` - Transcript input & summary generation pipeline
-  - `summary/` - Summary display, editing, pearls & tags
+  - `summary/` - Summary display & editing
   - `ui/` - Radix UI primitives (button, card, input, etc.)
-- `src/lib/` - Utilities: `claude.ts` (AI), `otter.ts` (API client), `supabase/` (DB)
+- `src/lib/` - Utilities: `ai-client.ts` (Anthropic singleton), `otter.ts` (API client), `supabase/` (DB types + client)
 - `supabase/migrations/` - Database schema migrations
 
 ### API Routes
@@ -55,10 +57,7 @@ supabase migration new <name>  # Create new migration
 | `/api/summaries`        | GET    | List/search user's summaries                          |
 | `/api/summaries`        | POST   | Save a summary                                        |
 | `/api/summaries/[id]`   | PATCH  | Update summary fields (title, content, sharing)       |
-| `/api/summaries/[id]`   | DELETE | Delete summary (pearls cascade automatically)         |
-| `/api/pearls`           | POST   | Save curated pearls for a summary                     |
-| `/api/pearls/generate`  | POST   | Generate pearls via Claude for selected tags          |
-| `/api/tags`             | POST   | Extract concept tags from summary content             |
+| `/api/summaries/[id]`   | DELETE | Delete summary                                        |
 | `/api/otter/login`      | POST   | Authenticate with Otter.ai                            |
 | `/api/otter/recordings` | GET    | Fetch user's Otter recordings                         |
 | `/api/otter/recordings` | POST   | Get transcripts for selected recordings               |
@@ -68,7 +67,7 @@ supabase migration new <name>  # Create new migration
 
 ### Database Tables
 
-- **summaries** - Stores summaries, themes, and context (JSONB columns)
+- **summaries** - Stores summaries and context (JSONB columns)
 - **otter_connections** - Persists Otter.ai credentials per user
 
 Both tables have Row Level Security enforcing user-only access.
@@ -95,6 +94,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 - **Auth modes:** Logged-in users (Supabase) and guests (localStorage) are both supported
 - **Otter integration:** Uses unofficial API; credentials stored per-user in Supabase or localStorage for guests
-- **Parallel processing:** Summary generation and theme extraction run concurrently
-- **Theme extraction:** Returns abstract conceptual themes with supporting quotes, not surface-level topics
+- **MVC + Service Layer:** Models (`src/models/`) handle types + data access, services (`src/services/`) handle AI operations, API routes are thin controllers
+- **server-only firewall:** `models/summaries.ts`, `models/otter.ts`, `services/summarize.ts` use `import 'server-only'`. `models/types.ts` is client-safe.
 - **Data access rule:** Client components must never call Supabase directly for data mutations — all data ops go through API routes. Direct Supabase is only for server components (SSR) and auth state (`AuthProvider`).

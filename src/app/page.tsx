@@ -15,7 +15,7 @@ import { SummaryModeSelector } from '@/components/generation/SummaryModeSelector
 import { SummaryView } from '@/components/summary/SummaryView';
 import { StreamingGenerationView } from '@/components/generation/StreamingGenerationView';
 import type { Recording } from '@/lib/otter';
-import type { SummaryContext } from '@/lib/claude';
+import type { SummaryContext } from '@/models/types';
 import {
   getStoredSession,
   storeSession,

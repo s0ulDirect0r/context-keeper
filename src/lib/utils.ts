@@ -1,8 +1,8 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { marked } from 'marked';
-import type { StructuredSummary, SummaryContent } from '@/lib/summary-types';
-import { isStructuredSummary } from '@/lib/summary-types';
+import type { StructuredSummary, SummaryContent } from '@/models/types';
+import { isStructuredSummary } from '@/models/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
