@@ -2,6 +2,8 @@
 
 **Turn your meeting recordings into orientation.**
 
+**[Live demo →](https://context-keeper-delta.vercel.app)**
+
 Cedar takes a meeting transcript and produces a summary aimed at a *specific reader* — not a generic recap. You tell it who needs to know what and why, and it writes to that goal.
 
 The premise: on most teams, someone is the connective tissue. They don't just attend meetings, they track the room — who needs to know what, what it meant, what happens next. That's a context gap held together by memory and a busy schedule. Cedar is built for that gap.
@@ -99,4 +101,4 @@ Otter.ai integration uses their unofficial API; credentials are stored per-user 
 
 ## Status
 
-Working prototype — import, contextualize, generate, edit, share, and export run end to end. Not currently deployed publicly.
+Working prototype, deployed at [context-keeper-delta.vercel.app](https://context-keeper-delta.vercel.app) — import, contextualize, generate, edit, share, and export run end to end.
